@@ -16,6 +16,7 @@ from core.player import Player
 from ui.delegates import ActionDelegate, NumberDelegate
 from ui.mouse_dialog import MouseActionDialog
 from ui.keyboard_dialog import KeyboardActionDialog
+from ui.image_search_dialog import ImageSearchDialog
 
 
 class MainWindow(QMainWindow):
@@ -232,6 +233,8 @@ class MainWindow(QMainWindow):
              action_text = "Mouse Move"
         elif event['type'] == 'mouse_scroll':
              action_text = "Mouse Wheel"
+        elif event['type'] == 'detect_image':
+             action_text = "Detect Image"
 
         action_item = QStandardItem(action_text)
         action_item.setEditable(True)
@@ -266,6 +269,13 @@ class MainWindow(QMainWindow):
             details = f"Key: {event.get('key','')}"
         elif event['type'] == 'mouse_scroll':
             details = f"Delta: {event.get('dy', 0)}"
+        elif event['type'] == 'detect_image':
+            image_path = event.get('image_path', '')
+            if image_path:
+                import os
+                details = f"Image: {os.path.basename(image_path)}"
+            else:
+                details = "No image set"
 
         details_item = QStandardItem(details)
         details_item.setEditable(True)
@@ -376,7 +386,8 @@ class MainWindow(QMainWindow):
             self.open_mouse_dialog(row)
         elif event['type'] in ['key_press', 'key_release']:
             self.open_keyboard_dialog(row)
-
+        elif event['type'] == 'detect_image':
+            self.open_image_search_dialog(row)
         elif event['type'] == 'undefined':
             # For undefined, show setup menu logic or just default to mouse?
             # Let's re-use show_setup_menu logic or just open mouse dialog as default
@@ -418,7 +429,11 @@ class MainWindow(QMainWindow):
         menu = QMenu(self)
         mouse_action = menu.addAction("Mouse Action")
         keyboard_action = menu.addAction("Keyboard Action")
-
+        
+        # Add Image submenu
+        image_menu = QMenu("Image", self)
+        detect_image_action = image_menu.addAction("Detect image [I]")
+        menu.addMenu(image_menu)
         
         action = menu.exec(self.table_view.viewport().mapToGlobal(self.table_view.visualRect(index).bottomLeft()))
         
@@ -426,6 +441,8 @@ class MainWindow(QMainWindow):
             self.open_mouse_dialog(index.row())
         elif action == keyboard_action:
             self.open_keyboard_dialog(index.row())
+        elif action == detect_image_action:
+            self.open_image_search_dialog(index.row())
 
 
     def open_mouse_dialog(self, row):
@@ -438,6 +455,13 @@ class MainWindow(QMainWindow):
     def open_keyboard_dialog(self, row):
         event = self.recorded_events[row]
         dialog = KeyboardActionDialog(self, event)
+        if dialog.exec():
+            new_data = dialog.get_data()
+            self.update_event(row, new_data)
+
+    def open_image_search_dialog(self, row):
+        event = self.recorded_events[row]
+        dialog = ImageSearchDialog(self, event)
         if dialog.exec():
             new_data = dialog.get_data()
             self.update_event(row, new_data)
@@ -473,6 +497,8 @@ class MainWindow(QMainWindow):
              action_text = "Mouse Move"
         elif event['type'] == 'mouse_scroll':
              action_text = "Mouse Wheel"
+        elif event['type'] == 'detect_image':
+             action_text = "Detect Image"
 
              
         self.model.item(row, 1).setText(action_text)
@@ -505,6 +531,13 @@ class MainWindow(QMainWindow):
             details = f"Key: {event.get('key','')}"
         elif event['type'] == 'mouse_scroll':
             details = f"Delta: {event.get('dy', 0)}"
+        elif event['type'] == 'detect_image':
+            image_path = event.get('image_path', '')
+            if image_path:
+                import os
+                details = f"Image: {os.path.basename(image_path)}"
+            else:
+                details = "No image set"
 
             
         self.model.item(row, 3).setText(details)
