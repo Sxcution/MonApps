@@ -8,6 +8,7 @@ import mss
 import mss.tools
 import os
 import datetime
+import time  # For busy-wait loop
 
 class RegionSelectionOverlay(QWidget):
     region_selected = pyqtSignal(tuple) # (x1, y1, x2, y2)
@@ -217,37 +218,40 @@ class WaitImageDialog(QDialog):
         self.overlay.show()
         
     def capture_image_template(self):
-        """Clean launch sequence"""
-        print("DEBUG: capture_image_template called")
+        """Chụp ảnh với vòng lặp xử lý sự kiện (An toàn nhất)"""
+        print("DEBUG: capture_image_template called (BUSY WAIT MODE)")
         
-        # 1. Hide windows explicitly
-        if self.parent():
-            self.parent().hide()  # Use hide() instead of minimize (cleaner)
-        self.hide()
-        
-        # 2. Force update
-        QApplication.processEvents()
-        
-        # 3. Launch snipper after 300ms (give time for windows to disappear)
-        # Using QTimer is SAFER to avoid capturing the fading-out window
-        from PyQt6.QtCore import QTimer
-        print("DEBUG: Scheduling snipper launch in 300ms")
-        QTimer.singleShot(300, self._launch_snipper_safe)
-    
-    def _launch_snipper_safe(self):
-        print("DEBUG: _launch_snipper_safe called")
         try:
+            # 1. Ẩn các cửa sổ
+            if self.parent():
+                self.parent().hide()
+            self.hide()
+            
+            # 2. Vòng lặp đợi 0.3 giây để UI kịp ẩn hoàn toàn
+            # Thay vì dùng QTimer (dễ bị kill), ta dùng vòng lặp processEvents
+            print("DEBUG: Waiting for windows to hide...")
+            deadline = time.time() + 0.3
+            while time.time() < deadline:
+                QApplication.processEvents()
+                time.sleep(0.01)
+                
+            # 3. Sau khi đợi xong, gọi Snipper NGAY LẬP TỨC
+            print("DEBUG: Launching snipper now...")
+            
             from utils.snipping_tool import SnippingWidget
-            # Create new instance (flags are fixed in class now)
+            # Tạo Snipper (lúc này màn hình đã sạch)
             self.snipper = SnippingWidget()
+            
+            # Kết nối tín hiệu
             self.snipper.snippet_taken.connect(self.on_image_captured)
             self.snipper.closed.connect(self.on_snipper_closed)
             
-            # SHOW IT
+            # 4. Hiển thị Snipper
             self.snipper.show()
-            self.snipper.activateWindow()
             self.snipper.raise_()
-            print("DEBUG: Snipper showed")
+            self.snipper.activateWindow()
+            self.snipper.setFocus()
+            print("DEBUG: Snipper launched successfully!")
             
         except Exception as e:
             print(f"ERROR launching snipper: {e}")
