@@ -50,12 +50,13 @@ class KeyboardActionDialog(QDialog):
         self.key_edit.setFocus()
         
     def load_data(self):
-        etype = self.event_data.get('type', 'key_press')
-        if etype == 'key_press':
+        etype = self.event_data.get('type', 'key_click') # Default to click for new/unknown
+        if etype == 'key_click':
             self.type_combo.setCurrentText("KeyPress")
+        elif etype == 'key_press':
+            self.type_combo.setCurrentText("KeyDown")
         elif etype == 'key_release':
             self.type_combo.setCurrentText("KeyUp")
-        # KeyDown isn't strictly in our model yet (we have press/release), but 'key_press' usually implies down.
         
         key = self.event_data.get('key', '')
         if key:
@@ -74,7 +75,10 @@ class KeyboardActionDialog(QDialog):
         
         if etype_text == "KeyUp":
             data['type'] = 'key_release'
-        else:
+        elif etype_text == "KeyDown":
             data['type'] = 'key_press'
+        else:
+            # KeyPress = Click
+            data['type'] = 'key_click'
             
         return data

@@ -1,20 +1,20 @@
 [
     {
-        "type": "key_press",
+        "type": "key_click",
         "text": "Click to setup",
         "time": 0.5,
         "id": "17408ac4-ec18-4996-a622-724e58bab2f1",
         "key": "F"
     },
     {
-        "type": "key_press",
+        "type": "key_click",
         "text": "Click to setup",
         "time": 0.5,
         "id": "c1fa33e9-4a00-4543-8e93-e842387f9ba0",
         "key": "Down"
     },
     {
-        "type": "key_press",
+        "type": "key_click",
         "text": "Click to setup",
         "time": 0.5,
         "id": "c5455c7d-e077-4860-9b14-24d4e66db18f",
@@ -47,7 +47,7 @@
         "goto_not_found": "Start"
     },
     {
-        "type": "key_press",
+        "type": "key_click",
         "text": "Click to setup",
         "time": 0.5,
         "id": "625affe5-0348-44f1-bac1-aa75e7aa826b",

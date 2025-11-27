@@ -16,7 +16,20 @@ from ui.main_window import MainWindow
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="ignore")
 
+def is_admin():
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except:
+        return False
+
 def main():
+    # Request Admin Privileges
+    if not is_admin():
+        print("⚠️ Not running as Admin. Restarting with Admin privileges...")
+        # Re-run the program with admin rights
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+        sys.exit()
+
     app = QApplication(sys.argv)
     app.setApplicationName("Macro Recorder")
     app.setOrganizationName("MonSoft")

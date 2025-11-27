@@ -7,6 +7,7 @@ import os
 from PyQt6.QtCore import QSettings
 from pynput.keyboard import Controller as KeyboardController
 from pynput.mouse import Controller as MouseController, Button
+from utils.direct_input import press_key, release_key
 
 class Player(threading.Thread):
     def __init__(self, events, stop_event):
@@ -87,15 +88,19 @@ class Player(threading.Thread):
         elif etype == 'mouse_scroll':
             self.mouse.scroll(event.get('dx', 0), event.get('dy', 0))
             
+        elif etype == 'key_click':
+            # Use DirectInput for games: Press -> Wait -> Release
+            press_key(event['key'])
+            time.sleep(0.1) # Short hold to ensure game registers it
+            release_key(event['key'])
+
         elif etype == 'key_press':
-            key = self._parse_key(event['key'])
-            if key:
-                self.keyboard.press(key)
+            # Use DirectInput for games
+            press_key(event['key'])
             
         elif etype == 'key_release':
-            key = self._parse_key(event['key'])
-            if key:
-                self.keyboard.release(key)
+            # Use DirectInput for games
+            release_key(event['key'])
                 
         # Handle delay
         delay = event.get('time', 0.5)
@@ -251,20 +256,59 @@ class Player(threading.Thread):
 
     def _parse_key(self, key_str):
         from pynput.keyboard import Key
+        
+        # 1. Handle pynput format (Key.space)
         if key_str.startswith('Key.'):
-            # It's a special key
             attr = key_str.split('.')[1]
             try:
                 return getattr(Key, attr)
             except AttributeError:
-                print(f"Unknown key: {key_str}")
-                return None
-        elif len(key_str) > 1 and key_str.startswith("'") and key_str.endswith("'"):
-             # It might be a quoted char like "'a'"
+                pass
+
+        # 2. Handle Quoted chars ('a')
+        if len(key_str) > 1 and key_str.startswith("'") and key_str.endswith("'"):
              return key_str[1:-1]
-        else:
-            # Regular char
-            return key_str
+             
+        # 3. Handle Qt/Common Key Names
+        key_map = {
+            "Down": Key.down,
+            "Up": Key.up,
+            "Left": Key.left,
+            "Right": Key.right,
+            "Enter": Key.enter,
+            "Return": Key.enter,
+            "Esc": Key.esc,
+            "Escape": Key.esc,
+            "Space": Key.space,
+            "Tab": Key.tab,
+            "Backspace": Key.backspace,
+            "Delete": Key.delete,
+            "Del": Key.delete,
+            "Shift": Key.shift,
+            "Ctrl": Key.ctrl,
+            "Control": Key.ctrl,
+            "Alt": Key.alt,
+            "PgUp": Key.page_up,
+            "Page Up": Key.page_up,
+            "PgDown": Key.page_down,
+            "Page Down": Key.page_down,
+            "Home": Key.home,
+            "End": Key.end,
+            "Insert": Key.insert,
+            "F1": Key.f1, "F2": Key.f2, "F3": Key.f3, "F4": Key.f4,
+            "F5": Key.f5, "F6": Key.f6, "F7": Key.f7, "F8": Key.f8,
+            "F9": Key.f9, "F10": Key.f10, "F11": Key.f11, "F12": Key.f12
+        }
+        
+        if key_str in key_map:
+            return key_map[key_str]
+            
+        # 4. Handle Single Chars (a, b, 1)
+        if len(key_str) == 1:
+            return key_str.lower()
+            
+        print(f"Unknown key: {key_str}")
+        return None
 
     def perform_after_action(self):
         """Executes the configured after-action"""
