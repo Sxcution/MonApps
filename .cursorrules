@@ -1,0 +1,5 @@
+# User Rules
+
+1. **Auto-Run**: Luôn tự động chạy lại ứng dụng sau khi sửa code xong.
+2. **Auto-Approve**: Cố gắng sử dụng chế độ tự động chạy lệnh (SafeToAutoRun) tối đa có thể để giảm bớt việc hỏi xác nhận.
+3. **Theme**: Giữ giao diện trắng, chữ đen/xanh đậm (style Jibit), không tự ý đổi sang nền đen.

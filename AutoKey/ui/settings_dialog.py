@@ -61,13 +61,14 @@ class SettingsDialog(QDialog):
             QKeySequenceEdit { 
                 padding: 5px; 
                 border: 1px solid #cccccc; 
-                border-radius: 4px;
+                border-radius: 3px;
                 color: #333333;
-                background-color: #f9f9f9;
+                background-color: #ffffff;
+                selection-background-color: #0078d4;
             }
             QKeySequenceEdit:focus {
-                background-color: #ffffff;
                 border: 2px solid #0078d4;
+                background-color: #ffffff;
             }
             QLineEdit {
                 padding: 5px; 
