@@ -4,7 +4,8 @@ Image Search Dialog - for configuring image detection actions
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                             QPushButton, QCheckBox, QComboBox, QSpinBox,
                             QGroupBox, QFormLayout, QFileDialog, QWidget, QApplication,
-                            QStyleOptionButton, QStyle, QAbstractItemView, QStyleOptionComboBox)
+                            QStyleOptionButton, QStyle, QAbstractItemView, QStyleOptionComboBox,
+                            QGridLayout)
 from PyQt6.QtCore import Qt, QTimer, QRect, pyqtSignal, QPointF
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QBrush, QPen, QPalette
 import os
@@ -213,7 +214,9 @@ class ImageSearchDialog(QDialog):
         self.event = event if event else {}
         self.captured_pixmap = None
         self.image_path = self.event.get('image_path', '')
+        self.image_path = self.event.get('image_path', '')
         self.is_snipping = False  # Track snipping state
+        self.custom_region = self.event.get('custom_region', None) # Store custom region rect
         
         self.setup_ui()
         self.load_event_data()
@@ -277,53 +280,64 @@ class ImageSearchDialog(QDialog):
         options_container.setSpacing(12)
         
         # Search area (bỏ checkbox, mặc định toàn màn hình)
-        restrict_layout = QHBoxLayout()
-        restrict_layout.setSpacing(8)
+        # Use Grid Layout for better alignment
+        grid_layout = QGridLayout()
+        grid_layout.setSpacing(8)
+        grid_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Row 0: Search Area
         search_area_label = QLabel("Vùng Tìm Kiếm:")
-        search_area_label.setMinimumWidth(120)
+        search_area_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        grid_layout.addWidget(search_area_label, 0, 0)
+        
         self.combo_window = StyledComboBox()
         self.combo_window.addItems(["toàn màn hình", "cửa sổ đang focus", "vùng tùy chỉnh"])
-        self.combo_window.setCurrentText("toàn màn hình")  # Mặc định
-        # Tính toán width cần thiết cho text dài nhất
+        self.combo_window.setCurrentText("toàn màn hình")
+        # Calc width logic...
         fm = self.combo_window.fontMetrics()
         max_text = "cửa sổ đang focus"
         text_width = fm.boundingRect(max_text).width()
-        # Set width đủ để hiển thị text + padding cho dropdown arrow
         self.combo_window.setMinimumWidth(max(140, text_width + 30))
         self.combo_window.currentTextChanged.connect(self.on_search_area_changed)
+        grid_layout.addWidget(self.combo_window, 0, 1)
         
-        # Button Define (hiển thị khi chọn "cửa sổ đang focus" hoặc "vùng tùy chỉnh")
         self.btn_define = QPushButton("Define")
         self.btn_define.setMinimumHeight(28)
         self.btn_define.setMinimumWidth(60)
         self.btn_define.clicked.connect(self.define_search_area)
-        self.btn_define.setVisible(False)  # Ẩn mặc định
+        self.btn_define.setVisible(False)
+        grid_layout.addWidget(self.btn_define, 0, 2)
         
-        restrict_layout.addWidget(search_area_label)
-        restrict_layout.addWidget(self.combo_window)
-        restrict_layout.addWidget(self.btn_define)
-        restrict_layout.addStretch()
-        options_container.addLayout(restrict_layout)
-        
-        # Color tolerance
-        tolerance_layout = QHBoxLayout()
-        tolerance_layout.setSpacing(8)
+        # Row 1: Tolerance
         tolerance_label = QLabel("Độ dung sai màu:")
-        tolerance_label.setMinimumWidth(60)
-        self.spin_tolerance = QSpinBox()
-        self.spin_tolerance.setRange(0, 60)
-        self.spin_tolerance.setMinimumWidth(80)
-        tolerance_layout.addWidget(tolerance_label)
-        tolerance_layout.addWidget(self.spin_tolerance)
+        tolerance_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        grid_layout.addWidget(tolerance_label, 1, 0)
         
-        # Test Button
+        self.spin_tolerance = QSpinBox()
+        self.spin_tolerance.setRange(0, 255)
+        self.spin_tolerance.setSuffix(" / 255")
+        self.spin_tolerance.setMinimumWidth(100)
+        grid_layout.addWidget(self.spin_tolerance, 1, 1)
+        
         self.btn_test = QPushButton("Test Ảnh")
         self.btn_test.setMinimumHeight(28)
         self.btn_test.clicked.connect(self.test_image_search)
-        tolerance_layout.addWidget(self.btn_test)
+        grid_layout.addWidget(self.btn_test, 1, 2)
         
-        tolerance_layout.addStretch()
-        options_container.addLayout(tolerance_layout)
+        # Push everything to the left
+        grid_layout.setColumnStretch(3, 1)
+        
+        options_container.addLayout(grid_layout)
+        
+        # Advanced Options
+        adv_layout = QHBoxLayout()
+        adv_layout.setSpacing(15)
+        self.cb_grayscale = StyledCheckBox("Grayscale (Đen trắng)")
+        self.cb_multiscale = StyledCheckBox("Multi-scale (Đa tỉ lệ)")
+        adv_layout.addWidget(self.cb_grayscale)
+        adv_layout.addWidget(self.cb_multiscale)
+        adv_layout.addStretch()
+        options_container.addLayout(adv_layout)
         
         # Test Result Label
         self.lbl_test_result = QLabel("")
@@ -486,7 +500,11 @@ class ImageSearchDialog(QDialog):
         if not self.event: return
         if self.image_path and os.path.exists(self.image_path):
             self.image_preview.set_image(QPixmap(self.image_path))
+        if self.image_path and os.path.exists(self.image_path):
+            self.image_preview.set_image(QPixmap(self.image_path))
         self.spin_tolerance.setValue(self.event.get('tolerance', 0))
+        self.cb_grayscale.setChecked(self.event.get('grayscale', False))
+        self.cb_multiscale.setChecked(self.event.get('multi_scale', False))
         
         # Map old English values to Vietnamese
         search_area_map = {
@@ -643,11 +661,50 @@ class ImageSearchDialog(QDialog):
         self.btn_define.setVisible(text in ["cửa sổ đang focus", "vùng tùy chỉnh"])
     
     def define_search_area(self):
-        """Define custom search area"""
-        # TODO: Implement area selection dialog
-        print("🔍 DEBUG: Define search area clicked")
-        from PyQt6.QtWidgets import QMessageBox
-        QMessageBox.information(self, "Thông báo", "Chức năng Define sẽ được triển khai sau")
+        """Define custom search area using Snipping Tool"""
+        try:
+            print("🔍 DEBUG: Starting define_search_area")
+            self.is_snipping = True
+            self.blockSignals(True)
+            self.setWindowModality(Qt.WindowModality.NonModal)
+            self.lower()
+            QApplication.processEvents()
+            
+            if self.parent():
+                self.parent().showMinimized()
+            
+            QApplication.processEvents()
+            import time
+            time.sleep(0.3)
+            
+            from utils.snipping_tool import SnippingWidget
+            self.snipper = SnippingWidget()
+            
+            # Connect signals
+            self.snipper.region_selected.connect(self.on_region_selected)
+            self.snipper.closed.connect(self.restore_ui)
+            
+            self.snipper.showFullScreen()
+            
+        except Exception as e:
+            print(f"Error defining area: {e}")
+            self.restore_ui()
+
+    def on_region_selected(self, rect):
+        """Handle region selection"""
+        self.custom_region = {
+            'left': rect.x(),
+            'top': rect.y(),
+            'width': rect.width(),
+            'height': rect.height()
+        }
+        print(f"🔍 DEBUG: Custom region selected: {self.custom_region}")
+        
+        # Update button text to show defined status
+        self.btn_define.setText(f"Defined ({rect.width()}x{rect.height()})")
+        self.btn_define.setStyleSheet("color: green; font-weight: bold;")
+        
+        self.restore_ui()
     
     def load_from_file(self):
         dialog = QFileDialog(self, "Chọn ảnh")
@@ -675,10 +732,36 @@ class ImageSearchDialog(QDialog):
         self.lbl_test_result.setStyleSheet("color: blue; font-weight: bold; margin-left: 60px;")
         QApplication.processEvents()
         
+        # Determine Search Region for Test
+        region = None
+        search_area_text = self.combo_window.currentText()
+        
+        if search_area_text == "cửa sổ đang focus":
+            from utils.window_utils import get_foreground_window_rect
+            region = get_foreground_window_rect()
+            if region:
+                print(f"🔍 DEBUG: Testing in focused window: {region}")
+            else:
+                self.lbl_test_result.setText("⚠️ Không tìm thấy cửa sổ focus!")
+                self.lbl_test_result.setStyleSheet("color: orange; font-weight: bold; margin-left: 60px;")
+                return
+        elif search_area_text == "vùng tùy chỉnh":
+            if self.custom_region:
+                region = self.custom_region
+                print(f"🔍 DEBUG: Testing in custom region: {region}")
+            else:
+                self.lbl_test_result.setText("⚠️ Chưa định nghĩa vùng tìm kiếm!")
+                self.lbl_test_result.setStyleSheet("color: orange; font-weight: bold; margin-left: 60px;")
+                return
+
         # Perform search
-        # Note: We search entire screen for test, ignoring 'search_area' for simplicity 
-        # or we could implement region logic if needed.
-        result = find_image_on_screen(self.image_path, confidence=confidence)
+        result = find_image_on_screen(
+            self.image_path, 
+            confidence=confidence,
+            region=region,
+            grayscale=self.cb_grayscale.isChecked(),
+            multi_scale=self.cb_multiscale.isChecked()
+        )
         
         if result:
             x, y, w, h = result
@@ -743,7 +826,10 @@ class ImageSearchDialog(QDialog):
             'image_path': self.image_path,
             'restrict_area': True,  # Luôn True vì đã bỏ checkbox
             'search_area': search_area_map.get(self.combo_window.currentText(), self.combo_window.currentText()),
+            'custom_region': self.custom_region,
             'tolerance': self.spin_tolerance.value(),
+            'grayscale': self.cb_grayscale.isChecked(),
+            'multi_scale': self.cb_multiscale.isChecked(),
             'mouse_action_enabled': self.cb_mouse_action.isChecked(),
             'mouse_action': mouse_action_map.get(self.combo_mouse_action.currentText(), self.combo_mouse_action.currentText()),
             'mouse_position': position_map.get(self.combo_position.currentText(), self.combo_position.currentText()),

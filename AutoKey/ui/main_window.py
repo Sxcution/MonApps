@@ -170,8 +170,13 @@ class MainWindow(QMainWindow):
         
         # Settings Menu
         settings_menu = QMenu(self)
+        
         hotkey_action = settings_menu.addAction("Hotkeys")
-        hotkey_action.triggered.connect(self.open_hotkey_settings)
+        hotkey_action.triggered.connect(lambda: self.open_settings(0))
+        
+        play_settings_action = settings_menu.addAction("Play Settings")
+        play_settings_action.triggered.connect(lambda: self.open_settings(1))
+        
         self.toolbar.settings_action.setMenu(settings_menu)
         
 
@@ -660,13 +665,13 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 self.statusBar().showMessage(f"Error loading: {e}")
 
-    def open_hotkey_settings(self):
+    def open_settings(self, tab_index=0):
         if hasattr(self, 'hotkey_listener') and self.hotkey_listener:
             self.hotkey_listener.stop()
             self.hotkey_listener = None
             
         from ui.settings_dialog import SettingsDialog
-        dialog = SettingsDialog(self)
+        dialog = SettingsDialog(self, initial_tab=tab_index)
         if dialog.exec():
             dialog.save_settings()
             self.setup_global_hotkeys() 

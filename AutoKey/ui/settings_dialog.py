@@ -1,36 +1,34 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QLineEdit, QPushButton, QFormLayout, QKeySequenceEdit)
+                             QLineEdit, QPushButton, QFormLayout, QKeySequenceEdit,
+                             QTabWidget, QWidget, QSpinBox, QComboBox)
 from PyQt6.QtCore import QSettings
 from PyQt6.QtGui import QKeySequence
 
 class SettingsDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, initial_tab=0):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.settings = QSettings("MonSoft", "MacroRecorder")
         self.setup_ui()
         self.load_settings()
+        self.tabs.setCurrentIndex(initial_tab)
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
         
-        form_layout = QFormLayout()
+        # Tab Widget
+        self.tabs = QTabWidget()
+        layout.addWidget(self.tabs)
         
-        # Hotkey Fields
-        self.record_hotkey = QKeySequenceEdit()
-        self.record_hotkey.setMaximumSequenceLength(1)
+        # Tab 1: Hotkeys
+        self.hotkey_tab = QWidget()
+        self.setup_hotkey_tab()
+        self.tabs.addTab(self.hotkey_tab, "Hotkeys")
         
-        self.stop_record_hotkey = QKeySequenceEdit()
-        self.stop_record_hotkey.setMaximumSequenceLength(1)
-        
-        self.play_hotkey = QKeySequenceEdit()
-        self.play_hotkey.setMaximumSequenceLength(1)
-        
-        form_layout.addRow("Start Record Hotkey:", self.record_hotkey)
-        form_layout.addRow("Stop Record Hotkey:", self.stop_record_hotkey)
-        form_layout.addRow("Play/Stop Hotkey:", self.play_hotkey)
-        
-        layout.addLayout(form_layout)
+        # Tab 2: Play
+        self.play_tab = QWidget()
+        self.setup_play_tab()
+        self.tabs.addTab(self.play_tab, "Play")
         
         # Buttons
         btn_layout = QHBoxLayout()
@@ -48,11 +46,67 @@ class SettingsDialog(QDialog):
         self.error_label = QLabel("")
         self.error_label.setStyleSheet("color: red;")
         layout.addWidget(self.error_label)
+
+    def setup_hotkey_tab(self):
+        layout = QVBoxLayout(self.hotkey_tab)
+        form_layout = QFormLayout()
+        
+        # Hotkey Fields
+        self.record_hotkey = QKeySequenceEdit()
+        self.record_hotkey.setMaximumSequenceLength(1)
+        
+        self.stop_record_hotkey = QKeySequenceEdit()
+        self.stop_record_hotkey.setMaximumSequenceLength(1)
+        
+        self.play_hotkey = QKeySequenceEdit()
+        self.play_hotkey.setMaximumSequenceLength(1)
+        
+        form_layout.addRow("Start Record Hotkey:", self.record_hotkey)
+        form_layout.addRow("Stop Record Hotkey:", self.stop_record_hotkey)
+        form_layout.addRow("Play/Stop Hotkey:", self.play_hotkey)
+        
+        layout.addLayout(form_layout)
+        layout.addStretch()
         
         # Connect signals for validation
         self.record_hotkey.keySequenceChanged.connect(self.validate_hotkeys)
         self.stop_record_hotkey.keySequenceChanged.connect(self.validate_hotkeys)
         self.play_hotkey.keySequenceChanged.connect(self.validate_hotkeys)
+
+    def setup_play_tab(self):
+        layout = QVBoxLayout(self.play_tab)
+        form_layout = QFormLayout()
+        
+        # 1. Run Count
+        self.spin_count = QSpinBox()
+        self.spin_count.setRange(0, 99999)
+        self.spin_count.setValue(1)
+        self.spin_count.setSpecialValueText("Vô hạn (Infinite)") # 0 displays as this
+        form_layout.addRow("Số lần chạy (0=Vô hạn):", self.spin_count)
+        
+        # 2. Duration (Hours : Minutes)
+        duration_layout = QHBoxLayout()
+        self.spin_hours = QSpinBox()
+        self.spin_hours.setRange(0, 999)
+        self.spin_hours.setSuffix(" giờ")
+        
+        self.spin_minutes = QSpinBox()
+        self.spin_minutes.setRange(0, 59)
+        self.spin_minutes.setSuffix(" phút")
+        
+        duration_layout.addWidget(self.spin_hours)
+        duration_layout.addWidget(self.spin_minutes)
+        duration_layout.addStretch()
+        
+        form_layout.addRow("Thời gian chạy:", duration_layout)
+        
+        # 3. After Completion
+        self.combo_after = QComboBox()
+        self.combo_after.addItems(["None", "Tắt Máy", "Sleep"])
+        form_layout.addRow("Khi chạy xong:", self.combo_after)
+        
+        layout.addLayout(form_layout)
+        layout.addStretch()
         
         # Apply Styles
         self.setStyleSheet("""
@@ -121,9 +175,25 @@ class SettingsDialog(QDialog):
         self.record_hotkey.setKeySequence(QKeySequence(rec_seq))
         self.stop_record_hotkey.setKeySequence(QKeySequence(stop_rec_seq))
         self.play_hotkey.setKeySequence(QKeySequence(play_seq))
+        
+        # Load Play Settings
+        self.spin_count.setValue(int(self.settings.value("play_count", 1)))
+        self.spin_hours.setValue(int(self.settings.value("play_hours", 0)))
+        self.spin_minutes.setValue(int(self.settings.value("play_minutes", 0)))
+        
+        after_action = self.settings.value("play_after_action", "None")
+        index = self.combo_after.findText(after_action)
+        if index >= 0:
+            self.combo_after.setCurrentIndex(index)
 
     def save_settings(self):
         # Save hotkeys
         self.settings.setValue("hotkey_record", self.record_hotkey.keySequence().toString())
         self.settings.setValue("hotkey_stop_record", self.stop_record_hotkey.keySequence().toString())
         self.settings.setValue("hotkey_play", self.play_hotkey.keySequence().toString())
+        
+        # Save Play Settings
+        self.settings.setValue("play_count", self.spin_count.value())
+        self.settings.setValue("play_hours", self.spin_hours.value())
+        self.settings.setValue("play_minutes", self.spin_minutes.value())
+        self.settings.setValue("play_after_action", self.combo_after.currentText())

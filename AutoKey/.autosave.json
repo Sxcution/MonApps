@@ -22,10 +22,24 @@
             "key": "S"
         },
         {
-            "type": "undefined",
+            "type": "detect_image",
             "text": "Click to setup",
             "time": 0.5,
-            "id": "2aaac6de-c6c6-4982-9154-d42e04ba3486"
+            "id": "2aaac6de-c6c6-4982-9154-d42e04ba3486",
+            "image_path": "c:\\Users\\Mon\\Desktop\\Mon\\AutoKey\\captures\\snip_1764279623.png",
+            "restrict_area": true,
+            "search_area": "entire screen",
+            "tolerance": 0,
+            "grayscale": false,
+            "multi_scale": false,
+            "mouse_action_enabled": false,
+            "mouse_action": "Move",
+            "mouse_position": "Centered",
+            "save_x": false,
+            "save_y": false,
+            "wait_timeout": 999999,
+            "goto_found": "Next",
+            "goto_not_found": "Start"
         },
         {
             "type": "undefined",

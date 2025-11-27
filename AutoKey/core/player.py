@@ -3,6 +3,8 @@ import threading
 import pyautogui
 import random
 import ctypes
+import os
+from PyQt6.QtCore import QSettings
 from pynput.keyboard import Controller as KeyboardController
 from pynput.mouse import Controller as MouseController, Button
 
@@ -14,57 +16,61 @@ class Player(threading.Thread):
         self.mouse = MouseController()
         self.keyboard = KeyboardController()
         self.daemon = True
+        
+        # Load Play Settings
+        self.settings = QSettings("MonSoft", "MacroRecorder")
+        self.play_count = int(self.settings.value("play_count", 1))
+        self.play_hours = int(self.settings.value("play_hours", 0))
+        self.play_minutes = int(self.settings.value("play_minutes", 0))
+        self.after_action = self.settings.value("play_after_action", "None")
+        
+        # Calculate max duration in seconds
+        self.max_duration = (self.play_hours * 3600) + (self.play_minutes * 60)
 
     def run(self):
+        print("Player started")
+        
         start_time = time.time()
-        # Sort events by time just in case, but for GoTo we need index access
-        # We assume events are already sorted or we sort them once
-        self.events.sort(key=lambda x: x['time'])
+        current_run = 0
         
-        # We need to handle "Go to" which means jumping indexes.
-        # But the events have 'time' which is relative to start. 
-        # If we jump, we might need to adjust timing or just execute logic.
-        # For simplicity in this macro recorder, "Go to" usually implies logic flow.
-        
-        idx = 0
-        while idx < len(self.events):
-            if self.stop_event.is_set():
+        while not self.stop_event.is_set():
+            # Check Run Count (0 means infinite)
+            if self.play_count > 0 and current_run >= self.play_count:
+                print("Reached run count limit.")
                 break
                 
-            event = self.events[idx]
+            # Check Duration
+            if self.max_duration > 0:
+                elapsed = time.time() - start_time
+                if elapsed >= self.max_duration:
+                    print("Reached duration limit.")
+                    break
             
-            # Calculate wait time
-            # Note: If we jumped, the time logic might be tricky. 
-            # Simple approach: Respect the 'time' delta from previous event or start.
-            # But 'time' in event is absolute offset from start.
-            # If we jump back, we can't wait for absolute time.
-            # We'll just execute immediately if we jumped, or use simple delays.
-            # For now, let's stick to the original timing logic for sequential, 
-            # but if we jump, we might need to reset start_time or ignore timing.
+            print(f"--- Starting Run {current_run + 1} ---")
+            self.execute_macro()
             
-            # BETTER APPROACH for Logic Macros:
-            # Execute step, then wait for next step's delay?
-            # The current model has 'time' as "Time since start".
-            # Let's try to respect it if we are moving forward, but if we jump, we just run.
+            current_run += 1
             
-            target_time = start_time + event['time']
-            current_time = time.time()
-            wait_time = target_time - current_time
+            # Small delay between runs to prevent CPU hogging if macro is empty
+            time.sleep(0.1)
             
-            if wait_time > 0:
-                time.sleep(wait_time)
-            
-            # Execute and check for flow control
-            next_idx = self.execute_event(event, idx)
+        print("Player finished")
+        
+        # Perform After Action if not stopped manually
+        if not self.stop_event.is_set():
+            self.perform_after_action()
+
+    def execute_macro(self):
+        """Executes one pass of the macro"""
+        current_idx = 0
+        while current_idx < len(self.events) and not self.stop_event.is_set():
+            event = self.events[current_idx]
+            next_idx = self.execute_event(event, current_idx)
             
             if next_idx is not None:
-                idx = next_idx
-                # Reset start time to align with new sequence if needed?
-                # Or just let it run fast until it catches up?
-                # For loops, we usually want to run as fast as possible or with fixed delays.
-                # Let's just update idx.
+                current_idx = next_idx
             else:
-                idx += 1
+                current_idx += 1
 
     def execute_event(self, event, current_idx):
         """
@@ -76,7 +82,6 @@ class Player(threading.Thread):
             return self.handle_detect_image(event, current_idx)
             
         elif etype in ['mouse_move', 'mouse_click']:
-            # ... existing mouse logic ...
             self._handle_mouse(event)
             
         elif etype == 'mouse_scroll':
@@ -92,6 +97,11 @@ class Player(threading.Thread):
             if key:
                 self.keyboard.release(key)
                 
+        # Handle delay
+        delay = event.get('time', 0.5)
+        if delay > 0:
+            time.sleep(delay)
+            
         return None
 
     def handle_detect_image(self, event, current_idx):
@@ -111,24 +121,31 @@ class Player(threading.Thread):
                 region = get_foreground_window_rect()
                 print(f"Searching in focused window: {region}")
             elif area_type == 'custom region':
-                # Not implemented yet, default to full screen
-                pass
+                region = event.get('custom_region')
+                if region:
+                     print(f"Searching in custom region: {region}")
         
         # Wait for image
         timeout = event.get('wait_timeout', 0)
         tolerance = event.get('tolerance', 0)
         # Convert tolerance 0-255 to confidence 0.0-1.0 (inverted)
-        # 0 tolerance = 1.0 confidence? Or 0 tolerance = exact match?
-        # Usually tolerance means "how much difference is allowed".
-        # 0 tolerance -> 1.0 confidence. 255 tolerance -> 0.0 confidence.
-        # Let's map: confidence = 1.0 - (tolerance / 255.0)
         # Adjusted: 0 tolerance now maps to ~0.9975 to allow tiny rendering differences
-        confidence = 1.0 - ((tolerance + 1) / 400.0) # slightly looser mapping
+        confidence = 1.0 - ((tolerance + 1) / 400.0) 
         if confidence < 0.1: confidence = 0.1
         
         print(f"Waiting for image: {image_path}, timeout={timeout}, conf={confidence}")
         
-        found_rect = wait_for_image(image_path, timeout=timeout, confidence=confidence, region=region)
+        grayscale = event.get('grayscale', False)
+        multi_scale = event.get('multi_scale', False)
+        
+        found_rect = wait_for_image(
+            image_path, 
+            timeout=timeout, 
+            confidence=confidence, 
+            region=region,
+            grayscale=grayscale,
+            multi_scale=multi_scale
+        )
         
         if found_rect:
             print(f"Image found at {found_rect}")
@@ -155,7 +172,7 @@ class Player(threading.Thread):
                     self.mouse.click(Button.right)
             
             # Go to
-            goto = event.get('goto_found', 'Start')
+            goto = event.get('goto_found', 'Next')
             return self._resolve_goto(goto, current_idx)
             
         else:
@@ -167,6 +184,8 @@ class Player(threading.Thread):
     def _resolve_goto(self, goto_str, current_idx):
         if goto_str == 'Start':
             return 0
+        elif goto_str == 'Next':
+            return None # Continue loop
         elif goto_str == 'End':
             return len(self.events) # Break loop
         elif goto_str.startswith('Step '):
@@ -246,3 +265,13 @@ class Player(threading.Thread):
         else:
             # Regular char
             return key_str
+
+    def perform_after_action(self):
+        """Executes the configured after-action"""
+        if self.after_action == "Tắt Máy":
+            print("Shutting down computer...")
+            os.system("shutdown /s /t 0")
+        elif self.after_action == "Sleep":
+            print("Sleeping computer...")
+            # Windows Sleep command (Hibernate off required for pure sleep, but this triggers suspend)
+            os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")

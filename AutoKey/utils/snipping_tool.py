@@ -5,6 +5,7 @@ from PyQt6.QtGui import QPainter, QColor, QPen, QPixmap, QCursor, QGuiApplicatio
 
 class SnippingWidget(QWidget):
     snippet_taken = pyqtSignal(str)
+    region_selected = pyqtSignal(QRect) # New signal for region selection
     closed = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -173,6 +174,7 @@ class SnippingWidget(QWidget):
         
         self.close()
         self.snippet_taken.emit(full_path)
+        self.region_selected.emit(rect) # Emit the selected region
 
     def keyPressEvent(self, event):
         print(f"🔍 DEBUG: keyPressEvent - key: {event.key()}")
