@@ -1,46 +1,70 @@
 
 MAIN_STYLESHEET = """
-/* --- FORCE OPAQUE BACKGROUND --- */
-QMainWindow, QDialog, #CentralWidget {
-    background-color: #FFFFFF;
-    color: #000000;
-}
-
-/* --- Title Bar --- */
-#TitleBar {
-    background-color: #F3F3F3; /* Light Gray Header */
-    border-bottom: 1px solid #E5E5E5;
-}
-#TitleBar QLabel {
-    color: #000000;
-    font-weight: bold;
-}
-
-/* --- Base Widget Styling --- */
-QWidget {
+/* --- GLOBAL RESET --- */
+* {
+    background: transparent; /* Let the Window's white palette show through */
+    color: #1A1A1A;          /* High contrast dark text (Jibit style) */
     font-family: 'Segoe UI', sans-serif;
     font-size: 13px;
-    color: #000000;
+    selection-background-color: #0078D4;
+    selection-color: #FFFFFF;
 }
 
-/* --- Buttons, Inputs, Tables (Keep your existing styles or use below) --- */
-QPushButton {
-    background-color: #F0F0F0;
-    border: 1px solid #CCCCCC;
-    border-radius: 4px;
-    color: #000000;
-    padding: 5px 10px;
-}
-QLineEdit, QTableView {
+/* --- MAIN WINDOW & CONTAINERS --- */
+QMainWindow, QWidget#CentralWidget {
     background-color: #FFFFFF;
+}
+
+/* --- TITLE BAR --- */
+#TitleBar {
+    background-color: #FFFFFF;
+    min-height: 32px;
+}
+/* Bottom border for separation */
+#TitleBar > QWidget { 
+    border-bottom: 1px solid #E5E5E5; 
+}
+
+/* --- BUTTONS (Clean Outline Style) --- */
+QPushButton {
+    background-color: #FFFFFF;
+    border: 1px solid #D1D1D1;
+    border-radius: 4px;
+    padding: 5px 12px;
+    color: #1A1A1A;
+}
+QPushButton:hover {
+    background-color: #F5F5F5;
+    border-color: #000000;
+}
+QPushButton:pressed {
+    background-color: #E0E0E0;
+}
+
+/* --- INPUTS --- */
+QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox {
+    background-color: #FAFAFA;
+    border: 1px solid #E0E0E0;
+    border-radius: 4px;
+    padding: 4px;
     color: #000000;
-    border: 1px solid #CCCCCC;
-    gridline-color: #EEEEEE;
+}
+QLineEdit:focus, QTextEdit:focus {
+    background-color: #FFFFFF;
+    border: 1px solid #0078D4;
+}
+
+/* --- LISTS & TABLES --- */
+QListWidget, QTableWidget {
+    background-color: #FFFFFF;
+    border: 1px solid #E5E5E5;
+    gridline-color: #F0F0F0;
 }
 QHeaderView::section {
-    background-color: #FAFAFA;
-    color: #000000;
+    background-color: #F9F9F9;
     border: none;
-    border-bottom: 1px solid #CCCCCC;
+    border-bottom: 1px solid #E5E5E5;
+    padding: 4px;
+    font-weight: bold;
 }
 """

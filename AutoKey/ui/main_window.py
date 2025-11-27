@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QTableView, QHead
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QTableView, QHeaderView
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QTableView, QHeaderView
 from PyQt6.QtCore import QSettings, QSize, QPoint, Qt, pyqtSlot
-from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction
+from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction, QPalette, QColor
 import threading
 
 from ui.toolbar import MainToolbar
@@ -15,6 +15,14 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Macro Recorder")
         self.settings = QSettings("MonSoft", "MacroRecorder")
+        
+        # --- FORCE PURE WHITE BACKGROUND (SYSTEM LEVEL) ---
+        white_palette = QPalette()
+        white_palette.setColor(QPalette.ColorRole.Window, QColor(255, 255, 255))
+        white_palette.setColor(QPalette.ColorRole.WindowText, QColor(0, 0, 0))
+        self.setPalette(white_palette)
+        self.setAutoFillBackground(True)
+        # ------------------------------------------------
         
         # Setup UI
         self.setup_ui()
