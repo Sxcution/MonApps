@@ -2,8 +2,6 @@ from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QTableView, QHead
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QTableView, QHeaderView
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QTableView, QHeaderView
 from PyQt6.QtCore import QSettings, QSize, QPoint, Qt, pyqtSlot
-import ctypes
-from ctypes import c_int, byref
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction, QPalette, QColor
 import threading
 
@@ -29,37 +27,8 @@ class MainWindow(QMainWindow):
         # Setup UI
         self.setup_ui()
         
-        # 3. CALL THE DWM FIX
-        self.disable_system_backdrop()
-        
         # Restore window state
         self.restore_geometry()
-
-    def disable_system_backdrop(self):
-        """
-        HARD FIX: Calls Windows DWM API to explicitly turn off Mica/Acrylic effects.
-        Target: DWMWA_SYSTEMBACKDROP_TYPE (38) -> DWMSBT_NONE (1)
-        """
-        try:
-            # Get the Window Handle (HWND)
-            hwnd = int(self.winId())
-            
-            # Constants for Windows 11 DWM
-            DWMWA_SYSTEMBACKDROP_TYPE = 38
-            DWMSBT_NONE = 1
-            
-            # Call API
-            dwmapi = ctypes.windll.dwmapi
-            value = c_int(DWMSBT_NONE)
-            result = dwmapi.DwmSetWindowAttribute(
-                hwnd, 
-                DWMWA_SYSTEMBACKDROP_TYPE, 
-                byref(value), 
-                ctypes.sizeof(value)
-            )
-            print(f"🔧 DWM Backdrop Disabled (Result: {result})")
-        except Exception as e:
-            print(f"⚠️ DWM API Error: {e}")
 
     def setup_ui(self):
         # Central Widget

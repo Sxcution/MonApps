@@ -1,0 +1,17 @@
+I am developing a PyQt6 application on Windows and facing a persistent issue with the Main Window background.
+Goal: Achieve a solid, pure white background (Clean/Jibit style) for the entire application window.
+Problem: The background sometimes appears transparent, black, or the "Mica/Acrylic" effect interferes, preventing the solid white color from showing, even though I want it fully opaque.
+
+I have tried the following fixes in `ui/main_window.py` and `ui/styles.py`:
+1. Removed `self.setAttribute(Qt.WA_TranslucentBackground)`.
+2. Set `self.central_widget.setObjectName("CentralWidget")` and `self.central_widget.setAutoFillBackground(True)`.
+3. Applied `QPalette` with `QColor(255, 255, 255)` to `Window` and `WindowText` roles.
+4. Applied a comprehensive Stylesheet (`MAIN_STYLESHEET`) targeting `QMainWindow`, `QWidget`, and `#CentralWidget` with `background-color: #FFFFFF`.
+
+Despite these efforts, the issue persists (or the background is not rendering as a clean solid white layer as expected).
+
+Attached is my source code (AutoKey_Debug_Package.zip).
+Please analyze `ui/main_window.py` and `ui/styles.py` and identify:
+1. Why the solid white background is not being enforced correctly.
+2. If there are conflicting attributes or missing Windows-specific flags (like `Qt.WA_PaintOnScreen` or DWM handling).
+3. The definitive code solution to force a solid white background on Windows 11/10 using PyQt6.
