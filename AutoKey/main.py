@@ -21,6 +21,11 @@ def main():
     app.setApplicationName("Macro Recorder")
     app.setOrganizationName("MonSoft")
     
+    # CRITICAL: Prevent Qt from quitting when all windows are hidden
+    # This is needed for the snipping tool which temporarily hides all windows
+    app.setQuitOnLastWindowClosed(False)
+    print("🔧 DEBUG: setQuitOnLastWindowClosed(False) - App will NOT auto-quit when windows hidden")
+    
     window = MainWindow()
     window.show()
     

@@ -220,21 +220,57 @@ class WaitImageDialog(QDialog):
         """Hides dialog -> Launches Snipper -> Restores Dialog on finish"""
         try:
             print("DEBUG: capture_image_template called")
-            # 1. Hide this Dialog AND the Main Window
+            
+            # 1. CREATE SNIPPER FIRST (before hiding anything)
+            print("DEBUG: Creating SnippingWidget BEFORE hiding windows")
+            self.snipper = SnippingWidget()
+            self.snipper.snippet_taken.connect(self.on_image_captured)
+            self.snipper.closed.connect(self.on_snipper_closed)
+            print("DEBUG: Snipper created and signals connected")
+            
+            # 2. Now hide windows
             if self.parent():
-                self.parent().setVisible(False)
-            self.setVisible(False)
+                print("DEBUG: Minimizing parent window to taskbar")
+                self.parent().showMinimized()
             
-            # 2. Force process events to update UI state immediately
+            print("DEBUG: Hiding dialog")
+            self.hide()
+            
+            # 3. Force process events
             QApplication.processEvents()
+            print("DEBUG: Events processed")
             
-            # 3. Launch Snipper with a slight delay to ensure hiding is done
-            from PyQt6.QtCore import QTimer
-            QTimer.singleShot(200, self._launch_snipper_safe)
+            # 4. Show snipper IMMEDIATELY (no timer)
+            print("DEBUG: Showing snipper IMMEDIATELY")
+            self.snipper.show()
+            self.snipper.raise_()
+            self.snipper.activateWindow()
+            self.snipper.setFocus()
+            print("DEBUG: Snipper shown, raised, activated, and focused")
+            
         except Exception as e:
             print(f"ERROR in capture_image_template: {e}")
             import traceback
             traceback.print_exc()
+    
+    def _show_snipper(self):
+        """Show the already-created snipper"""
+        try:
+            print("DEBUG: _show_snipper called - showing snipper now")
+            if hasattr(self, 'snipper') and self.snipper:
+                self.snipper.show()
+                self.snipper.raise_()
+                self.snipper.activateWindow()
+                self.snipper.setFocus()
+                print("DEBUG: Snipper shown, raised, activated, and focused")
+            else:
+                print("ERROR: No snipper object found!")
+                self.restore_windows()
+        except Exception as e:
+            print(f"ERROR in _show_snipper: {e}")
+            import traceback
+            traceback.print_exc()
+            self.restore_windows()
         
     def _launch_snipper_safe(self):
         """Launch snipper after windows are hidden"""
@@ -247,6 +283,12 @@ class WaitImageDialog(QDialog):
             print("DEBUG: Signals connected")
             self.snipper.show()
             print("DEBUG: Snipper shown")
+            
+            # CRITICAL: Force the snipper to be on top and have focus
+            self.snipper.raise_()
+            self.snipper.activateWindow()
+            self.snipper.setFocus()
+            print("DEBUG: Snipper raised, activated, and focused")
         except Exception as e:
             print(f"ERROR in _launch_snipper_safe: {e}")
             import traceback
@@ -257,8 +299,8 @@ class WaitImageDialog(QDialog):
     def restore_windows(self):
         """Restore dialog and parent window visibility"""
         if self.parent():
-            self.parent().setVisible(True)
-        self.setVisible(True)
+            self.parent().showNormal()  # Restore from minimized
+        self.show()
         self.activateWindow()
     
     
@@ -267,10 +309,10 @@ class WaitImageDialog(QDialog):
         try:
             print("DEBUG: Snipper closed, restoring windows...")
             if self.parent():
-                self.parent().setVisible(True)
+                self.parent().showNormal()  # Restore from minimized
                 self.parent().activateWindow()
             
-            self.setVisible(True)
+            self.show()
             self.activateWindow()
             
             # Clean up

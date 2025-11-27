@@ -735,3 +735,6 @@ class MainWindow(QMainWindow):
         self.settings.setValue("window_size", self.size())
         self.settings.setValue("window_pos", self.pos())
         super().closeEvent(event)
+        # Explicitly quit the app since we disabled auto-quit on last window closed
+        from PyQt6.QtWidgets import QApplication
+        QApplication.quit()

@@ -17,6 +17,7 @@ class SnippingWidget(QWidget):
             Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+        
         self.setCursor(QCursor(Qt.CursorShape.CrossCursor))
         self.setMouseTracking(True)
         
@@ -39,16 +40,19 @@ class SnippingWidget(QWidget):
         CRITICAL: Do NOT grab mouse here immediately. Qt requires the window to be 
         physically visible on screen before grabbing input.
         """
+        print("DEBUG: SnippingWidget.showEvent called")
         super().showEvent(event)
         self.setFocus()
         self.activateWindow()
         
         # Wait 100ms for the window to be fully mapped by Windows OS
+        print("DEBUG: Scheduling input grab in 100ms")
         QTimer.singleShot(100, self._start_grabbing)
 
     def _start_grabbing(self):
         """Safe place to grab inputs"""
         try:
+            print("DEBUG: _start_grabbing called")
             self.grabMouse()
             self.grabKeyboard()
             print("DEBUG: Mouse and Keyboard grabbed successfully")
@@ -91,13 +95,16 @@ class SnippingWidget(QWidget):
         self.setGeometry(total_geometry)
 
     def paintEvent(self, event):
+        print("DEBUG: SnippingWidget.paintEvent called")
         if not self.dark_pixmap:
+            print("DEBUG: No dark_pixmap, skipping paint")
             return
 
         painter = QPainter(self)
         
         # 1. Draw the darkened background everywhere
         painter.drawPixmap(0, 0, self.dark_pixmap)
+        print("DEBUG: Drew dark background")
         
         # 2. If selecting, draw the original (bright) pixmap in the selection rect
         if self.is_snipping:
