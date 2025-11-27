@@ -1,39 +1,30 @@
 """
 Image Search Dialog - for configuring image detection actions
-Fixed version with working capture functionality
 """
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                             QPushButton, QCheckBox, QComboBox, QSpinBox,
-                            QGroupBox, QFormLayout, QFileDialog, QWidget)
+                            QGroupBox, QFormLayout, QFileDialog, QWidget, QApplication)
 from PyQt6.QtCore import Qt, QTimer, QRect
 from PyQt6.QtGui import QPixmap, QPainter, QColor
 import os
-
+import time
 
 class ImagePreviewLabel(QLabel):
     """Custom label to display image with icon overlay if no image"""
-    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMinimumSize(160, 160)
         self.setMaximumSize(160, 160)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setStyleSheet("""
-            QLabel {
-                border: 1px solid #ccc;
-                background: white;
-            }
-        """)
+        self.setStyleSheet("QLabel { border: 1px solid #ccc; background: white; }")
         self.pixmap_data = None
         self.show_placeholder()
         
     def show_placeholder(self):
-        """Show placeholder icon"""
         placeholder = QPixmap(160, 160)
         placeholder.fill(Qt.GlobalColor.white)
         painter = QPainter(placeholder)
         painter.setPen(QColor(180, 180, 180))
-        # Draw a simple image icon representation
         painter.drawRect(40, 40, 80, 80)
         painter.drawLine(50, 90, 70, 70)
         painter.drawLine(70, 70, 90, 100)
@@ -42,7 +33,6 @@ class ImagePreviewLabel(QLabel):
         self.setPixmap(placeholder)
         
     def set_image(self, pixmap):
-        """Set image, scaled to fit"""
         if pixmap and not pixmap.isNull():
             self.pixmap_data = pixmap
             scaled = pixmap.scaled(160, 160, Qt.AspectRatioMode.KeepAspectRatio, 
@@ -51,10 +41,7 @@ class ImagePreviewLabel(QLabel):
         else:
             self.show_placeholder()
 
-
 class ImageSearchDialog(QDialog):
-    """Dialog for configuring image detection/search action"""
-    
     def __init__(self, parent=None, event=None):
         super().__init__(parent)
         self.setWindowTitle("Search image")
@@ -72,68 +59,41 @@ class ImageSearchDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         
-        # Description label
         desc_label = QLabel("Finds position of the defined image in the selected screen area.")
         desc_label.setWordWrap(True)
         layout.addWidget(desc_label)
         
-        # Image specifications group
         img_group = QGroupBox("Image specifications:")
         img_layout = QHBoxLayout()
-        
-        # Left: Image preview
         preview_container = QVBoxLayout()
-        preview_label = QLabel("Image:")
-        preview_container.addWidget(preview_label)
-        
+        preview_container.addWidget(QLabel("Image:"))
         self.image_preview = ImagePreviewLabel()
         preview_container.addWidget(self.image_preview)
         
-        # Buttons under image
         btn_container = QHBoxLayout()
-        
         self.btn_load = QPushButton("Nhập Ảnh")
-        self.btn_load.setIcon(self.style().standardIcon(self.style().StandardPixmap.SP_DirIcon))
-        self.btn_load.setToolTip("Load from file")
         self.btn_load.clicked.connect(self.load_from_file)
-        
         self.btn_capture = QPushButton("Cắt Ảnh")
-        self.btn_capture.setIcon(self.style().standardIcon(self.style().StandardPixmap.SP_DialogYesButton))
-        self.btn_capture.setToolTip("Capture from screen")
         self.btn_capture.clicked.connect(self.capture_from_screen)
         
         btn_container.addWidget(self.btn_load)
         btn_container.addWidget(self.btn_capture)
         btn_container.addStretch()
         preview_container.addLayout(btn_container)
-        
         img_layout.addLayout(preview_container)
         
-        # Right: Options
         options_layout = QFormLayout()
-        
-        # Restrict search area
         self.cb_restrict = QCheckBox("Restrict search area to")
         self.combo_window = QComboBox()
         self.combo_window.addItems(["focused window", "entire screen", "custom region"])
         self.combo_window.setEnabled(False)
         self.cb_restrict.toggled.connect(self.combo_window.setEnabled)
-        
         options_layout.addRow(self.cb_restrict, self.combo_window)
         
-        # Color tolerance
         tolerance_layout = QHBoxLayout()
-        tolerance_label = QLabel("Color tolerance:")
         self.spin_tolerance = QSpinBox()
         self.spin_tolerance.setRange(0, 255)
-        self.spin_tolerance.setValue(0)
-        self.spin_tolerance.setMaximumWidth(60)
-        tolerance_layout.addWidget(tolerance_label)
-        tolerance_layout.addWidget(self.spin_tolerance)
-        tolerance_layout.addStretch()
-        
-        options_layout.addRow(tolerance_layout)
-        
+        options_layout.addRow(QLabel("Color tolerance:"), self.spin_tolerance)
         img_layout.addLayout(options_layout, 1)
         img_group.setLayout(img_layout)
         layout.addWidget(img_group)
@@ -225,112 +185,72 @@ class ImageSearchDialog(QDialog):
         not_found_group.setLayout(not_found_layout)
         layout.addWidget(not_found_group)
         
-        layout.addStretch()
-        
-        # Bottom buttons
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-        
         self.btn_ok = QPushButton("OK")
         self.btn_ok.setDefault(True)
         self.btn_ok.clicked.connect(self.accept)
-        button_layout.addWidget(self.btn_ok)
-        
         self.btn_cancel = QPushButton("Cancel")
         self.btn_cancel.clicked.connect(self.reject)
+        button_layout.addWidget(self.btn_ok)
         button_layout.addWidget(self.btn_cancel)
-        
-        self.btn_help = QPushButton("Help")
-        button_layout.addWidget(self.btn_help)
-        
         layout.addLayout(button_layout)
-        
+
     def load_event_data(self):
-        """Load existing event data into UI"""
-        if not self.event:
-            return
-            
-        # Load image if path exists
+        if not self.event: return
         if self.image_path and os.path.exists(self.image_path):
-            pixmap = QPixmap(self.image_path)
-            self.image_preview.set_image(pixmap)
-            
-        # Load other settings
+            self.image_preview.set_image(QPixmap(self.image_path))
         self.cb_restrict.setChecked(self.event.get('restrict_area', False))
-        self.combo_window.setCurrentText(self.event.get('search_area', 'focused window'))
         self.spin_tolerance.setValue(self.event.get('tolerance', 0))
-        
+        self.combo_window.setCurrentText(self.event.get('search_area', 'focused window'))
         self.cb_mouse_action.setChecked(self.event.get('mouse_action_enabled', False))
         self.combo_mouse_action.setCurrentText(self.event.get('mouse_action', 'Move'))
         self.combo_position.setCurrentText(self.event.get('mouse_position', 'Centered'))
-        
         self.spin_wait_time.setValue(self.event.get('wait_timeout', 65535))
-        
+        self.combo_goto_found.setCurrentText(self.event.get('goto_found', 'Start'))
+        self.combo_goto_not_found.setCurrentText(self.event.get('goto_not_found', 'End'))
+
     def capture_from_screen(self):
-        """Capture image from screen using snipping tool"""
-        # ✅ FIX: Import đúng và gọi hàm đúng
+        """
+        Gọi hàm cắt ảnh từ utils. Logic ẩn/hiện đã được chuyển vào trong hàm đó.
+        """
         try:
             from utils.snipping_tool import capture_screen_region
             
-            # Ẩn dialog tạm thời
-            self.hide()
-            
-            # Gọi capture_screen_region() và đợi kết quả
+            # Gọi hàm này, nó sẽ tự lo việc ẩn cửa sổ -> chụp -> hiện snipper -> hiện lại cửa sổ
             pixmap, rect = capture_screen_region()
             
             if pixmap and not pixmap.isNull():
                 self.captured_pixmap = pixmap
                 self.image_preview.set_image(pixmap)
                 
-                # Lưu ảnh vào thư mục
+                # Lưu ảnh
                 images_dir = os.path.join(os.getcwd(), "captured_images")
                 os.makedirs(images_dir, exist_ok=True)
-                
-                import time
                 filename = f"capture_{int(time.time())}.png"
                 self.image_path = os.path.join(images_dir, filename)
                 pixmap.save(self.image_path, "PNG")
-                
                 print(f"✅ Ảnh cắt lưu tại: {self.image_path}")
             else:
-                print("❌ Không cắt được ảnh")
-            
-            # Hiện dialog lại
-            self.show()
-            self.activateWindow()
-            
-        except ImportError as e:
-            print(f"❌ Lỗi import: {e}")
-            self.show()
-            self.activateWindow()
-        except Exception as e:
-            print(f"❌ Lỗi khi cắt ảnh: {e}")
-            self.show()
-            self.activateWindow()
-        
-    def load_from_file(self):
-        """Load image from file"""
-        try:
-            dialog = QFileDialog(self, "Select Image")
-            dialog.setNameFilter("Image Files (*.png *.jpg *.bmp)")
-            dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
-            
-            if dialog.exec():
-                filenames = dialog.selectedFiles()
-                if filenames:
-                    filename = filenames[0]
-                    pixmap = QPixmap(filename)
-                    if not pixmap.isNull():
-                        self.image_path = filename
-                        self.image_preview.set_image(pixmap)
-                        print(f"✅ Ảnh tải: {filename}")
-                    else:
-                        print(f"❌ Không thể tải: {filename}")
-        except Exception as e:
-            print(f"❌ Lỗi: {e}")
+                print("❌ Hủy cắt ảnh")
                 
+        except ImportError as e:
+            print(f"❌ Lỗi import utils: {e}")
+        except Exception as e:
+            print(f"❌ Lỗi không xác định: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def load_from_file(self):
+        dialog = QFileDialog(self, "Select Image")
+        dialog.setNameFilter("Images (*.png *.jpg *.bmp)")
+        if dialog.exec():
+            f = dialog.selectedFiles()[0]
+            self.image_path = f
+            self.image_preview.set_image(QPixmap(f))
+
     def get_data(self):
-        """Return dialog data as dict"""
+        # Trả về data như cũ
         return {
             'type': 'detect_image',
             'image_path': self.image_path,
