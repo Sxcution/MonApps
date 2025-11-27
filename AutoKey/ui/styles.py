@@ -2,85 +2,142 @@
 MAIN_STYLESHEET = """
 /* --- GLOBAL RESET --- */
 * {
-    background: transparent; /* Let the Window's white palette show through */
-    color: #1A1A1A;          /* High contrast dark text (Jibit style) */
+    background: transparent;
+    color: #1A1A1A;
     font-family: 'Segoe UI', sans-serif;
     font-size: 13px;
     selection-background-color: #0078D4;
     selection-color: #FFFFFF;
+    outline: none;
 }
 
-/* --- MAIN WINDOW & CONTAINERS --- */
-QMainWindow, QWidget#CentralWidget {
+/* --- WINDOWS & DIALOGS --- */
+QMainWindow, QDialog {
     background-color: #FFFFFF;
 }
 
-/* --- TITLE BAR --- */
-#TitleBar {
+QWidget#CentralWidget {
     background-color: #FFFFFF;
-    min-height: 32px;
-}
-/* Bottom border for separation */
-#TitleBar > QWidget { 
-    border-bottom: 1px solid #E5E5E5; 
-}
-
-/* --- BUTTONS (Clean Outline Style) --- */
-QPushButton {
-    background-color: #FFFFFF;
-    border: 1px solid #D1D1D1;
-    border-radius: 4px;
-    padding: 5px 12px;
-    color: #1A1A1A;
-}
-QPushButton:hover {
-    background-color: #F5F5F5;
-    border-color: #000000;
-}
-QPushButton:pressed {
-    background-color: #E0E0E0;
-}
-
-/* --- INPUTS --- */
-QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox {
-    background-color: #FAFAFA;
-    border: 1px solid #E0E0E0;
-    border-radius: 4px;
-    padding: 4px;
-    color: #000000;
-}
-QLineEdit:focus, QTextEdit:focus {
-    background-color: #FFFFFF;
-    border: 1px solid #0078D4;
-}
-
-/* --- LISTS & TABLES --- */
-QListWidget, QTableWidget {
-    background-color: #FFFFFF;
-    border: 1px solid #E5E5E5;
-    gridline-color: #F0F0F0;
-}
-QHeaderView::section {
-    background-color: #F9F9F9;
-    border: none;
-    border-bottom: 1px solid #E5E5E5;
-    padding: 4px;
-    font-weight: bold;
 }
 
 /* --- MENUS --- */
 QMenu {
     background-color: #FFFFFF;
     border: 1px solid #CCCCCC;
+    border-radius: 4px;
     padding: 4px;
 }
 QMenu::item {
-    padding: 6px 24px 6px 12px;
+    padding: 6px 28px 6px 12px;
     background-color: transparent;
     color: #1A1A1A;
+    border-radius: 3px;
 }
 QMenu::item:selected {
     background-color: #E5F3FF;
     color: #000000;
+}
+QMenu::separator {
+    height: 1px;
+    background: #E0E0E0;
+    margin: 4px 0;
+}
+
+/* --- TABLE VIEW --- */
+QTableView {
+    background-color: #FFFFFF;
+    border: 1px solid #CCCCCC;
+    gridline-color: #E0E0E0;
+    selection-background-color: #E5F3FF;
+    selection-color: #000000;
+}
+QHeaderView::section {
+    background-color: #F5F5F5;
+    padding: 6px;
+    border: none;
+    border-bottom: 1px solid #CCCCCC;
+    border-right: 1px solid #E0E0E0;
+    font-weight: bold;
+    color: #333333;
+}
+QTableView::item {
+    padding: 4px;
+}
+
+/* --- BUTTONS --- */
+QPushButton {
+    background-color: #FFFFFF;
+    border: 1px solid #CCCCCC;
+    border-radius: 4px;
+    padding: 6px 16px;
+    color: #1A1A1A;
+    min-width: 60px;
+}
+QPushButton:hover {
+    background-color: #F5F5F5;
+    border-color: #999999;
+}
+QPushButton:pressed {
+    background-color: #E5E5E5;
+    border-color: #999999;
+}
+
+/* --- INPUTS --- */
+QLineEdit, QSpinBox, QComboBox {
+    background-color: #FFFFFF;
+    border: 1px solid #CCCCCC;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #1A1A1A;
+    min-height: 20px;
+}
+QLineEdit:focus, QSpinBox:focus, QComboBox:focus {
+    border: 1px solid #0078D4;
+    background-color: #FFFFFF;
+}
+
+/* --- COMBO BOX --- */
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 20px;
+    border-left-width: 0px;
+    border-top-right-radius: 3px;
+    border-bottom-right-radius: 3px;
+}
+QComboBox QAbstractItemView {
+    background-color: #FFFFFF;
+    border: 1px solid #CCCCCC;
+    selection-background-color: #E5F3FF;
+    selection-color: #000000;
+}
+
+/* --- GROUP BOX --- */
+QGroupBox {
+    border: 1px solid #E0E0E0;
+    border-radius: 4px;
+    margin-top: 1.5em; /* leave space at the top for the title */
+    padding-top: 10px;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 5px;
+    color: #555555;
+    font-weight: bold;
+}
+
+/* --- LABELS & OTHERS --- */
+QLabel {
+    color: #1A1A1A;
+    background: transparent;
+}
+QCheckBox, QRadioButton {
+    spacing: 8px;
+    color: #1A1A1A;
+}
+QCheckBox::indicator, QRadioButton::indicator {
+    width: 16px;
+    height: 16px;
 }
 """

@@ -11,8 +11,47 @@ class MainToolbar(QToolBar):
         self.setIconSize(QSize(24, 24))
         
         # Setup Actions
-        self.open_action = QAction("Open", self)
+        # File Menu Actions
+        self.new_action = QAction("New", self)
+        self.new_action.setShortcut("Ctrl+N")
+        self.new_action.setStatusTip("Create new macro")
+        
+        self.open_action = QAction("Open...", self)
+        self.open_action.setShortcut("Ctrl+O")
         self.open_action.setStatusTip("Open recorded file")
+        
+        self.save_action = QAction("Save", self)
+        self.save_action.setShortcut("Ctrl+S")
+        self.save_action.setStatusTip("Save current macro")
+        
+        self.save_as_action = QAction("Save as...", self)
+        self.save_as_action.setShortcut("Ctrl+Shift+S")
+        self.save_as_action.setStatusTip("Save current macro as new file")
+        
+        self.exit_action = QAction("Exit", self)
+        self.exit_action.setShortcut("Alt+F4")
+        self.exit_action.setStatusTip("Exit application")
+
+        # File Menu Button
+        self.file_button = QToolButton(self)
+        self.file_button.setText("File")
+        self.file_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        
+        from PyQt6.QtWidgets import QMenu
+        self.file_menu = QMenu(self.file_button)
+        self.file_menu.addAction(self.new_action)
+        self.file_menu.addAction(self.open_action)
+        self.file_menu.addSeparator()
+        self.file_menu.addAction(self.save_action)
+        self.file_menu.addAction(self.save_as_action)
+        self.file_menu.addSeparator()
+        self.file_menu.addAction(self.exit_action)
+        
+        self.file_button.setMenu(self.file_menu)
+        
+        self.add_action = QAction("Add", self)
+        self.add_action.setStatusTip("Add new step")
+        # You might want an icon here later
         
         self.play_action = QAction("Play", self)
         self.play_action.setCheckable(True)
@@ -26,7 +65,9 @@ class MainToolbar(QToolBar):
         self.settings_action.setStatusTip("Configure application settings")
         
         # Add actions to toolbar
-        self.addAction(self.open_action)
+        self.addWidget(self.file_button)
+        self.addSeparator()
+        self.addAction(self.add_action)
         self.addSeparator()
         self.addAction(self.play_action)
         self.addSeparator()
