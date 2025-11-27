@@ -211,35 +211,50 @@ class ImageSearchDialog(QDialog):
         self.combo_goto_not_found.setCurrentText(self.event.get('goto_not_found', 'End'))
 
     def capture_from_screen(self):
-        """
-        Gọi hàm cắt ảnh từ utils. Logic ẩn/hiện đã được chuyển vào trong hàm đó.
-        """
+        """Hides dialog -> Shows Snipper -> Restores Dialog"""
         try:
-            from utils.snipping_tool import capture_screen_region
+            # 1. Hide the modal dialog explicitly
+            self.hide()
             
-            # Gọi hàm này, nó sẽ tự lo việc ẩn cửa sổ -> chụp -> hiện snipper -> hiện lại cửa sổ
-            pixmap, rect = capture_screen_region()
+            # 2. Minimize the main window if it exists
+            if self.parent():
+                self.parent().showMinimized()
+                
+            # 3. Allow UI to update (essential for hide to take effect)
+            QApplication.processEvents()
+            import time
+            time.sleep(0.2) # Small buffer for OS animations
             
-            if pixmap and not pixmap.isNull():
-                self.captured_pixmap = pixmap
-                self.image_preview.set_image(pixmap)
-                
-                # Lưu ảnh
-                images_dir = os.path.join(os.getcwd(), "captured_images")
-                os.makedirs(images_dir, exist_ok=True)
-                filename = f"capture_{int(time.time())}.png"
-                self.image_path = os.path.join(images_dir, filename)
-                pixmap.save(self.image_path, "PNG")
-                print(f"✅ Ảnh cắt lưu tại: {self.image_path}")
-            else:
-                print("❌ Hủy cắt ảnh")
-                
-        except ImportError as e:
-            print(f"❌ Lỗi import utils: {e}")
+            # 4. Initialize Snipper
+            from utils.snipping_tool import SnippingWidget
+            self.snipper = SnippingWidget()
+            
+            # 5. Connect signals using a closure or helper to restore windows
+            self.snipper.snippet_taken.connect(self.on_snipper_success)
+            self.snipper.closed.connect(self.restore_ui)
+            
+            # 6. Show the snipper (It is now ApplicationModal, so it takes over)
+            self.snipper.show()
+            
         except Exception as e:
-            print(f"❌ Lỗi không xác định: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"Error launching snipper: {e}")
+            self.restore_ui()
+
+    def restore_ui(self):
+        """Restores the main UI state"""
+        if self.parent():
+            self.parent().showNormal()
+            self.parent().activateWindow()
+        
+        self.showNormal()
+        self.activateWindow()
+        self.raise_()
+
+    def on_snipper_success(self, path):
+        """Handle success"""
+        self.image_path = path
+        self.image_preview.set_image(QPixmap(path))
+        self.restore_ui()
 
     def load_from_file(self):
         dialog = QFileDialog(self, "Select Image")
