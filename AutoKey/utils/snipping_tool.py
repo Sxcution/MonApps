@@ -8,15 +8,25 @@ class SnippingWidget(QWidget):
     snippet_taken = pyqtSignal(str)  # Returns path
     closed = pyqtSignal()            # Returns nothing (cancel)
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        # FORCE parent to None to detach from main app window logic
+        super().__init__(None)
         print("DEBUG: SnippingWidget initializing...")
+        
+        # Configure window flags
+        # Qt.WindowType.Window: Tells OS this is a standalone window
+        # FramelessWindowHint: No borders
+        # WindowStaysOnTopHint: Force it ABOVE everything else
+        # REMOVED Qt.WindowType.Tool - Tool windows get hidden when parent hides!
         self.setWindowFlags(
+            Qt.WindowType.Window | 
             Qt.WindowType.FramelessWindowHint | 
-            Qt.WindowType.WindowStaysOnTopHint | 
-            Qt.WindowType.Tool
+            Qt.WindowType.WindowStaysOnTopHint
         )
+        
+        # Ensure fully opaque initially (we handle transparency in paintEvent)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+        self.setWindowOpacity(1.0)
         
         self.setCursor(QCursor(Qt.CursorShape.CrossCursor))
         self.setMouseTracking(True)

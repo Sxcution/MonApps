@@ -217,42 +217,43 @@ class WaitImageDialog(QDialog):
         self.overlay.show()
         
     def capture_image_template(self):
-        """Hides dialog -> Launches Snipper -> Restores Dialog on finish"""
+        """Clean launch sequence"""
+        print("DEBUG: capture_image_template called")
+        
+        # 1. Hide windows explicitly
+        if self.parent():
+            self.parent().hide()  # Use hide() instead of minimize (cleaner)
+        self.hide()
+        
+        # 2. Force update
+        QApplication.processEvents()
+        
+        # 3. Launch snipper after 300ms (give time for windows to disappear)
+        # Using QTimer is SAFER to avoid capturing the fading-out window
+        from PyQt6.QtCore import QTimer
+        print("DEBUG: Scheduling snipper launch in 300ms")
+        QTimer.singleShot(300, self._launch_snipper_safe)
+    
+    def _launch_snipper_safe(self):
+        print("DEBUG: _launch_snipper_safe called")
         try:
-            print("DEBUG: capture_image_template called")
-            
-            # 1. CREATE SNIPPER FIRST (before hiding anything)
-            print("DEBUG: Creating SnippingWidget BEFORE hiding windows")
+            from utils.snipping_tool import SnippingWidget
+            # Create new instance (flags are fixed in class now)
             self.snipper = SnippingWidget()
             self.snipper.snippet_taken.connect(self.on_image_captured)
             self.snipper.closed.connect(self.on_snipper_closed)
-            print("DEBUG: Snipper created and signals connected")
             
-            # 2. Move parent window OFF-SCREEN (not minimize - that may cause z-order issues)
-            if self.parent():
-                print("DEBUG: Moving parent window OFF-SCREEN")
-                self._original_parent_pos = self.parent().pos()
-                self.parent().move(-10000, -10000)  # Far off screen
-            
-            print("DEBUG: Hiding dialog")
-            self.hide()
-            
-            # 3. Force process events
-            QApplication.processEvents()
-            print("DEBUG: Events processed")
-            
-            # 4. Show snipper IMMEDIATELY
-            print("DEBUG: Showing snipper IMMEDIATELY")
+            # SHOW IT
             self.snipper.show()
-            self.snipper.raise_()
             self.snipper.activateWindow()
-            self.snipper.setFocus()
-            print("DEBUG: Snipper shown, raised, activated, and focused")
+            self.snipper.raise_()
+            print("DEBUG: Snipper showed")
             
         except Exception as e:
-            print(f"ERROR in capture_image_template: {e}")
+            print(f"ERROR launching snipper: {e}")
             import traceback
             traceback.print_exc()
+            self.restore_windows()
     
     def _show_snipper(self):
         """Show the already-created snipper"""
@@ -300,34 +301,24 @@ class WaitImageDialog(QDialog):
     def restore_windows(self):
         """Restore dialog and parent window visibility"""
         if self.parent():
-            # Restore parent position if we saved it
-            if hasattr(self, '_original_parent_pos'):
-                self.parent().move(self._original_parent_pos)
-            self.parent().show()
-        self.show()
+            self.parent().showNormal()
+        self.showNormal()
         self.activateWindow()
     
     
     def on_snipper_closed(self):
-        """Restores the application windows"""
-        try:
-            print("DEBUG: Snipper closed, restoring windows...")
-            if self.parent():
-                # Restore parent position if we saved it
-                if hasattr(self, '_original_parent_pos'):
-                    self.parent().move(self._original_parent_pos)
-                self.parent().show()
-                self.parent().activateWindow()
-            
-            self.show()
-            self.activateWindow()
-            
-            # Clean up
-            if hasattr(self, 'snipper'):
-                self.snipper.deleteLater()
-                self.snipper = None
-        except Exception as e:
-            print(f"ERROR in on_snipper_closed: {e}")
+        """Restore windows"""
+        print("DEBUG: Restoring windows")
+        if self.parent():
+            self.parent().showNormal()
+            self.parent().activateWindow()
+        self.showNormal()
+        self.activateWindow()
+        
+        # Clean up
+        if hasattr(self, 'snipper'):
+            self.snipper.deleteLater()
+            self.snipper = None
 
         
     def on_image_captured(self, file_path):
