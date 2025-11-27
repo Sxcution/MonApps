@@ -1,6 +1,11 @@
 
 MAIN_STYLESHEET = """
 
+/* --- Force Solid Background for Main Content --- */
+#CentralWidget {
+    background-color: #FFFFFF;
+}
+
 /* --- Main Container --- */
 
 QMainWindow, QDialog {
