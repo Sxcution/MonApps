@@ -1,6 +1,8 @@
 import time
 import threading
 import pyautogui
+import random
+import ctypes
 from pynput.keyboard import Controller as KeyboardController
 from pynput.mouse import Controller as MouseController, Button
 
@@ -35,24 +37,62 @@ class Player(threading.Thread):
     def execute_event(self, event):
         etype = event['type']
         
-        if etype == 'mouse_move':
-            self.mouse.position = (event['x'], event['y'])
+        if etype in ['mouse_move', 'mouse_click']:
+            # Calculate Target Coordinates
+            target_x = event.get('x', 0)
+            target_y = event.get('y', 0)
             
-        elif etype == 'mouse_click':
-            # pynput button mapping
-            btn = Button.left
-            if 'Button.right' in event['button']:
-                btn = Button.right
-            elif 'Button.middle' in event['button']:
-                btn = Button.middle
-            
-            if event['pressed']:
-                self.mouse.press(btn)
+            # 1. Handle Ignore Coordinates (Current Position)
+            if event.get('ignore_coordinates', False):
+                target_x, target_y = self.mouse.position
             else:
-                self.mouse.release(btn)
+                # 2. Handle Coordinate Modes
+                mode = event.get('coordinate_mode', 'absolute')
+                
+                if mode == 'relative':
+                    # Relative to active window
+                    hwnd = ctypes.windll.user32.GetForegroundWindow()
+                    if hwnd:
+                        rect = ctypes.wintypes.RECT()
+                        ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect))
+                        target_x += rect.left
+                        target_y += rect.top
+                        
+                elif mode == 'offset':
+                    # Offset from current position
+                    curr_x, curr_y = self.mouse.position
+                    target_x += curr_x
+                    target_y += curr_y
+            
+            # 3. Handle Randomization
+            rand_pixels = event.get('randomize_pixels', 0)
+            if rand_pixels > 0:
+                target_x += random.randint(-rand_pixels, rand_pixels)
+                target_y += random.randint(-rand_pixels, rand_pixels)
+            
+            # Execute
+            if etype == 'mouse_move':
+                self.mouse.position = (target_x, target_y)
+                
+            elif etype == 'mouse_click':
+                # Move first if needed (usually click implies move to that spot)
+                # But if ignore_coordinates is True, we are already there.
+                self.mouse.position = (target_x, target_y)
+                
+                # pynput button mapping
+                btn = Button.left
+                if 'Button.right' in event.get('button', ''):
+                    btn = Button.right
+                elif 'Button.middle' in event.get('button', ''):
+                    btn = Button.middle
+                
+                if event.get('pressed', True):
+                    self.mouse.press(btn)
+                else:
+                    self.mouse.release(btn)
                 
         elif etype == 'mouse_scroll':
-            self.mouse.scroll(event['dx'], event['dy'])
+            self.mouse.scroll(event.get('dx', 0), event.get('dy', 0))
             
         elif etype == 'key_press':
             key = self._parse_key(event['key'])

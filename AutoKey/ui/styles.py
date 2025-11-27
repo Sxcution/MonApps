@@ -139,5 +139,30 @@ QCheckBox, QRadioButton {
 QCheckBox::indicator, QRadioButton::indicator {
     width: 16px;
     height: 16px;
+    border: 1px solid #CCCCCC;
+    background: #FFFFFF;
+    border-radius: 8px; /* Circular for radio */
+}
+QCheckBox::indicator {
+    border-radius: 3px; /* Square for checkbox */
+}
+QRadioButton::indicator:checked {
+    background-color: #0078D4;
+    border: 1px solid #0078D4;
+    image: none; /* We can use a simple dot if needed, or just color */
+}
+QCheckBox::indicator:checked {
+    background-color: #0078D4;
+    border: 1px solid #0078D4;
+}
+/* Simple dot for radio checked */
+QRadioButton::indicator:checked::after {
+    content: "";
+    display: block;
+    width: 8px;
+    height: 8px;
+    margin: 3px;
+    background: white;
+    border-radius: 4px;
 }
 """

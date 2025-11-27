@@ -94,14 +94,16 @@ class MainWindow(QMainWindow):
         
         # Table View
         self.table_view = QTableView()
-        self.model = QStandardItemModel(0, 3)
-        # Reordered Columns: Action | Delay (ms) | Details
-        self.model.setHorizontalHeaderLabels(["Action", "Delay (ms)", "Details"])
+        self.model = QStandardItemModel(0, 4)
+        # Reordered Columns: Step | Action | Delay (ms) | Details
+        self.model.setHorizontalHeaderLabels(["Step", "Action", "Delay (ms)", "Details"])
         self.table_view.setModel(self.model)
         self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table_view.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        self.table_view.setColumnWidth(0, 50) # Fixed width for Step
         self.table_view.setAlternatingRowColors(True)
-        self.table_view.setShowGrid(True) # Show Grid
-        self.table_view.verticalHeader().setVisible(True) # Show Row Numbers
+        self.table_view.setShowGrid(True)
+        self.table_view.verticalHeader().setVisible(False) # Hide default vertical header
         self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.customContextMenuRequested.connect(self.show_context_menu)
         
@@ -109,8 +111,8 @@ class MainWindow(QMainWindow):
         self.table_view.clicked.connect(self.on_table_clicked)
         
         # Set Delegates
-        self.table_view.setItemDelegateForColumn(0, ActionDelegate(self.table_view))
-        self.table_view.setItemDelegateForColumn(1, NumberDelegate(self.table_view))
+        self.table_view.setItemDelegateForColumn(1, ActionDelegate(self.table_view))
+        self.table_view.setItemDelegateForColumn(2, NumberDelegate(self.table_view))
         
         # Connect Item Changed
         self.model.itemChanged.connect(self.on_item_changed)
@@ -206,7 +208,12 @@ class MainWindow(QMainWindow):
         row = self.model.rowCount()
         self.model.insertRow(row)
         
-        # Action Column (0)
+        # Step Column (0)
+        step_item = QStandardItem(str(row + 1))
+        step_item.setEditable(False)
+        step_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # Action Column (1)
         action_text = ""
         if event['type'] == 'undefined':
             action_text = event['text']
@@ -229,12 +236,12 @@ class MainWindow(QMainWindow):
              action_item.setForeground(QColor("gray"))
              action_item.setEditable(False) # Prevent direct edit until setup
         
-        # Delay Column (1) - Display in Milliseconds
+        # Delay Column (2) - Display in Milliseconds
         ms_delay = int(event.get('time', 0.5) * 1000)
         delay_item = QStandardItem(str(ms_delay))
         delay_item.setEditable(True)
         
-        # Details Column (2)
+        # Details Column (3)
         details = ""
         if event['type'] == 'mouse_move':
             details = f"x={event.get('x',0)}, y={event.get('y',0)}"
@@ -252,9 +259,10 @@ class MainWindow(QMainWindow):
         details_item = QStandardItem(details)
         details_item.setEditable(True)
         
-        self.model.setItem(row, 0, action_item)
-        self.model.setItem(row, 1, delay_item)
-        self.model.setItem(row, 2, details_item)
+        self.model.setItem(row, 0, step_item)
+        self.model.setItem(row, 1, action_item)
+        self.model.setItem(row, 2, delay_item)
+        self.model.setItem(row, 3, details_item)
         self.table_view.scrollToBottom()
 
     def on_item_changed(self, item):
@@ -267,7 +275,7 @@ class MainWindow(QMainWindow):
             
         event = self.recorded_events[row]
         
-        if col == 0: # Action
+        if col == 1: # Action
             text = item.text()
             # Smart Action Logic
             if text.startswith("Key ") and " Down" in text:
@@ -279,7 +287,7 @@ class MainWindow(QMainWindow):
                 item.setText(f"Key {text} Down")
                 self.model.blockSignals(False)
                 
-                details_item = self.model.item(row, 2)
+                details_item = self.model.item(row, 3)
                 if details_item:
                     details_item.setText(f"Key: {text.lower()}")
                     
@@ -293,14 +301,14 @@ class MainWindow(QMainWindow):
                 item.setText("Mouse Click")
                 self.model.blockSignals(False)
             
-        elif col == 1: # Delay (ms input)
+        elif col == 2: # Delay (ms input)
             try:
                 ms_value = int(item.text())
                 event['time'] = ms_value / 1000.0 
             except ValueError:
                 pass 
                 
-        elif col == 2: # Details
+        elif col == 3: # Details
             pass
 
     def on_table_clicked(self, index):
@@ -315,8 +323,8 @@ class MainWindow(QMainWindow):
             
         event = self.recorded_events[row]
         
-        # If clicking Action column (0)
-        if col == 0:
+        # If clicking Action column (1)
+        if col == 1:
             if event['type'] == 'undefined':
                 self.show_setup_menu(index)
             else:
@@ -360,6 +368,10 @@ class MainWindow(QMainWindow):
         event = self.recorded_events[row]
         
         # Re-generate items
+        # Step
+        self.model.item(row, 0).setText(str(row + 1))
+        
+        # Action
         action_text = ""
         if event['type'] == 'key_press':
              action_text = f"Key {event['key']} Down"
@@ -372,13 +384,13 @@ class MainWindow(QMainWindow):
         elif event['type'] == 'mouse_scroll':
              action_text = "Mouse Wheel"
              
-        self.model.item(row, 0).setText(action_text)
-        self.model.item(row, 0).setForeground(QColor("black")) # Reset color
-        self.model.item(row, 0).setEditable(True)
+        self.model.item(row, 1).setText(action_text)
+        self.model.item(row, 1).setForeground(QColor("black")) # Reset color
+        self.model.item(row, 1).setEditable(True)
         
         # Delay
         ms_delay = int(event.get('time', 0.5) * 1000)
-        self.model.item(row, 1).setText(str(ms_delay))
+        self.model.item(row, 2).setText(str(ms_delay))
         
         # Details
         details = ""
@@ -393,7 +405,7 @@ class MainWindow(QMainWindow):
         elif event['type'] == 'mouse_scroll':
             details = f"Delta: {event.get('dy', 0)}"
             
-        self.model.item(row, 2).setText(details)
+        self.model.item(row, 3).setText(details)
 
     def save_recording(self):
         if not self.recorded_events:
