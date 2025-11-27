@@ -6,7 +6,7 @@ from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction
 import threading
 
 from ui.toolbar import MainToolbar
-from ui.styles import WHITE_THEME
+from ui.styles import MAIN_STYLESHEET
 from core.recorder import Recorder
 from core.player import Player
 
@@ -47,7 +47,8 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.table_view)
         
         # Apply Theme
-        self.setStyleSheet(WHITE_THEME)
+        print("🔍 Applying MAIN_STYLESHEET for solid white theme")
+        self.setStyleSheet(MAIN_STYLESHEET)
         
         # Connect Toolbar Actions
         self.toolbar.open_action.triggered.connect(self.load_recording)
