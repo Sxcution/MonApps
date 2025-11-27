@@ -4,7 +4,7 @@ from PyQt6.QtCore import QSettings, QSize, QPoint, Qt, pyqtSlot, QTimer
 import ctypes
 from ctypes import c_int, byref
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction, QPalette, QColor, QIcon, QPixmap
-from utils.snipping_tool import SnippingWidget
+
 import time
 import threading
 
@@ -16,7 +16,7 @@ from core.player import Player
 from ui.delegates import ActionDelegate, NumberDelegate
 from ui.mouse_dialog import MouseActionDialog
 from ui.keyboard_dialog import KeyboardActionDialog
-from ui.wait_image_dialog import WaitImageDialog
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -232,9 +232,7 @@ class MainWindow(QMainWindow):
              action_text = "Mouse Move"
         elif event['type'] == 'mouse_scroll':
              action_text = "Mouse Wheel"
-        elif event['type'] == 'wait_image':
-             action_text = "Wait Image"
-             
+
         action_item = QStandardItem(action_text)
         action_item.setEditable(True)
         if event['type'] == 'undefined':
@@ -268,9 +266,7 @@ class MainWindow(QMainWindow):
             details = f"Key: {event.get('key','')}"
         elif event['type'] == 'mouse_scroll':
             details = f"Delta: {event.get('dy', 0)}"
-        elif event['type'] == 'wait_image':
-            details = f"Image: {event.get('path','')} (t={event.get('timeout_ms',60000)}ms)"
-            
+
         details_item = QStandardItem(details)
         details_item.setEditable(True)
         
@@ -364,18 +360,7 @@ class MainWindow(QMainWindow):
         elif action == delete_action:
             self.delete_event(index.row())
             
-        # New Capture Action
-        action_capture = menu.addAction("📸 Capture Screen Region (Jibit Style)")
-        # Old File Action
-        action_file = menu.addAction("📂 Select Image File...")
 
-        action = menu.exec(self.table_view.viewport().mapToGlobal(pos))
-
-        if action == action_capture:
-            self.start_snipping()
-        elif action == action_file:
-            self.insert_wait_image_from_file()
-        elif action == edit_action:
             self.edit_event(index.row())
         elif action == delete_action:
             self.delete_event(index.row())
@@ -391,8 +376,7 @@ class MainWindow(QMainWindow):
             self.open_mouse_dialog(row)
         elif event['type'] in ['key_press', 'key_release']:
             self.open_keyboard_dialog(row)
-        elif event['type'] == 'wait_image':
-            self.open_wait_image_dialog(row)
+
         elif event['type'] == 'undefined':
             # For undefined, show setup menu logic or just default to mouse?
             # Let's re-use show_setup_menu logic or just open mouse dialog as default
@@ -434,7 +418,7 @@ class MainWindow(QMainWindow):
         menu = QMenu(self)
         mouse_action = menu.addAction("Mouse Action")
         keyboard_action = menu.addAction("Keyboard Action")
-        wait_image_action = menu.addAction("Wait Image")
+
         
         action = menu.exec(self.table_view.viewport().mapToGlobal(self.table_view.visualRect(index).bottomLeft()))
         
@@ -442,8 +426,7 @@ class MainWindow(QMainWindow):
             self.open_mouse_dialog(index.row())
         elif action == keyboard_action:
             self.open_keyboard_dialog(index.row())
-        elif action == wait_image_action:
-            self.open_wait_image_dialog(index.row())
+
 
     def open_mouse_dialog(self, row):
         event = self.recorded_events[row]
@@ -459,12 +442,7 @@ class MainWindow(QMainWindow):
             new_data = dialog.get_data()
             self.update_event(row, new_data)
 
-    def open_wait_image_dialog(self, row):
-        event = self.recorded_events[row]
-        dialog = WaitImageDialog(self, event)
-        if dialog.exec():
-            new_data = dialog.get_data()
-            self.update_event(row, new_data)
+
 
 
 
@@ -474,66 +452,7 @@ class MainWindow(QMainWindow):
         # Refresh row
         self.refresh_row(row)
 
-    def start_snipping(self):
-        """
-        Step 1: Hide Main Window
-        Step 2: Wait for animation to finish (200ms)
-        Step 3: Launch Snipper
-        """
-        print("DEBUG: start_snipping called")
-        self.showMinimized()
-        # Important: Give Windows time to minimize animation before taking screenshot
-        QTimer.singleShot(300, self._launch_snipper)
 
-    def _launch_snipper(self):
-        print("DEBUG: _launch_snipper called")
-        # Create new instance every time to get fresh screenshot
-        self.snipper = SnippingWidget()
-        
-        # Connect signals
-        self.snipper.snippet_taken.connect(self.on_image_captured)
-        self.snipper.closed.connect(self.on_snipper_closed)
-        
-        # Show Full Screen Overlay
-        self.snipper.show()
-        self.snipper.activateWindow()
-        print("DEBUG: Snipper shown")
-
-    def on_image_captured(self, file_path):
-        """Called when user successfully selects a region"""
-        print(f"DEBUG: on_image_captured: {file_path}")
-        self.showNormal()      # Restore Main Window
-        self.activateWindow()  # Bring to front
-        self.add_wait_image_event(file_path)
-
-    def on_snipper_closed(self):
-        """Called when user presses ESC or cancels"""
-        print("DEBUG: on_snipper_closed")
-        self.showNormal()
-        self.activateWindow()
-
-    def insert_wait_image_from_file(self):
-        # Renamed from original insert_wait_image
-        from PyQt6.QtWidgets import QFileDialog, QInputDialog
-        path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Images (*.png *.jpg)")
-        if path:
-            self.add_wait_image_event(path)
-
-    def add_wait_image_event(self, path):
-        from PyQt6.QtWidgets import QInputDialog
-        timeout, ok = QInputDialog.getInt(self, "Timeout", "Wait timeout (seconds):", 10, 1, 3600)
-        if not ok: return
-
-        event = {
-            'type': 'wait_image',
-            'path': path,
-            'timeout_ms': timeout * 1000, # Convert to ms
-            'threshold': 0.85, # Default
-            'poll_interval_ms': 150, # Default
-            'time': 0.5
-        }
-        self.recorded_events.append(event)
-        self.add_event_to_table(event)
 
     def refresh_row(self, row):
         event = self.recorded_events[row]
@@ -554,8 +473,7 @@ class MainWindow(QMainWindow):
              action_text = "Mouse Move"
         elif event['type'] == 'mouse_scroll':
              action_text = "Mouse Wheel"
-        elif event['type'] == 'wait_image':
-             action_text = "Wait Image"
+
              
         self.model.item(row, 1).setText(action_text)
         self.model.item(row, 1).setForeground(QColor("black")) # Reset color
@@ -587,12 +505,7 @@ class MainWindow(QMainWindow):
             details = f"Key: {event.get('key','')}"
         elif event['type'] == 'mouse_scroll':
             details = f"Delta: {event.get('dy', 0)}"
-        elif event['type'] == 'wait_image':
-            details = f"Image: {event.get('path','')} (t={event.get('timeout_ms',60000)}ms)"
-            # Add Preview Icon
-            icon = QIcon(event.get('path', ''))
-            self.model.item(row, 1).setIcon(icon)
-            self.model.item(row, 1).setToolTip(f"<img src='{event.get('path', '')}' width='200'>")
+
             
         self.model.item(row, 3).setText(details)
 

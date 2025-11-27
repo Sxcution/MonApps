@@ -104,30 +104,7 @@ class Player(threading.Thread):
             if key:
                 self.keyboard.release(key)
             
-        elif etype == 'wait_image':
-            from core.image_search import wait_for_image
-            print(f"Waiting for image: {event.get('path')}")
-            
-            # Extract params
-            path = event.get('path')
-            timeout = event.get('timeout_ms', 60000)
-            threshold = event.get('threshold', 0.85)
-            poll = event.get('poll_interval_ms', 150)
-            region = event.get('region') # None or [x1, y1, x2, y2]
-            
-            if region:
-                region = tuple(region)
-                
-            pos = wait_for_image(path, region, timeout, poll, threshold)
-            
-            if pos:
-                print(f"Image found at {pos}")
-                # Optional: Move mouse to image?
-                # self.mouse.position = pos
-            else:
-                print(f"Image not found within {timeout}ms timeout.")
-                # Stop execution on timeout?
-                # self.stop_event.set()
+
 
     def _parse_key(self, key_str):
         from pynput.keyboard import Key
