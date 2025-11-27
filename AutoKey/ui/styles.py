@@ -67,4 +67,20 @@ QHeaderView::section {
     padding: 4px;
     font-weight: bold;
 }
+
+/* --- MENUS --- */
+QMenu {
+    background-color: #FFFFFF;
+    border: 1px solid #CCCCCC;
+    padding: 4px;
+}
+QMenu::item {
+    padding: 6px 24px 6px 12px;
+    background-color: transparent;
+    color: #1A1A1A;
+}
+QMenu::item:selected {
+    background-color: #E5F3FF;
+    color: #000000;
+}
 """
