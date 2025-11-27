@@ -31,7 +31,7 @@ class Player(threading.Thread):
     def run(self):
         print("Player started")
         
-        start_time = time.time()
+        self.start_time = time.time()
         current_run = 0
         
         while not self.stop_event.is_set():
@@ -42,7 +42,7 @@ class Player(threading.Thread):
                 
             # Check Duration
             if self.max_duration > 0:
-                elapsed = time.time() - start_time
+                elapsed = time.time() - self.start_time
                 if elapsed >= self.max_duration:
                     print("Reached duration limit.")
                     break
@@ -64,8 +64,23 @@ class Player(threading.Thread):
     def execute_macro(self):
         """Executes one pass of the macro"""
         current_idx = 0
+        
         while current_idx < len(self.events) and not self.stop_event.is_set():
             event = self.events[current_idx]
+            
+            # Check duration limit
+            if self.max_duration > 0:
+                elapsed = (time.time() - self.start_time) / 60 # minutes
+                if elapsed >= self.max_duration:
+                    print("⏱️ Max duration reached. Stopping.")
+                    return
+
+            # Handle delay (Relative)
+            delay = event.get('time', 0.0)
+            if delay > 0:
+                time.sleep(delay)
+
+            # Execute event
             next_idx = self.execute_event(event, current_idx)
             
             if next_idx is not None:
@@ -101,11 +116,6 @@ class Player(threading.Thread):
         elif etype == 'key_release':
             # Use DirectInput for games
             release_key(event['key'])
-                
-        # Handle delay
-        delay = event.get('time', 0.5)
-        if delay > 0:
-            time.sleep(delay)
             
         return None
 
@@ -313,9 +323,8 @@ class Player(threading.Thread):
     def perform_after_action(self):
         """Executes the configured after-action"""
         if self.after_action == "Tắt Máy":
-            print("Shutting down computer...")
+            print("Shutting down...")
             os.system("shutdown /s /t 0")
         elif self.after_action == "Sleep":
-            print("Sleeping computer...")
-            # Windows Sleep command (Hibernate off required for pure sleep, but this triggers suspend)
+            print("Going to sleep...")
             os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")

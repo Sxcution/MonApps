@@ -19,6 +19,7 @@ class Recorder(QObject):
         self.recording = True
         self.events = []
         self.start_time = time.time()
+        self.last_time = self.start_time # Initialize for relative deltas
         
         # Start listeners
         self.mouse_listener = mouse.Listener(
@@ -44,7 +45,10 @@ class Recorder(QObject):
         return self.events
 
     def _get_delay(self):
-        return time.time() - self.start_time
+        now = time.time()
+        delta = now - self.last_time
+        self.last_time = now
+        return delta
 
     def on_move(self, x, y):
         if not self.recording: return
