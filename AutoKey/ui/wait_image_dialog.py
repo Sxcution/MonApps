@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                              QDialogButtonBox, QFileDialog, QWidget, QApplication, QFormLayout)
 from PyQt6.QtCore import Qt, QRect, pyqtSignal
 from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QPixmap
+from utils.snipping_tool import SnippingWidget
 import mss
 import mss.tools
 import os
@@ -216,46 +217,61 @@ class WaitImageDialog(QDialog):
         self.overlay.show()
         
     def capture_image_template(self):
-        self.hide()
-        QApplication.processEvents()
-        
-        self.overlay = RegionSelectionOverlay()
-        self.overlay.region_selected.connect(self.on_image_captured)
-        self.overlay.show()
-        
-    def on_image_captured(self, rect):
-        # rect is (x1, y1, x2, y2)
-        x1, y1, x2, y2 = rect
-        w = x2 - x1
-        h = y2 - y1
-        
-        if w <= 0 or h <= 0:
-            self.show()
-            return
-
         try:
-            # Create images directory if not exists
-            img_dir = os.path.join(os.getcwd(), "captured_images")
-            os.makedirs(img_dir, exist_ok=True)
+            print("DEBUG: capture_image_template called")
+            # Set non-modal FIRST before hiding
+            self.setWindowModality(Qt.WindowModality.NonModal)
+            # Minimize to keep it alive but out of the way
+            self.showMinimized()
+            QApplication.processEvents()
             
-            # Generate filename
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"template_{timestamp}.png"
-            filepath = os.path.join(img_dir, filename)
-            
-            # Capture using mss
-            with mss.mss() as sct:
-                monitor = {"top": y1, "left": x1, "width": w, "height": h}
-                sct_img = sct.grab(monitor)
-                mss.tools.to_png(sct_img.rgb, sct_img.size, output=filepath)
-                
-            # Update UI
-            self.img_path_edit.setText(filepath)
-            
+            # Call directly - no timer needed
+            print("DEBUG: Launching snipper directly")
+            self._launch_snipper_for_template()
         except Exception as e:
-            print(f"Error capturing image: {e}")
-            
-        self.show()
+            print(f"ERROR in capture_image_template: {e}")
+            import traceback
+            traceback.print_exc()
+        
+    def _launch_snipper_for_template(self):
+        try:
+            print("DEBUG: _launch_snipper_for_template called")
+            self.snipper = SnippingWidget()
+            print("DEBUG: SnippingWidget created")
+            self.snipper.snippet_taken.connect(self.on_image_captured)
+            self.snipper.closed.connect(self.on_snipper_closed)
+            print("DEBUG: Signals connected")
+            self.snipper.show()
+            self.snipper.activateWindow()
+            print("DEBUG: Snipper shown and activated")
+        except Exception as e:
+            print(f"ERROR in _launch_snipper_for_template: {e}")
+            import traceback
+            traceback.print_exc()
+            self.show()
+        
+    def on_snipper_closed(self):
+        try:
+            print("DEBUG: on_snipper_closed in dialog")
+            self.setWindowModality(Qt.WindowModality.ApplicationModal)
+            self.showNormal()
+            self.activateWindow()
+        except Exception as e:
+            print(f"ERROR in on_snipper_closed: {e}")
+        
+    def on_image_captured(self, file_path):
+        try:
+            print(f"DEBUG: on_image_captured in dialog: {file_path}")
+            # Update the image path
+            self.img_path_edit.setText(file_path)
+            # Restore modal and show
+            self.setWindowModality(Qt.WindowModality.ApplicationModal)
+            self.showNormal()
+            self.activateWindow()
+        except Exception as e:
+            print(f"ERROR in on_image_captured: {e}")
+            import traceback
+            traceback.print_exc()
         
     def on_region_selected(self, rect):
         self.x1_spin.setValue(rect[0])

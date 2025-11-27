@@ -1,52 +1,102 @@
+import sys
 from PyQt6.QtWidgets import QWidget, QApplication
 from PyQt6.QtCore import Qt, QRect, pyqtSignal, QPoint
-from PyQt6.QtGui import QPainter, QColor, QPen, QCursor
+from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QPixmap, QCursor
 
 class SnippingWidget(QWidget):
-    # Signal returns the path of the saved image
-    snippet_taken = pyqtSignal(str) 
-    closed = pyqtSignal()
+    # Signals
+    snippet_taken = pyqtSignal(str)  # Returns path
+    closed = pyqtSignal()            # Returns nothing (cancel)
 
     def __init__(self):
         super().__init__()
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        print("DEBUG: SnippingWidget initializing...")
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint | 
+            Qt.WindowType.WindowStaysOnTopHint | 
+            Qt.WindowType.Tool
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
         self.setCursor(QCursor(Qt.CursorShape.CrossCursor))
         self.setMouseTracking(True)
         
-        # Geometry setup (cover all screens)
-        full_screen = QApplication.primaryScreen().geometry()
-        for screen in QApplication.screens():
-            full_screen = full_screen.united(screen.geometry())
-        self.setGeometry(full_screen)
-        
+        # State
         self.begin = QPoint()
         self.end = QPoint()
         self.is_snipping = False
-        self.opacity_color = QColor(0, 0, 0, 100) # Dim background
+        
+        # Screen Capture Data
+        self.original_pixmap = None  # Clean screenshot
+        self.dark_pixmap = None      # Dimmed screenshot
+        
+        # Init Geometry & Capture
+        self.capture_screen_state()
+        print("DEBUG: SnippingWidget initialized.")
+
+    def capture_screen_state(self):
+        """Captures the entire virtual desktop immediately."""
+        print("DEBUG: Capturing screen state...")
+        screen = QApplication.primaryScreen()
+        
+        # Calculate total geometry of all screens
+        total_geometry = QRect()
+        for s in QApplication.screens():
+            total_geometry = total_geometry.united(s.geometry())
+            
+        print(f"DEBUG: Total geometry: {total_geometry}")
+
+        # Grab Window (0 means desktop)
+        self.original_pixmap = screen.grabWindow(0, 
+                                                 total_geometry.x(), 
+                                                 total_geometry.y(), 
+                                                 total_geometry.width(), 
+                                                 total_geometry.height())
+        
+        if self.original_pixmap.isNull():
+            print("ERROR: Failed to grab screen!")
+        else:
+            print(f"DEBUG: Screen grabbed. Size: {self.original_pixmap.size()}")
+
+        # Create a darkened version for the background
+        self.dark_pixmap = self.original_pixmap.copy()
+        painter = QPainter(self.dark_pixmap)
+        painter.setBrush(QColor(0, 0, 0, 100)) # Black with 100 alpha
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRect(self.dark_pixmap.rect())
+        painter.end()
+        
+        # Set widget geometry to cover everything
+        self.setGeometry(total_geometry)
 
     def paintEvent(self, event):
+        if not self.dark_pixmap:
+            return
+
         painter = QPainter(self)
-        painter.setBrush(self.opacity_color)
-        painter.setPen(Qt.PenStyle.NoPen)
         
-        # Fill whole screen with dim color
-        painter.drawRect(self.rect())
+        # 1. Draw the darkened background everywhere
+        painter.drawPixmap(0, 0, self.dark_pixmap)
         
+        # 2. If selecting, draw the original (bright) pixmap in the selection rect
         if self.is_snipping:
-            # Clear the selected rectangle (make it transparent) to "see through"
-            selection_rect = QRect(self.begin, self.end).normalized()
-            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
-            painter.drawRect(selection_rect)
-            
-            # Reset mode to draw border
-            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
-            pen = QPen(QColor('#0078D4'), 2) # Blue border like Windows/Jibit
-            painter.setPen(pen)
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawRect(selection_rect)
+            rect = QRect(self.begin, self.end).normalized()
+            if not rect.isEmpty():
+                # Draw the clear part (reveal original)
+                painter.drawPixmap(rect, self.original_pixmap, rect)
+                
+                # Draw Border
+                pen = QPen(QColor('#0078D4'), 2)
+                painter.setPen(pen)
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawRect(rect)
+                
+                # Draw Coordinates Text (Optional - Jibit style)
+                text = f"{rect.width()} x {rect.height()}"
+                painter.setPen(QColor('white'))
+                painter.drawText(rect.topLeft() - QPoint(0, 5), text)
 
     def mousePressEvent(self, event):
+        print(f"DEBUG: Mouse press at {event.pos()}")
         self.begin = event.pos()
         self.end = event.pos()
         self.is_snipping = True
@@ -58,33 +108,35 @@ class SnippingWidget(QWidget):
             self.update()
 
     def mouseReleaseEvent(self, event):
+        print(f"DEBUG: Mouse release at {event.pos()}")
         self.is_snipping = False
-        self.close()
-        
-        # Capture logic
         rect = QRect(self.begin, self.end).normalized()
-        if rect.width() > 10 and rect.height() > 10:
-            self.capture_image(rect)
-        else:
+        
+        # If selection is too small, treat as cancel or mistake
+        if rect.width() < 10 or rect.height() < 10:
+            print("DEBUG: Selection too small, cancelling.")
+            self.close()
             self.closed.emit()
+            return
 
-    def capture_image(self, rect):
-        # Hide self to grab the screen behind
-        self.hide()
-        screen = QApplication.primaryScreen()
-        if screen:
-            pixmap = screen.grabWindow(0, rect.x(), rect.y(), rect.width(), rect.height())
-            
-            # Save to temp file
-            import os, time
-            if not os.path.exists("captures"):
-                os.makedirs("captures")
-            
-            filename = f"captures/snip_{int(time.time())}.png"
-            # Ensure absolute path
-            abs_path = os.path.abspath(filename)
-            pixmap.save(abs_path)
-            print(f"📸 Image captured: {abs_path}")
-            self.snippet_taken.emit(abs_path)
-        else:
+        # Crop the image from the ORIGINAL (Clean) pixmap
+        cropped = self.original_pixmap.copy(rect)
+        
+        # Save to temp file
+        import os, time
+        if not os.path.exists("captures"):
+            os.makedirs("captures")
+        
+        filename = f"captures/snip_{int(time.time())}.png"
+        full_path = os.path.abspath(filename)
+        cropped.save(full_path)
+        
+        print(f"📸 Saved snippet: {full_path}")
+        self.close()
+        self.snippet_taken.emit(full_path)
+
+    def keyPressEvent(self, event):
+        # Allow cancelling with ESC
+        if event.key() == Qt.Key.Key_Escape:
+            self.close()
             self.closed.emit()

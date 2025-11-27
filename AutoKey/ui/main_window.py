@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QTableView, QHeaderView, 
                              QToolButton, QMenu, QFileDialog, QInputDialog)
-from PyQt6.QtCore import QSettings, QSize, QPoint, Qt, pyqtSlot
+from PyQt6.QtCore import QSettings, QSize, QPoint, Qt, pyqtSlot, QTimer
 import ctypes
 from ctypes import c_int, byref
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction, QPalette, QColor, QIcon, QPixmap
@@ -475,25 +475,42 @@ class MainWindow(QMainWindow):
         self.refresh_row(row)
 
     def start_snipping(self):
-        # Minimize main window to see the screen
+        """
+        Step 1: Hide Main Window
+        Step 2: Wait for animation to finish (200ms)
+        Step 3: Launch Snipper
+        """
+        print("DEBUG: start_snipping called")
         self.showMinimized()
-
-        # Small delay to allow window animation to finish
-        # (Use QTimer in production, simplified sleep here)
-        # We use a delayed init for the snipper
-        from PyQt6.QtCore import QTimer
+        # Important: Give Windows time to minimize animation before taking screenshot
         QTimer.singleShot(300, self._launch_snipper)
 
     def _launch_snipper(self):
+        print("DEBUG: _launch_snipper called")
+        # Create new instance every time to get fresh screenshot
         self.snipper = SnippingWidget()
+        
+        # Connect signals
         self.snipper.snippet_taken.connect(self.on_image_captured)
-        self.snipper.closed.connect(self.showNormal) # Restore if cancelled
+        self.snipper.closed.connect(self.on_snipper_closed)
+        
+        # Show Full Screen Overlay
         self.snipper.show()
+        self.snipper.activateWindow()
+        print("DEBUG: Snipper shown")
 
     def on_image_captured(self, file_path):
-        self.showNormal() # Restore window
-        self.activateWindow()
+        """Called when user successfully selects a region"""
+        print(f"DEBUG: on_image_captured: {file_path}")
+        self.showNormal()      # Restore Main Window
+        self.activateWindow()  # Bring to front
         self.add_wait_image_event(file_path)
+
+    def on_snipper_closed(self):
+        """Called when user presses ESC or cancels"""
+        print("DEBUG: on_snipper_closed")
+        self.showNormal()
+        self.activateWindow()
 
     def insert_wait_image_from_file(self):
         # Renamed from original insert_wait_image
