@@ -1,46 +1,42 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QComboBox, QSpinBox, QDialogButtonBox)
+                             QComboBox, QSpinBox, QDialogButtonBox, QKeySequenceEdit)
+from PyQt6.QtGui import QKeySequence
 
 class KeyboardActionDialog(QDialog):
     def __init__(self, parent=None, event_data=None):
         super().__init__(parent)
         self.setWindowTitle("Edit selected command")
-        self.setFixedSize(400, 200)
+        self.setWindowTitle("Edit selected command")
+        # Removed setFixedSize to allow auto-sizing
         
         self.event_data = event_data or {}
         
         layout = QVBoxLayout(self)
+        layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetFixedSize) # Auto-fit content
+        layout.setSpacing(10)
         
-        layout.addWidget(QLabel("This command send keystrokes to the currently active window"))
+        # Combined Row for Key and Type (Swapped)
+        row_layout = QHBoxLayout()
+        row_layout.setSpacing(10) # Minimal spacing
         
-        # Event Type
-        type_layout = QHBoxLayout()
-        type_layout.addWidget(QLabel("Keyboard event type:"))
+        # Key (First now)
+        row_layout.addWidget(QLabel("Key:"))
+        self.key_edit = QKeySequenceEdit()
+        self.key_edit.setMaximumSequenceLength(1)
+        self.key_edit.setFixedWidth(100) # Reduced width
+        row_layout.addWidget(self.key_edit)
+        
+        # Type (Second now)
+        row_layout.addWidget(QLabel("Type:"))
         self.type_combo = QComboBox()
         self.type_combo.addItems(["KeyPress", "KeyDown", "KeyUp"])
-        type_layout.addWidget(self.type_combo)
-        layout.addLayout(type_layout)
+        self.type_combo.setFixedWidth(90) # Reduced width
+        row_layout.addWidget(self.type_combo)
         
-        # Key
-        key_layout = QHBoxLayout()
-        key_layout.addWidget(QLabel("Key:"))
-        self.key_combo = QComboBox()
-        # Populate with common keys
-        keys = [chr(i) for i in range(65, 91)] + [str(i) for i in range(10)] # A-Z, 0-9
-        keys.extend(["Enter", "Space", "Tab", "Esc", "Backspace", "Shift", "Ctrl", "Alt"])
-        self.key_combo.addItems(keys)
-        self.key_combo.setEditable(True) # Allow typing
+        row_layout.addStretch()
+        layout.addLayout(row_layout)
         
-        key_layout.addWidget(self.key_combo)
-        
-        # ASCII/Scan code (placeholder)
-        self.code_spin = QSpinBox()
-        self.code_spin.setEnabled(False)
-        key_layout.addWidget(self.code_spin)
-        
-        layout.addLayout(key_layout)
-        
-        layout.addStretch()
+        # Removed layout.addStretch() to bring buttons closer
         
         # Buttons
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -49,6 +45,9 @@ class KeyboardActionDialog(QDialog):
         layout.addWidget(buttons)
         
         self.load_data()
+        
+        # Auto-focus the key input
+        self.key_edit.setFocus()
         
     def load_data(self):
         etype = self.event_data.get('type', 'key_press')
@@ -60,12 +59,16 @@ class KeyboardActionDialog(QDialog):
         
         key = self.event_data.get('key', '')
         if key:
-            self.key_combo.setCurrentText(key.upper())
+            self.key_edit.setKeySequence(QKeySequence(key))
             
     def get_data(self):
         etype_text = self.type_combo.currentText()
+        
+        # Get key string from sequence
+        key_seq = self.key_edit.keySequence().toString()
+        
         data = {
-            'key': self.key_combo.currentText().lower(),
+            'key': key_seq,
             'time': self.event_data.get('time', 0.5)
         }
         

@@ -3,7 +3,9 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QTableView, QHea
 from PyQt6.QtCore import QSettings, QSize, QPoint, Qt, pyqtSlot
 import ctypes
 from ctypes import c_int, byref
-from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction, QPalette, QColor
+from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction, QPalette, QColor, QIcon, QPixmap
+from utils.snipping_tool import SnippingWidget
+import time
 import threading
 
 from ui.toolbar import MainToolbar
@@ -14,6 +16,7 @@ from core.player import Player
 from ui.delegates import ActionDelegate, NumberDelegate
 from ui.mouse_dialog import MouseActionDialog
 from ui.keyboard_dialog import KeyboardActionDialog
+from ui.wait_image_dialog import WaitImageDialog
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -140,6 +143,8 @@ class MainWindow(QMainWindow):
         hotkey_action.triggered.connect(self.open_hotkey_settings)
         self.toolbar.settings_action.setMenu(settings_menu)
         
+
+        
         # Make the button show the menu immediately
         widget = self.toolbar.widgetForAction(self.toolbar.settings_action)
         if widget:
@@ -218,7 +223,7 @@ class MainWindow(QMainWindow):
         if event['type'] == 'undefined':
             action_text = event['text']
         elif event['type'] == 'key_press':
-             action_text = f"Key {event['key']} Down"
+             action_text = f"Key {event['key']}"
         elif event['type'] == 'key_release':
              action_text = f"Key {event['key']} Up"
         elif event['type'] == 'mouse_click':
@@ -246,7 +251,17 @@ class MainWindow(QMainWindow):
         if event['type'] == 'mouse_move':
             details = f"x={event.get('x',0)}, y={event.get('y',0)}"
         elif event['type'] == 'mouse_click':
-            details = f"{event.get('button','Left')} {'Down' if event.get('pressed',True) else 'Up'} at {event.get('x',0)},{event.get('y',0)}"
+            button = event.get('button', 'Button.left')
+            x = event.get('x', 0)
+            y = event.get('y', 0)
+            if button == 'Button.left':
+                details = f"Click: {x},{y}"
+            elif button == 'Button.right':
+                details = f"Right Click: {x},{y}"
+            elif button == 'Button.middle':
+                details = f"Middle Click: {x},{y}"
+            else:
+                details = f"{button}: {x},{y}"
         elif event['type'] == 'key_press':
             details = f"Key: {event.get('key','')}"
         elif event['type'] == 'key_release':
@@ -254,7 +269,7 @@ class MainWindow(QMainWindow):
         elif event['type'] == 'mouse_scroll':
             details = f"Delta: {event.get('dy', 0)}"
         elif event['type'] == 'wait_image':
-            details = f"Path: {event.get('path','')}"
+            details = f"Image: {event.get('path','')} (t={event.get('timeout_ms',60000)}ms)"
             
         details_item = QStandardItem(details)
         details_item.setEditable(True)
@@ -278,13 +293,14 @@ class MainWindow(QMainWindow):
         if col == 1: # Action
             text = item.text()
             # Smart Action Logic
-            if text.startswith("Key ") and " Down" in text:
+            if text.startswith("Key ") and " Down" not in text and " Up" not in text:
+                # Likely just "Key X"
                 pass
             elif len(text) == 1: # Single char typed (e.g. "W")
                 event['type'] = 'key_press'
                 event['key'] = text.lower()
                 self.model.blockSignals(True)
-                item.setText(f"Key {text} Down")
+                item.setText(f"Key {text}")
                 self.model.blockSignals(False)
                 
                 details_item = self.model.item(row, 3)
@@ -332,10 +348,93 @@ class MainWindow(QMainWindow):
                 # For now, let's stick to "Click to setup" logic
                 pass
 
+    def show_context_menu(self, pos):
+        index = self.table_view.indexAt(pos)
+        if not index.isValid():
+            return
+            
+        menu = QMenu(self)
+        edit_action = menu.addAction("Edit")
+        delete_action = menu.addAction("Delete")
+        
+        action = menu.exec(self.table_view.viewport().mapToGlobal(pos))
+        
+        if action == edit_action:
+            self.edit_event(index.row())
+        elif action == delete_action:
+            self.delete_event(index.row())
+            
+        # New Capture Action
+        action_capture = menu.addAction("📸 Capture Screen Region (Jibit Style)")
+        # Old File Action
+        action_file = menu.addAction("📂 Select Image File...")
+
+        action = menu.exec(self.table_view.viewport().mapToGlobal(pos))
+
+        if action == action_capture:
+            self.start_snipping()
+        elif action == action_file:
+            self.insert_wait_image_from_file()
+        elif action == edit_action:
+            self.edit_event(index.row())
+        elif action == delete_action:
+            self.delete_event(index.row())
+
+    def edit_event(self, row):
+        if row >= len(self.recorded_events):
+            return
+            
+        event = self.recorded_events[row]
+        
+        # Determine which dialog to open based on event type
+        if event['type'] in ['mouse_move', 'mouse_click', 'mouse_scroll']:
+            self.open_mouse_dialog(row)
+        elif event['type'] in ['key_press', 'key_release']:
+            self.open_keyboard_dialog(row)
+        elif event['type'] == 'wait_image':
+            self.open_wait_image_dialog(row)
+        elif event['type'] == 'undefined':
+            # For undefined, show setup menu logic or just default to mouse?
+            # Let's re-use show_setup_menu logic or just open mouse dialog as default
+            # But better to show the setup menu if it's undefined
+            index = self.model.index(row, 1)
+            self.show_setup_menu(index)
+
+    def delete_event(self, row):
+        if row >= len(self.recorded_events):
+            return
+            
+        # Remove from data
+        self.recorded_events.pop(row)
+        
+        # Remove from model
+        self.model.removeRow(row)
+        
+        # Renumber steps
+        for r in range(self.model.rowCount()):
+            self.model.item(r, 0).setText(str(r + 1))
+            
+        self.statusBar().showMessage(f"Deleted step {row + 1}.")
+
+    def keyPressEvent(self, event):
+        # Handle Delete key for table
+        if event.key() == Qt.Key.Key_Delete:
+            if self.table_view.hasFocus():
+                selection = self.table_view.selectionModel().selectedRows()
+                if selection:
+                    # Delete in reverse order to avoid index shifting issues
+                    rows = sorted([index.row() for index in selection], reverse=True)
+                    for row in rows:
+                        self.delete_event(row)
+                    return
+                    
+        super().keyPressEvent(event)
+
     def show_setup_menu(self, index):
         menu = QMenu(self)
         mouse_action = menu.addAction("Mouse Action")
         keyboard_action = menu.addAction("Keyboard Action")
+        wait_image_action = menu.addAction("Wait Image")
         
         action = menu.exec(self.table_view.viewport().mapToGlobal(self.table_view.visualRect(index).bottomLeft()))
         
@@ -343,6 +442,8 @@ class MainWindow(QMainWindow):
             self.open_mouse_dialog(index.row())
         elif action == keyboard_action:
             self.open_keyboard_dialog(index.row())
+        elif action == wait_image_action:
+            self.open_wait_image_dialog(index.row())
 
     def open_mouse_dialog(self, row):
         event = self.recorded_events[row]
@@ -358,11 +459,64 @@ class MainWindow(QMainWindow):
             new_data = dialog.get_data()
             self.update_event(row, new_data)
 
+    def open_wait_image_dialog(self, row):
+        event = self.recorded_events[row]
+        dialog = WaitImageDialog(self, event)
+        if dialog.exec():
+            new_data = dialog.get_data()
+            self.update_event(row, new_data)
+
+
+
     def update_event(self, row, new_data):
         # Merge new data into event
         self.recorded_events[row].update(new_data)
         # Refresh row
         self.refresh_row(row)
+
+    def start_snipping(self):
+        # Minimize main window to see the screen
+        self.showMinimized()
+
+        # Small delay to allow window animation to finish
+        # (Use QTimer in production, simplified sleep here)
+        # We use a delayed init for the snipper
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(300, self._launch_snipper)
+
+    def _launch_snipper(self):
+        self.snipper = SnippingWidget()
+        self.snipper.snippet_taken.connect(self.on_image_captured)
+        self.snipper.closed.connect(self.showNormal) # Restore if cancelled
+        self.snipper.show()
+
+    def on_image_captured(self, file_path):
+        self.showNormal() # Restore window
+        self.activateWindow()
+        self.add_wait_image_event(file_path)
+
+    def insert_wait_image_from_file(self):
+        # Renamed from original insert_wait_image
+        from PyQt6.QtWidgets import QFileDialog, QInputDialog
+        path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Images (*.png *.jpg)")
+        if path:
+            self.add_wait_image_event(path)
+
+    def add_wait_image_event(self, path):
+        from PyQt6.QtWidgets import QInputDialog
+        timeout, ok = QInputDialog.getInt(self, "Timeout", "Wait timeout (seconds):", 10, 1, 3600)
+        if not ok: return
+
+        event = {
+            'type': 'wait_image',
+            'path': path,
+            'timeout_ms': timeout * 1000, # Convert to ms
+            'threshold': 0.85, # Default
+            'poll_interval_ms': 150, # Default
+            'time': 0.5
+        }
+        self.recorded_events.append(event)
+        self.add_event_to_table(event)
 
     def refresh_row(self, row):
         event = self.recorded_events[row]
@@ -374,7 +528,7 @@ class MainWindow(QMainWindow):
         # Action
         action_text = ""
         if event['type'] == 'key_press':
-             action_text = f"Key {event['key']} Down"
+             action_text = f"Key {event['key']}"
         elif event['type'] == 'key_release':
              action_text = f"Key {event['key']} Up"
         elif event['type'] == 'mouse_click':
@@ -383,6 +537,8 @@ class MainWindow(QMainWindow):
              action_text = "Mouse Move"
         elif event['type'] == 'mouse_scroll':
              action_text = "Mouse Wheel"
+        elif event['type'] == 'wait_image':
+             action_text = "Wait Image"
              
         self.model.item(row, 1).setText(action_text)
         self.model.item(row, 1).setForeground(QColor("black")) # Reset color
@@ -397,15 +553,32 @@ class MainWindow(QMainWindow):
         if event['type'] == 'mouse_move':
             details = f"x={event.get('x',0)}, y={event.get('y',0)}"
         elif event['type'] == 'mouse_click':
-            details = f"{event.get('button','Left')} {'Down' if event.get('pressed',True) else 'Up'} at {event.get('x',0)},{event.get('y',0)}"
+            button = event.get('button', 'Button.left')
+            x = event.get('x', 0)
+            y = event.get('y', 0)
+            if button == 'Button.left':
+                details = f"Click: {x},{y}"
+            elif button == 'Button.right':
+                details = f"Right Click: {x},{y}"
+            elif button == 'Button.middle':
+                details = f"Middle Click: {x},{y}"
+            else:
+                details = f"{button}: {x},{y}"
         elif event['type'] == 'key_press':
             details = f"Key: {event.get('key','')}"
         elif event['type'] == 'key_release':
             details = f"Key: {event.get('key','')}"
         elif event['type'] == 'mouse_scroll':
             details = f"Delta: {event.get('dy', 0)}"
+        elif event['type'] == 'wait_image':
+            details = f"Image: {event.get('path','')} (t={event.get('timeout_ms',60000)}ms)"
+            # Add Preview Icon
+            icon = QIcon(event.get('path', ''))
+            self.model.item(row, 1).setIcon(icon)
+            self.model.item(row, 1).setToolTip(f"<img src='{event.get('path', '')}' width='200'>")
             
         self.model.item(row, 3).setText(details)
+
 
     def save_recording(self):
         if not self.recorded_events:
@@ -451,33 +624,6 @@ class MainWindow(QMainWindow):
                 self.statusBar().showMessage(f"Loaded {len(self.recorded_events)} events from {filename}")
             except Exception as e:
                 self.statusBar().showMessage(f"Error loading: {e}")
-
-    def show_context_menu(self, pos):
-        menu = QMenu(self)
-        insert_action = menu.addAction("Insert 'Wait for Image' Step")
-        action = menu.exec(self.table_view.viewport().mapToGlobal(pos))
-        
-        if action == insert_action:
-            self.insert_wait_image()
-
-    def insert_wait_image(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Select Image Template", "", "Images (*.png *.jpg *.bmp)")
-        if not path:
-            return
-            
-        timeout, ok = QInputDialog.getInt(self, "Timeout", "Wait timeout (seconds):", 30, 1, 3600)
-        if not ok:
-            return
-            
-        event = {
-            'type': 'wait_image',
-            'path': path,
-            'timeout': timeout,
-            'time': 0.5 # Default small delay
-        }
-        
-        self.recorded_events.append(event)
-        self.add_event_to_table(event)
 
     def open_hotkey_settings(self):
         if hasattr(self, 'hotkey_listener') and self.hotkey_listener:

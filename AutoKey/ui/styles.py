@@ -61,7 +61,8 @@ QHeaderView::section {
     color: #333333;
 }
 QTableView::item {
-    padding: 4px;
+    padding: 5px;
+    height: 40px; /* Increase row height for icons */
 }
 
 /* --- BUTTONS --- */
@@ -94,6 +95,15 @@ QLineEdit, QSpinBox, QComboBox {
 QLineEdit:focus, QSpinBox:focus, QComboBox:focus {
     border: 1px solid #0078D4;
     background-color: #FFFFFF;
+}
+
+/* Hide SpinBox Up/Down Buttons */
+QSpinBox::up-button, QSpinBox::down-button,
+QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
+    width: 0px;
+    height: 0px;
+    border: none;
+    background: transparent;
 }
 
 /* --- COMBO BOX --- */

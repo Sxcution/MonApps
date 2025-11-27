@@ -1,4 +1,14 @@
 import sys
+import os
+
+# DPI Awareness Fix for Windows
+if sys.platform.startswith("win"):
+    import ctypes
+    try:
+        ctypes.windll.user32.SetProcessDPIAware()
+    except:
+        pass
+
 from PyQt6.QtWidgets import QApplication
 from ui.main_window import MainWindow
 
