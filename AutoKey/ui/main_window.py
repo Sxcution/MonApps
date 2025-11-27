@@ -37,27 +37,42 @@ class MainWindow(QMainWindow):
 
     def disable_system_backdrop(self):
         """
-        HARD FIX: Calls Windows DWM API to explicitly turn off Mica/Acrylic effects.
-        Target: DWMWA_SYSTEMBACKDROP_TYPE (38) -> DWMSBT_NONE (1)
+        HARD FIX: Calls Windows DWM API to:
+        1. Disable Mica/Acrylic effects (Solid Window)
+        2. Force Title Bar to White
+        3. Force Title Text to Black
         """
         try:
             # Get the Window Handle (HWND)
             hwnd = int(self.winId())
             
-            # Constants for Windows 11 DWM
+            # Constants for Windows DWM
+            DWMWA_USE_IMMERSIVE_DARK_MODE = 20
             DWMWA_SYSTEMBACKDROP_TYPE = 38
+            DWMWA_CAPTION_COLOR = 35
+            DWMWA_TEXT_COLOR = 36
             DWMSBT_NONE = 1
             
-            # Call API
             dwmapi = ctypes.windll.dwmapi
-            value = c_int(DWMSBT_NONE)
-            result = dwmapi.DwmSetWindowAttribute(
-                hwnd, 
-                DWMWA_SYSTEMBACKDROP_TYPE, 
-                byref(value), 
-                ctypes.sizeof(value)
-            )
-            print(f"🔧 DWM Backdrop Disabled (Result: {result})")
+            
+            # 1. Disable Backdrop (Solid Background)
+            val_none = c_int(DWMSBT_NONE)
+            dwmapi.DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, byref(val_none), 4)
+            
+            # 2. Force Light Mode (for Title Bar)
+            val_light = c_int(0)
+            dwmapi.DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, byref(val_light), 4)
+            
+            # 3. Force Title Bar Color -> White (0x00FFFFFF)
+            # COLORREF is 0x00BBGGRR, but for White (FF,FF,FF) it's the same.
+            val_white = c_int(0x00FFFFFF)
+            dwmapi.DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, byref(val_white), 4)
+            
+            # 4. Force Title Text Color -> Black (0x00000000)
+            val_black = c_int(0x00000000)
+            dwmapi.DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, byref(val_black), 4)
+            
+            print("🔧 Windows DWM: Backdrop Disabled, Title Bar set to White.")
         except Exception as e:
             print(f"⚠️ DWM API Error: {e}")
 
