@@ -26,11 +26,9 @@ class MainWindow(QMainWindow):
         # Central Widget
         self.central_widget = QWidget()
         self.central_widget.setObjectName("CentralWidget")
+        self.central_widget.setAutoFillBackground(True)
         self.setCentralWidget(self.central_widget)
         
-        # Force opaque background
-        self.setAutoFillBackground(True)
-        self.central_widget.setAutoFillBackground(True)
         self.layout = QVBoxLayout(self.central_widget)
         self.layout.setContentsMargins(0, 0, 0, 0)
         
