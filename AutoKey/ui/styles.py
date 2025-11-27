@@ -115,11 +115,38 @@ QComboBox::drop-down {
     border-top-right-radius: 3px;
     border-bottom-right-radius: 3px;
 }
+/* Dropdown popup menu */
+QComboBox::view {
+    border: 2px solid #000000;
+    border-radius: 4px;
+    background-color: #FFFFFF;
+}
+
 QComboBox QAbstractItemView {
     background-color: #FFFFFF;
-    border: 1px solid #CCCCCC;
+    border: 2px solid #000000;
+    border-radius: 4px;
     selection-background-color: #E5F3FF;
     selection-color: #000000;
+    outline: none;
+    padding: 0px;
+}
+
+QComboBox QAbstractItemView::item:selected {
+    background-color: #0078D4;
+    color: #FFFFFF;
+    border: 1px solid #000000;
+}
+
+QComboBox QAbstractItemView::item {
+    padding: 4px 8px;
+    border: none;
+    background-color: transparent;
+}
+
+QComboBox QAbstractItemView::item:hover {
+    background-color: #E5F3FF;
+    border: none;
 }
 
 /* --- GROUP BOX --- */
