@@ -221,39 +221,38 @@ class WaitImageDialog(QDialog):
         try:
             print("DEBUG: capture_image_template called")
             # 1. Hide this Dialog AND the Main Window
-            self.setVisible(False)
             if self.parent():
                 self.parent().setVisible(False)
+            self.setVisible(False)
             
-            # 2. Process events to ensure windows are visually gone
-            import time
+            # 2. Force process events to update UI state immediately
             QApplication.processEvents()
-            time.sleep(0.2)  # Small buffer for OS animations
             
-            # 3. Launch Snipper
-            print("DEBUG: Launching snipper directly")
-            self._launch_snipper_for_template()
+            # 3. Launch Snipper with a slight delay to ensure hiding is done
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(200, self._launch_snipper_safe)
         except Exception as e:
             print(f"ERROR in capture_image_template: {e}")
             import traceback
             traceback.print_exc()
         
-    def _launch_snipper_for_template(self):
+    def _launch_snipper_safe(self):
+        """Launch snipper after windows are hidden"""
         try:
-            print("DEBUG: _launch_snipper_for_template called")
+            print("DEBUG: _launch_snipper_safe called")
             self.snipper = SnippingWidget()
             print("DEBUG: SnippingWidget created")
             self.snipper.snippet_taken.connect(self.on_image_captured)
             self.snipper.closed.connect(self.on_snipper_closed)
             print("DEBUG: Signals connected")
             self.snipper.show()
-            self.snipper.activateWindow()
-            print("DEBUG: Snipper shown and activated")
+            print("DEBUG: Snipper shown")
         except Exception as e:
-            print(f"ERROR in _launch_snipper_for_template: {e}")
+            print(f"ERROR in _launch_snipper_safe: {e}")
             import traceback
             traceback.print_exc()
-            self.show()
+            # Restore windows on error
+            self.restore_windows()
         
     def restore_windows(self):
         """Restore dialog and parent window visibility"""
@@ -262,12 +261,25 @@ class WaitImageDialog(QDialog):
         self.setVisible(True)
         self.activateWindow()
     
+    
     def on_snipper_closed(self):
+        """Restores the application windows"""
         try:
-            print("DEBUG: on_snipper_closed in dialog")
-            self.restore_windows()
+            print("DEBUG: Snipper closed, restoring windows...")
+            if self.parent():
+                self.parent().setVisible(True)
+                self.parent().activateWindow()
+            
+            self.setVisible(True)
+            self.activateWindow()
+            
+            # Clean up
+            if hasattr(self, 'snipper'):
+                self.snipper.deleteLater()
+                self.snipper = None
         except Exception as e:
             print(f"ERROR in on_snipper_closed: {e}")
+
         
     def on_image_captured(self, file_path):
         try:

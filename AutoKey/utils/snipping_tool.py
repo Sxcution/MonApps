@@ -1,6 +1,6 @@
 import sys
 from PyQt6.QtWidgets import QWidget, QApplication
-from PyQt6.QtCore import Qt, QRect, pyqtSignal, QPoint
+from PyQt6.QtCore import Qt, QRect, pyqtSignal, QPoint, QTimer
 from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QPixmap, QCursor
 
 class SnippingWidget(QWidget):
@@ -34,13 +34,26 @@ class SnippingWidget(QWidget):
         print("DEBUG: SnippingWidget initialized.")
 
     def showEvent(self, event):
-        """CRITICAL FIX: Grab input so clicks don't hit the modal window behind"""
+        """
+        Show event override. 
+        CRITICAL: Do NOT grab mouse here immediately. Qt requires the window to be 
+        physically visible on screen before grabbing input.
+        """
         super().showEvent(event)
-        self.activateWindow()
         self.setFocus()
-        # Force capture mouse/keyboard inputs
-        self.grabMouse()
-        self.grabKeyboard()
+        self.activateWindow()
+        
+        # Wait 100ms for the window to be fully mapped by Windows OS
+        QTimer.singleShot(100, self._start_grabbing)
+
+    def _start_grabbing(self):
+        """Safe place to grab inputs"""
+        try:
+            self.grabMouse()
+            self.grabKeyboard()
+            print("DEBUG: Mouse and Keyboard grabbed successfully")
+        except Exception as e:
+            print(f"ERROR: Failed to grab input: {e}")
 
     def capture_screen_state(self):
         """Captures the entire virtual desktop immediately."""
