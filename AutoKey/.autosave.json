@@ -1,0 +1,68 @@
+{
+    "events": [
+        {
+            "type": "key_press",
+            "text": "Click to setup",
+            "time": 0.5,
+            "id": "17408ac4-ec18-4996-a622-724e58bab2f1",
+            "key": "F"
+        },
+        {
+            "type": "key_press",
+            "text": "Click to setup",
+            "time": 0.5,
+            "id": "5c1ef11f-ec56-483e-a978-dc1ea47d348f",
+            "key": "S"
+        },
+        {
+            "type": "key_press",
+            "text": "Click to setup",
+            "time": 0.5,
+            "id": "e362af13-aaa2-4f28-9da7-a2eb742e9e62",
+            "key": "S"
+        },
+        {
+            "type": "undefined",
+            "text": "Click to setup",
+            "time": 0.5,
+            "id": "2aaac6de-c6c6-4982-9154-d42e04ba3486"
+        },
+        {
+            "type": "undefined",
+            "text": "Click to setup",
+            "time": 0.5,
+            "id": "c1fa33e9-4a00-4543-8e93-e842387f9ba0"
+        },
+        {
+            "type": "undefined",
+            "text": "Click to setup",
+            "time": 0.5,
+            "id": "c5455c7d-e077-4860-9b14-24d4e66db18f"
+        },
+        {
+            "type": "undefined",
+            "text": "Click to setup",
+            "time": 0.5,
+            "id": "dda20e57-a662-4c6e-a487-db30d15a9950"
+        },
+        {
+            "type": "undefined",
+            "text": "Click to setup",
+            "time": 0.5,
+            "id": "625affe5-0348-44f1-bac1-aa75e7aa826b"
+        },
+        {
+            "type": "undefined",
+            "text": "Click to setup",
+            "time": 0.5,
+            "id": "a5d86dab-7342-46d8-b609-56d757903821"
+        },
+        {
+            "type": "undefined",
+            "text": "Click to setup",
+            "time": 0.5,
+            "id": "ee75349a-0033-48a5-9098-604a735b5cc4"
+        }
+    ],
+    "current_filename": "C:/Users/Mon/Desktop/Mon/y.json"
+}

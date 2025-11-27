@@ -122,7 +122,8 @@ class Player(threading.Thread):
         # Usually tolerance means "how much difference is allowed".
         # 0 tolerance -> 1.0 confidence. 255 tolerance -> 0.0 confidence.
         # Let's map: confidence = 1.0 - (tolerance / 255.0)
-        confidence = 1.0 - (tolerance / 400.0) # slightly looser mapping
+        # Adjusted: 0 tolerance now maps to ~0.9975 to allow tiny rendering differences
+        confidence = 1.0 - ((tolerance + 1) / 400.0) # slightly looser mapping
         if confidence < 0.1: confidence = 0.1
         
         print(f"Waiting for image: {image_path}, timeout={timeout}, conf={confidence}")

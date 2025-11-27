@@ -9,6 +9,7 @@ from PyQt6.QtCore import Qt, QTimer, QRect, pyqtSignal, QPointF
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QBrush, QPen, QPalette
 import os
 import time
+from utils.image_finder import find_image_on_screen
 
 class StyledComboBox(QComboBox):
     """QComboBox with styled dropdown menu border"""
@@ -314,8 +315,20 @@ class ImageSearchDialog(QDialog):
         self.spin_tolerance.setMinimumWidth(80)
         tolerance_layout.addWidget(tolerance_label)
         tolerance_layout.addWidget(self.spin_tolerance)
+        
+        # Test Button
+        self.btn_test = QPushButton("Test Ảnh")
+        self.btn_test.setMinimumHeight(28)
+        self.btn_test.clicked.connect(self.test_image_search)
+        tolerance_layout.addWidget(self.btn_test)
+        
         tolerance_layout.addStretch()
         options_container.addLayout(tolerance_layout)
+        
+        # Test Result Label
+        self.lbl_test_result = QLabel("")
+        self.lbl_test_result.setStyleSheet("font-weight: bold; margin-left: 60px;")
+        options_container.addWidget(self.lbl_test_result)
         
         options_container.addStretch()
         img_layout.addLayout(options_container, 1)
@@ -642,7 +655,38 @@ class ImageSearchDialog(QDialog):
         if dialog.exec():
             f = dialog.selectedFiles()[0]
             self.image_path = f
+            self.image_path = f
             self.image_preview.set_image(QPixmap(f))
+
+    def test_image_search(self):
+        """Test if image can be found on screen now"""
+        if not self.image_path or not os.path.exists(self.image_path):
+            self.lbl_test_result.setText("❌ Chưa chọn ảnh hoặc ảnh không tồn tại!")
+            self.lbl_test_result.setStyleSheet("color: red; font-weight: bold; margin-left: 60px;")
+            return
+            
+        # Calculate confidence same as Player
+        # Adjusted: 0 tolerance now maps to ~0.9975 to allow tiny rendering differences
+        tolerance = self.spin_tolerance.value()
+        confidence = 1.0 - ((tolerance + 1) / 400.0)
+        if confidence < 0.1: confidence = 0.1
+        
+        self.lbl_test_result.setText("⏳ Đang tìm kiếm...")
+        self.lbl_test_result.setStyleSheet("color: blue; font-weight: bold; margin-left: 60px;")
+        QApplication.processEvents()
+        
+        # Perform search
+        # Note: We search entire screen for test, ignoring 'search_area' for simplicity 
+        # or we could implement region logic if needed.
+        result = find_image_on_screen(self.image_path, confidence=confidence)
+        
+        if result:
+            x, y, w, h = result
+            self.lbl_test_result.setText(f"✅ Đã tìm thấy ảnh tại vị trí: {x}, {y}")
+            self.lbl_test_result.setStyleSheet("color: green; font-weight: bold; margin-left: 60px;")
+        else:
+            self.lbl_test_result.setText("❌ Không tìm thấy ảnh trên màn hình!")
+            self.lbl_test_result.setStyleSheet("color: red; font-weight: bold; margin-left: 60px;")
 
     def closeEvent(self, event):
         """Override to prevent closing during snipping"""

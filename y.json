@@ -1,0 +1,25 @@
+[
+    {
+        "type": "detect_image",
+        "text": "Click to setup",
+        "time": 0.5,
+        "image_path": "c:\\Users\\Mon\\Desktop\\Mon\\AutoKey\\captures\\snip_1764277074.png",
+        "restrict_area": true,
+        "search_area": "entire screen",
+        "tolerance": 0,
+        "mouse_action_enabled": false,
+        "mouse_action": "Move",
+        "mouse_position": "Centered",
+        "save_x": false,
+        "save_y": false,
+        "wait_timeout": 65535,
+        "goto_found": "Next",
+        "goto_not_found": "Start"
+    },
+    {
+        "type": "key_press",
+        "text": "Click to setup",
+        "time": 0.5,
+        "key": "F"
+    }
+]

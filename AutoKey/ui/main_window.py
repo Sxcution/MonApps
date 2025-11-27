@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QTableView, QHeaderView, 
-                             QToolButton, QMenu, QFileDialog, QInputDialog)
+                             QToolButton, QMenu, QFileDialog, QInputDialog, QAbstractItemView)
 from PyQt6.QtCore import QSettings, QSize, QPoint, Qt, pyqtSlot, QTimer
 import ctypes
 from ctypes import c_int, byref
@@ -7,6 +7,7 @@ from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction, QPalette, QC
 
 import time
 import threading
+import uuid
 
 from ui.toolbar import MainToolbar
 from ui.styles import MAIN_STYLESHEET
@@ -41,6 +42,9 @@ class MainWindow(QMainWindow):
         
         # Restore window state
         self.restore_geometry()
+        
+        # Auto-load previous state
+        self.load_autosave()
 
     def disable_system_backdrop(self):
         """
@@ -102,17 +106,41 @@ class MainWindow(QMainWindow):
         # Reordered Columns: Step | Action | Delay (ms) | Details
         self.model.setHorizontalHeaderLabels(["Step", "Action", "Delay (ms)", "Details"])
         self.table_view.setModel(self.model)
-        self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table_view.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        self.table_view.setColumnWidth(0, 50) # Fixed width for Step
+        self.table_view.setModel(self.model)
+        
+        # Configure Column Resizing
+        header = self.table_view.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        self.table_view.setColumnWidth(0, 50) # Step
+        
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        self.table_view.setColumnWidth(1, 250) # Action
+        
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        self.table_view.setColumnWidth(2, 80) # Delay (approx 6 digits)
+        
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch) # Details
+        
         self.table_view.setAlternatingRowColors(True)
         self.table_view.setShowGrid(True)
         self.table_view.verticalHeader().setVisible(False) # Hide default vertical header
         self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.customContextMenuRequested.connect(self.show_context_menu)
         
+        # Enable larger icons for thumbnails
+        self.table_view.setIconSize(QSize(300, 40))
+        
         # Connect Click for "Click to setup"
         self.table_view.clicked.connect(self.on_table_clicked)
+        # Connect Double Click to Edit
+        self.table_view.doubleClicked.connect(self.on_table_double_clicked)
+        
+        # Enable Drag and Drop
+        self.table_view.setDragEnabled(True)
+        self.table_view.setAcceptDrops(True)
+        self.table_view.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        self.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         
         # Set Delegates
         self.table_view.setItemDelegateForColumn(1, ActionDelegate(self.table_view))
@@ -120,6 +148,8 @@ class MainWindow(QMainWindow):
         
         # Connect Item Changed
         self.model.itemChanged.connect(self.on_item_changed)
+        self.model.rowsRemoved.connect(self.on_rows_removed)
+        self.model.rowsInserted.connect(self.on_rows_inserted)
         
         self.layout.addWidget(self.table_view)
         
@@ -224,9 +254,9 @@ class MainWindow(QMainWindow):
         if event['type'] == 'undefined':
             action_text = event['text']
         elif event['type'] == 'key_press':
-             action_text = f"Key {event['key']}"
+             action_text = f"Key Press {event['key']}"
         elif event['type'] == 'key_release':
-             action_text = f"Key {event['key']} Up"
+             action_text = f"Key Release {event['key']}"
         elif event['type'] == 'mouse_click':
              action_text = "Mouse Click"
         elif event['type'] == 'mouse_move':
@@ -237,48 +267,31 @@ class MainWindow(QMainWindow):
              action_text = "Detect Image"
 
         action_item = QStandardItem(action_text)
-        action_item.setEditable(True)
+        action_item.setEditable(False) # Disable inline edit, use Dialog instead
+        
+        # Ensure event has an ID for drag-and-drop tracking
+        if 'id' not in event:
+            event['id'] = str(uuid.uuid4())
+            
+        action_item.setData(event['id'], Qt.ItemDataRole.UserRole) # Store ID only (safe for drag-drop)
+        action_item.setData(event['id'], Qt.ItemDataRole.ToolTipRole) # Fallback/Debug ID
+        
+        # Explicitly set flags to ensure copy works
+        action_item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsDropEnabled)
+        
         if event['type'] == 'undefined':
              action_item.setForeground(QColor("gray"))
-             action_item.setEditable(False) # Prevent direct edit until setup
         
         # Delay Column (2) - Display in Milliseconds
         ms_delay = int(event.get('time', 0.5) * 1000)
         delay_item = QStandardItem(str(ms_delay))
+        delay_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         delay_item.setEditable(True)
         
         # Details Column (3)
-        details = ""
-        if event['type'] == 'mouse_move':
-            details = f"x={event.get('x',0)}, y={event.get('y',0)}"
-        elif event['type'] == 'mouse_click':
-            button = event.get('button', 'Button.left')
-            x = event.get('x', 0)
-            y = event.get('y', 0)
-            if button == 'Button.left':
-                details = f"Click: {x},{y}"
-            elif button == 'Button.right':
-                details = f"Right Click: {x},{y}"
-            elif button == 'Button.middle':
-                details = f"Middle Click: {x},{y}"
-            else:
-                details = f"{button}: {x},{y}"
-        elif event['type'] == 'key_press':
-            details = f"Key: {event.get('key','')}"
-        elif event['type'] == 'key_release':
-            details = f"Key: {event.get('key','')}"
-        elif event['type'] == 'mouse_scroll':
-            details = f"Delta: {event.get('dy', 0)}"
-        elif event['type'] == 'detect_image':
-            image_path = event.get('image_path', '')
-            if image_path:
-                import os
-                details = f"Image: {os.path.basename(image_path)}"
-            else:
-                details = "No image set"
-
-        details_item = QStandardItem(details)
-        details_item.setEditable(True)
+        details_item = QStandardItem()
+        self.update_details_item(details_item, event)
+        details_item.setEditable(False) # Disable inline edit
         
         self.model.setItem(row, 0, step_item)
         self.model.setItem(row, 1, action_item)
@@ -353,6 +366,50 @@ class MainWindow(QMainWindow):
                 # Optional: Allow opening dialog for existing items too?
                 # For now, let's stick to "Click to setup" logic
                 pass
+
+    def on_table_double_clicked(self, index):
+        if not index.isValid():
+            return
+        # Allow inline edit for Delay column (2)
+        if index.column() == 2:
+            return
+        self.edit_event(index.row())
+
+    def on_rows_inserted(self, parent, start, end):
+        print(f"🔍 DEBUG: Rows inserted {start} to {end}")
+        for row in range(start, end + 1):
+            item = self.model.item(row, 1)
+            if item:
+                event_id = item.data(Qt.ItemDataRole.UserRole)
+                print(f"  Row {row} ID: {event_id}")
+
+    def on_rows_removed(self, parent, start, end):
+        """Rebuild recorded_events list after rows are moved/removed using IDs"""
+        print(f"🔍 DEBUG: Rows removed {start} to {end}")
+        # Create a map of current events by ID for quick lookup
+        event_map = {e.get('id'): e for e in self.recorded_events if 'id' in e}
+        
+        new_events = []
+        for row in range(self.model.rowCount()):
+            item = self.model.item(row, 1)
+            if item:
+                event_id = item.data(Qt.ItemDataRole.UserRole)
+                if not event_id:
+                    event_id = item.data(Qt.ItemDataRole.ToolTipRole) # Fallback
+                
+                if event_id and event_id in event_map:
+                    new_events.append(event_map[event_id])
+                elif event_id:
+                    print(f"Warning: Event ID {event_id} not found in map")
+                else:
+                    print(f"Warning: Row {row} has NO ID")
+        
+        print(f"🔍 DEBUG: Rebuilt list has {len(new_events)} events (Model has {self.model.rowCount()} rows)")
+        self.recorded_events = new_events
+        
+        # Renumber steps
+        for row in range(self.model.rowCount()):
+             self.model.item(row, 0).setText(str(row + 1))
 
     def show_context_menu(self, pos):
         index = self.table_view.indexAt(pos)
@@ -488,9 +545,9 @@ class MainWindow(QMainWindow):
         # Action
         action_text = ""
         if event['type'] == 'key_press':
-             action_text = f"Key {event['key']}"
+             action_text = f"Key Press {event['key']}"
         elif event['type'] == 'key_release':
-             action_text = f"Key {event['key']} Up"
+             action_text = f"Key Release {event['key']}"
         elif event['type'] == 'mouse_click':
              action_text = "Mouse Click"
         elif event['type'] == 'mouse_move':
@@ -503,14 +560,23 @@ class MainWindow(QMainWindow):
              
         self.model.item(row, 1).setText(action_text)
         self.model.item(row, 1).setForeground(QColor("black")) # Reset color
-        self.model.item(row, 1).setEditable(True)
+        self.model.item(row, 1).setEditable(False)
         
         # Delay
         ms_delay = int(event.get('time', 0.5) * 1000)
         self.model.item(row, 2).setText(str(ms_delay))
+        self.model.item(row, 2).setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         
         # Details
+        self.update_details_item(self.model.item(row, 3), event)
+
+    def update_details_item(self, item, event):
+        import os
         details = ""
+        
+        # Reset icon first
+        item.setIcon(QIcon())
+        
         if event['type'] == 'mouse_move':
             details = f"x={event.get('x',0)}, y={event.get('y',0)}"
         elif event['type'] == 'mouse_click':
@@ -526,21 +592,27 @@ class MainWindow(QMainWindow):
             else:
                 details = f"{button}: {x},{y}"
         elif event['type'] == 'key_press':
-            details = f"Key: {event.get('key','')}"
+            details = f"Press: {event.get('key','')}"
         elif event['type'] == 'key_release':
-            details = f"Key: {event.get('key','')}"
+            details = f"Release: {event.get('key','')}"
         elif event['type'] == 'mouse_scroll':
             details = f"Delta: {event.get('dy', 0)}"
         elif event['type'] == 'detect_image':
             image_path = event.get('image_path', '')
             if image_path:
-                import os
-                details = f"Image: {os.path.basename(image_path)}"
+                # No text, just thumbnail
+                if os.path.exists(image_path):
+                    pixmap = QPixmap(image_path)
+                    if not pixmap.isNull():
+                        # Create thumbnail - larger size
+                        scaled = pixmap.scaledToHeight(40, Qt.TransformationMode.SmoothTransformation)
+                        item.setIcon(QIcon(scaled))
+                        # Set size hint to ensure row is tall enough
+                        item.setSizeHint(QSize(0, 40))
             else:
                 details = "No image set"
 
-            
-        self.model.item(row, 3).setText(details)
+        item.setText(details)
 
 
     def save_recording(self):
@@ -678,9 +750,47 @@ class MainWindow(QMainWindow):
         self.move(frame_gm.topLeft())
 
     def closeEvent(self, event):
+        self.save_autosave()
         self.settings.setValue("window_size", self.size())
         self.settings.setValue("window_pos", self.pos())
         super().closeEvent(event)
         # Explicitly quit the app since we disabled auto-quit on last window closed
         from PyQt6.QtWidgets import QApplication
         QApplication.quit()
+
+    def save_autosave(self):
+        """Save current state to a hidden autosave file"""
+        import json
+        import os
+        try:
+            autosave_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".autosave.json")
+            data = {
+                'events': self.recorded_events,
+                'current_filename': self.current_filename
+            }
+            with open(autosave_file, 'w') as f:
+                json.dump(data, f, indent=4)
+            print(f"State autosaved to {autosave_file}")
+        except Exception as e:
+            print(f"Error autosaving state: {e}")
+
+    def load_autosave(self):
+        """Load state from hidden autosave file"""
+        import json
+        import os
+        try:
+            autosave_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".autosave.json")
+            if os.path.exists(autosave_file):
+                with open(autosave_file, 'r') as f:
+                    data = json.load(f)
+                
+                self.recorded_events = data.get('events', [])
+                self.current_filename = data.get('current_filename')
+                
+                self.model.removeRows(0, self.model.rowCount())
+                for event in self.recorded_events:
+                    self.add_event_to_table(event)
+                    
+                print(f"State restored from {autosave_file}")
+        except Exception as e:
+            print(f"Error loading autosave: {e}")

@@ -156,9 +156,16 @@ class SnippingWidget(QWidget):
         print(f"🔍 DEBUG: Saving snippet: {rect.width()}x{rect.height()}")
         # Save logic
         import os, time
-        if not os.path.exists("captures"): os.makedirs("captures")
-        filename = f"captures/snip_{int(time.time())}.png"
-        full_path = os.path.abspath(filename)
+        # Determine AutoKey root directory (parent of utils)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        autokey_root = os.path.dirname(current_dir)
+        captures_dir = os.path.join(autokey_root, "captures")
+        
+        if not os.path.exists(captures_dir):
+            os.makedirs(captures_dir)
+            
+        filename = f"snip_{int(time.time())}.png"
+        full_path = os.path.join(captures_dir, filename)
         
         # Crop from original
         self.original_pixmap.copy(rect).save(full_path)
