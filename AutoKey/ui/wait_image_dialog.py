@@ -228,10 +228,11 @@ class WaitImageDialog(QDialog):
             self.snipper.closed.connect(self.on_snipper_closed)
             print("DEBUG: Snipper created and signals connected")
             
-            # 2. Now hide windows
+            # 2. Move parent window OFF-SCREEN (not minimize - that may cause z-order issues)
             if self.parent():
-                print("DEBUG: Minimizing parent window to taskbar")
-                self.parent().showMinimized()
+                print("DEBUG: Moving parent window OFF-SCREEN")
+                self._original_parent_pos = self.parent().pos()
+                self.parent().move(-10000, -10000)  # Far off screen
             
             print("DEBUG: Hiding dialog")
             self.hide()
@@ -240,7 +241,7 @@ class WaitImageDialog(QDialog):
             QApplication.processEvents()
             print("DEBUG: Events processed")
             
-            # 4. Show snipper IMMEDIATELY (no timer)
+            # 4. Show snipper IMMEDIATELY
             print("DEBUG: Showing snipper IMMEDIATELY")
             self.snipper.show()
             self.snipper.raise_()
@@ -299,7 +300,10 @@ class WaitImageDialog(QDialog):
     def restore_windows(self):
         """Restore dialog and parent window visibility"""
         if self.parent():
-            self.parent().showNormal()  # Restore from minimized
+            # Restore parent position if we saved it
+            if hasattr(self, '_original_parent_pos'):
+                self.parent().move(self._original_parent_pos)
+            self.parent().show()
         self.show()
         self.activateWindow()
     
@@ -309,7 +313,10 @@ class WaitImageDialog(QDialog):
         try:
             print("DEBUG: Snipper closed, restoring windows...")
             if self.parent():
-                self.parent().showNormal()  # Restore from minimized
+                # Restore parent position if we saved it
+                if hasattr(self, '_original_parent_pos'):
+                    self.parent().move(self._original_parent_pos)
+                self.parent().show()
                 self.parent().activateWindow()
             
             self.show()
