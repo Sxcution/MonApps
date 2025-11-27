@@ -33,6 +33,15 @@ class SnippingWidget(QWidget):
         self.capture_screen_state()
         print("DEBUG: SnippingWidget initialized.")
 
+    def showEvent(self, event):
+        """CRITICAL FIX: Grab input so clicks don't hit the modal window behind"""
+        super().showEvent(event)
+        self.activateWindow()
+        self.setFocus()
+        # Force capture mouse/keyboard inputs
+        self.grabMouse()
+        self.grabKeyboard()
+
     def capture_screen_state(self):
         """Captures the entire virtual desktop immediately."""
         print("DEBUG: Capturing screen state...")
@@ -109,6 +118,10 @@ class SnippingWidget(QWidget):
 
     def mouseReleaseEvent(self, event):
         print(f"DEBUG: Mouse release at {event.pos()}")
+        # Release input capture before closing
+        self.releaseMouse()
+        self.releaseKeyboard()
+        
         self.is_snipping = False
         rect = QRect(self.begin, self.end).normalized()
         
@@ -138,5 +151,7 @@ class SnippingWidget(QWidget):
     def keyPressEvent(self, event):
         # Allow cancelling with ESC
         if event.key() == Qt.Key.Key_Escape:
+            self.releaseMouse()
+            self.releaseKeyboard()
             self.close()
             self.closed.emit()

@@ -217,15 +217,20 @@ class WaitImageDialog(QDialog):
         self.overlay.show()
         
     def capture_image_template(self):
+        """Hides dialog -> Launches Snipper -> Restores Dialog on finish"""
         try:
             print("DEBUG: capture_image_template called")
-            # Set non-modal FIRST before hiding
-            self.setWindowModality(Qt.WindowModality.NonModal)
-            # Minimize to keep it alive but out of the way
-            self.showMinimized()
-            QApplication.processEvents()
+            # 1. Hide this Dialog AND the Main Window
+            self.setVisible(False)
+            if self.parent():
+                self.parent().setVisible(False)
             
-            # Call directly - no timer needed
+            # 2. Process events to ensure windows are visually gone
+            import time
+            QApplication.processEvents()
+            time.sleep(0.2)  # Small buffer for OS animations
+            
+            # 3. Launch Snipper
             print("DEBUG: Launching snipper directly")
             self._launch_snipper_for_template()
         except Exception as e:
@@ -250,24 +255,27 @@ class WaitImageDialog(QDialog):
             traceback.print_exc()
             self.show()
         
+    def restore_windows(self):
+        """Restore dialog and parent window visibility"""
+        if self.parent():
+            self.parent().setVisible(True)
+        self.setVisible(True)
+        self.activateWindow()
+    
     def on_snipper_closed(self):
         try:
             print("DEBUG: on_snipper_closed in dialog")
-            self.setWindowModality(Qt.WindowModality.ApplicationModal)
-            self.showNormal()
-            self.activateWindow()
+            self.restore_windows()
         except Exception as e:
             print(f"ERROR in on_snipper_closed: {e}")
         
     def on_image_captured(self, file_path):
         try:
             print(f"DEBUG: on_image_captured in dialog: {file_path}")
-            # Update the image path
+            # Restore windows first
+            self.restore_windows()
+            # Then load image
             self.img_path_edit.setText(file_path)
-            # Restore modal and show
-            self.setWindowModality(Qt.WindowModality.ApplicationModal)
-            self.showNormal()
-            self.activateWindow()
         except Exception as e:
             print(f"ERROR in on_image_captured: {e}")
             import traceback
