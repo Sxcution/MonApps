@@ -162,7 +162,7 @@ QUAN TRỌNG:
 - KHÔNG BAO GIỜ trả về {'action': 'use_tool', ...}
 - CHỈ trả lời bằng ngôn ngữ tự nhiên, thân thiện
 - Nếu câu hỏi có chứa dữ liệu từ database (trong dấu ngoặc vuông [...]), hãy đọc và tóm tắt cho user
-- Trả lời ngắn gọn, súc tích bằng tiếng Việt
+- Trả lời ngắn gọn, súc tích bằng tiếng Việt kèm những icon nếu cần.
 """
         
         system_prompt = base_prompt + anti_json_instruction
@@ -178,48 +178,97 @@ QUAN TRỌNG:
         # Detect search intent
         if any(kw in user_message.lower() for kw in ['tìm', 'search', 'có', 'xem', 'coi', 'hiển thị']):
             # Extract search keyword intelligently
+            import re
             search_kw = None
             
-            # Pattern 1: "tìm <keyword>"
-            import re
-            match = re.search(r'tìm\s+(.+?)(?:\s+trong|\s+không|\?|$)', user_message.lower())
+            # Pattern 1: "tìm [ghi chú] có tên X" or "tìm [ghi chú] X"
+            # Remove filler words first
+            cleaned = user_message.lower()
+            cleaned = re.sub(r'ghi\s*chú\s*(có\s*tên|của)?', '', cleaned)  # Remove "ghi chú có tên/của"
+            cleaned = re.sub(r'\s+', ' ', cleaned).strip()  # Normalize whitespace
+            
+            # Now extract after "tìm"
+            match = re.search(r'tìm\s+(.+?)(?:\s+không|\?|$)', cleaned)
             if match:
-                search_kw = match.group(1).strip()
+                potential_kw = match.group(1).strip()
+                # Handle OR: "thắng nguyễn hoặc check user" → try both
+                if 'hoặc' in potential_kw or 'hay' in potential_kw or 'và' in potential_kw:
+                    # Split by OR/AND and try first part
+                    parts = re.split(r'\s+(?:hoặc|hay|và)\s+', potential_kw)
+                    search_kw = parts[0].strip()  # Use first part
+                else:
+                    search_kw = potential_kw
             
             # Pattern 2: "có <keyword> không"
             if not search_kw:
-                match = re.search(r'có\s+(.+?)\s+không', user_message.lower())
+                match = re.search(r'có\s+(.+?)\s+không', cleaned)
                 if match:
                     search_kw = match.group(1).strip()
             
-            # Pattern 3: Just check if specific keywords exist
+            # Pattern 3: Remove action verbs and take the rest
             if not search_kw:
-                for word in ['thắng nguyễn', 'thang nguyen']:
-                    if word in user_message.lower():
-                        search_kw = word
-                        break
+                # Remove common action verbs
+                cleaned = re.sub(r'^(hiển thị|xem|coi|tìm|search)\s+', '', cleaned)
+                cleaned = re.sub(r'\s+(?:của|trong)\s+', ' ', cleaned)
+                tokens = cleaned.split()
+                if len(tokens) >= 1:
+                    search_kw = ' '.join(tokens[:4])  # Take up to 4 words
             
             # Execute search if keyword found
             if search_kw and 'ghi chú' in user_message.lower():
+                with open('debug_log.txt', 'a', encoding='utf-8') as f:
+                    f.write(f"\n[SEARCH] Keyword: '{search_kw}'\n")
+                
                 result = AVAILABLE_TOOLS['search_notes']['function'](search_kw)
+                
+                with open('debug_log.txt', 'a', encoding='utf-8') as f:
+                    f.write(f"[SEARCH] Result count: {result.get('count', 0)}\n")
+                
                 if result.get('success'):
                     notes = result.get('notes', [])
                     if notes:
+                        import re
                         tool_result_text = f"\n\n[TÔI ĐÃ TÌM THẤY {len(notes)} GHI CHÚ:\n"
                         for note in notes[:5]:  # Limit to 5 results
-                            tool_result_text += f"- Tiêu đề: {note['title']}\n  Nội dung: {note['content'][:100]}...\n"
+                            # Strip HTML tags
+                            clean_title = re.sub('<.*?>', '', note['title'])
+                            clean_content = re.sub('<.*?>', '', note['content'])
+                            
+                            # Smart snippet extraction
+                            snippet = ""
+                            if search_kw:
+                                # Find keyword in content (case insensitive)
+                                idx = clean_content.lower().find(search_kw.lower())
+                                if idx != -1:
+                                    # Extract around keyword: -100 chars to +400 chars
+                                    start = max(0, idx - 100)
+                                    end = min(len(clean_content), idx + 400)
+                                    snippet = f"...{clean_content[start:end]}..."
+                                else:
+                                    # Keyword in title, show start of content
+                                    snippet = clean_content[:500] + "..."
+                            else:
+                                snippet = clean_content[:500] + "..."
+                                
+                            tool_result_text += f"- Tiêu đề: {clean_title}\n  Nội dung: {snippet}\n"
                         tool_result_text += "]"
                     else:
                         tool_result_text = f"\n\n[TÔI ĐÃ TÌM KIẾM NHƯNG KHÔNG TÌM THẤY GHI CHÚ NÀO VỚI TỪ KHÓA '{search_kw}']"
+                
+                with open('debug_log.txt', 'a', encoding='utf-8') as f:
+                    f.write(f"[SEARCH] Final text: {tool_result_text[:200]}...\n")
         
         # Detect "list all notes" intent
         elif any(phrase in user_message.lower() for phrase in ['tất cả ghi chú', 'all notes', 'danh sách ghi chú']):
             result = AVAILABLE_TOOLS['get_all_notes']['function']()
             if result.get('success'):
+                import re
                 notes = result.get('notes', [])
                 tool_result_text = f"\n\n[DANH SÁCH {len(notes)} GHI CHÚ:\n"
                 for note in notes[:10]:  # Limit to 10
-                    tool_result_text += f"- {note['title']}: {note['content'][:80]}...\n"
+                    clean_title = re.sub('<.*?>', '', note['title'])
+                    clean_content = re.sub('<.*?>', '', note['content'])
+                    tool_result_text += f"- {clean_title}: {clean_content[:300]}...\n"
                 tool_result_text += "]"
         
         # Detect MXH intent 

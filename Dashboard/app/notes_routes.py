@@ -73,12 +73,59 @@ def api_get_notes():
     conn.close()
     return jsonify([dict(row) for row in notes_rows])
 
+import re
+
+# ... (existing imports)
+
+# Helper function to process Base64 images
+def process_base64_images(content_html):
+    if not content_html:
+        return content_html
+        
+    def replace_match(match):
+        try:
+            full_match = match.group(0)
+            # Extract extension and data
+            m = re.match(r'data:image/(?P<ext>.*?);base64,(?P<data>.*)', full_match, re.DOTALL)
+            if not m:
+                return full_match
+                
+            ext = m.group('ext')
+            data_str = m.group('data')
+            
+            # Normalize extension
+            if 'jpeg' in ext: ext = 'jpg'
+            if '+' in ext: ext = ext.split('+')[0]
+            
+            image_data = base64.b64decode(data_str)
+            filename = f"{uuid.uuid4()}.{ext}"
+            
+            # Ensure folder exists
+            os.makedirs(NOTES_IMAGES_FOLDER, exist_ok=True)
+            
+            file_path = os.path.join(NOTES_IMAGES_FOLDER, filename)
+            with open(file_path, 'wb') as f:
+                f.write(image_data)
+                
+            return f"/notes/images/{filename}"
+        except Exception as e:
+            print(f"Error processing image: {e}")
+            return match.group(0)
+
+    # Find and replace Base64 images
+    return re.sub(r'data:image/[a-zA-Z0-9+.-]+;base64,[^"\'\s>]+', replace_match, content_html)
+
 @notes_bp.route("/api/add", methods=["POST"])
 def api_add_note():
     data = request.json
-    title_html, content_html = data.get("title_html", "").strip(), data.get("content_html", "").strip()
+    title_html = data.get("title_html", "").strip()
+    content_html = data.get("content_html", "").strip()
+    
+    # Process images
+    content_html = process_base64_images(content_html)
+    
     reminder_time = data.get("reminder_time") or None
-
+    # ... (rest of add logic)
     if not title_html and not content_html:
         return jsonify({"error": "Tiêu đề hoặc nội dung không được để trống"}), 400
     
@@ -88,7 +135,7 @@ def api_add_note():
         "due_time": reminder_time, 
         "status": "active" if reminder_time else "none", 
         "modified_at": now,
-        "is_marked": data.get("is_marked", False) # Ensure is_marked is handled
+        "is_marked": data.get("is_marked", False)
     }
 
     conn = get_db_connection()
@@ -98,7 +145,6 @@ def api_add_note():
     )
     conn.commit()
     
-    # Fetch the newly created note to return complete data
     saved_note_row = conn.execute("SELECT * FROM notes WHERE id = ?", (new_note['id'],)).fetchone()
     conn.close()
     return jsonify(dict(saved_note_row)), 201
@@ -106,9 +152,14 @@ def api_add_note():
 @notes_bp.route("/api/update/<note_id>", methods=["POST"])
 def api_update_note(note_id):
     data = request.json
-    title_html, content_html = data.get("title_html", "").strip(), data.get("content_html", "").strip()
-    reminder_time = data.get("reminder_time") # Allows setting reminder to null
-
+    title_html = data.get("title_html", "").strip()
+    content_html = data.get("content_html", "").strip()
+    
+    # Process images
+    content_html = process_base64_images(content_html)
+    
+    reminder_time = data.get("reminder_time")
+    # ... (rest of update logic)
     if not title_html and not content_html:
         return jsonify({"error": "Tiêu đề hoặc nội dung không được để trống"}), 400
     
@@ -116,18 +167,16 @@ def api_update_note(note_id):
 
     conn = get_db_connection()
     
-    # Get current status to avoid overwriting 'notified'
     current_note = conn.execute("SELECT status FROM notes WHERE id = ?", (note_id,)).fetchone()
     if not current_note:
         conn.close()
         return jsonify({"error": "Không tìm thấy ghi chú"}), 404
 
-    # Determine the new status
     if reminder_time:
         status = "active"
     elif current_note['status'] == 'active':
         status = 'none'
-    else: # Keep 'notified' or other statuses if they exist
+    else:
         status = current_note['status']
 
     cursor = conn.execute(
