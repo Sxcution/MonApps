@@ -31,8 +31,8 @@ def get_context_data():
     """Fetch relevant data from Dashboard for AI context"""
     conn = get_db_connection()
     
-    # 1. Get Notes
-    notes = conn.execute('SELECT title_html, content_html, status FROM notes WHERE is_marked = 0 LIMIT 5').fetchall()
+    # 1. Get Notes (Fix: Sort by modified_at DESC to show latest notes)
+    notes = conn.execute('SELECT title_html, content_html, status FROM notes WHERE is_marked = 0 ORDER BY modified_at DESC LIMIT 5').fetchall()
     notes_text = "Recent Notes:\n" + "\n".join([f"- [{n['status']}] {n['title_html']}: {n['content_html']}" for n in notes])
     
     # 2. Get Telegram Sessions Status
@@ -176,58 +176,51 @@ QUAN TRỌNG:
         tool_result_text = ""
         
         # Detect search intent
-        if any(kw in user_message.lower() for kw in ['tìm', 'search', 'có', 'xem', 'coi', 'hiển thị']):
-            # Extract search keyword intelligently
+        # Expanded triggers: tìm, search, có, xem, coi, hiển thị, thấy, biết, check, kiểm tra
+        search_triggers = ['tìm', 'search', 'có', 'xem', 'coi', 'hiển thị', 'thấy', 'biết', 'check', 'kiểm tra']
+        
+        if any(kw in user_message.lower() for kw in search_triggers) and 'ghi chú' in user_message.lower():
+            # Smart Keyword Extraction (No Regex)
             import re
-            search_kw = None
             
-            # Pattern 1: "tìm [ghi chú] có tên X" or "tìm [ghi chú] X"
-            # Remove filler words first
-            cleaned = user_message.lower()
-            cleaned = re.sub(r'ghi\s*chú\s*(có\s*tên|của)?', '', cleaned)  # Remove "ghi chú có tên/của"
-            cleaned = re.sub(r'\s+', ' ', cleaned).strip()  # Normalize whitespace
-            
-            # Now extract after "tìm"
-            match = re.search(r'tìm\s+(.+?)(?:\s+không|\?|$)', cleaned)
-            if match:
-                potential_kw = match.group(1).strip()
-                # Handle OR: "thắng nguyễn hoặc check user" → try both
-                if 'hoặc' in potential_kw or 'hay' in potential_kw or 'và' in potential_kw:
-                    # Split by OR/AND and try first part
-                    parts = re.split(r'\s+(?:hoặc|hay|và)\s+', potential_kw)
-                    search_kw = parts[0].strip()  # Use first part
+            def extract_search_keyword(text):
+                text = text.lower()
+                # 1. If contains "ghi chú" -> take the part after it
+                if "ghi chú" in text:
+                    parts = text.split("ghi chú", 1)
+                    if len(parts) > 1:
+                        part = parts[1]
+                    else:
+                        part = text
                 else:
-                    search_kw = potential_kw
-            
-            # Pattern 2: "có <keyword> không"
-            if not search_kw:
-                match = re.search(r'có\s+(.+?)\s+không', cleaned)
-                if match:
-                    search_kw = match.group(1).strip()
-            
-            # Pattern 3: Remove action verbs and take the rest
-            if not search_kw:
-                # Remove common action verbs
-                cleaned = re.sub(r'^(hiển thị|xem|coi|tìm|search)\s+', '', cleaned)
-                cleaned = re.sub(r'\s+(?:của|trong)\s+', ' ', cleaned)
-                tokens = cleaned.split()
-                if len(tokens) >= 1:
-                    search_kw = ' '.join(tokens[:4])  # Take up to 4 words
+                    part = text
+
+                # 2. Remove stop words
+                stop_words = [
+                    "tìm", "coi", "xem", "xem thử", "xem coi", "hiển thị", "có", "không",
+                    "tên", "nào", "trong", "về", "của", "hay", "hoặc", "đi", "thấy", "biết", "check", "kiểm tra",
+                    "là", "gì", "ở", "đâu"
+                ]
+
+                # Split by punctuation/spaces
+                tokens = re.split(r"[ ,\?\.\-]+", part)
+                keywords = [w for w in tokens if w and w not in stop_words]
+
+                # 3. Join remaining words
+                return " ".join(keywords).strip()
+
+            search_kw = extract_search_keyword(user_message)
             
             # Execute search if keyword found
-            if search_kw and 'ghi chú' in user_message.lower():
+            if search_kw:
                 with open('debug_log.txt', 'a', encoding='utf-8') as f:
-                    f.write(f"\n[SEARCH] Keyword: '{search_kw}'\n")
+                    f.write(f"\n[SEARCH] Smart Keyword: '{search_kw}'\n")
                 
                 result = AVAILABLE_TOOLS['search_notes']['function'](search_kw)
-                
-                with open('debug_log.txt', 'a', encoding='utf-8') as f:
-                    f.write(f"[SEARCH] Result count: {result.get('count', 0)}\n")
                 
                 if result.get('success'):
                     notes = result.get('notes', [])
                     if notes:
-                        import re
                         tool_result_text = f"\n\n[TÔI ĐÃ TÌM THẤY {len(notes)} GHI CHÚ:\n"
                         for note in notes[:5]:  # Limit to 5 results
                             # Strip HTML tags
@@ -236,27 +229,21 @@ QUAN TRỌNG:
                             
                             # Smart snippet extraction
                             snippet = ""
-                            if search_kw:
-                                # Find keyword in content (case insensitive)
-                                idx = clean_content.lower().find(search_kw.lower())
-                                if idx != -1:
-                                    # Extract around keyword: -100 chars to +400 chars
-                                    start = max(0, idx - 100)
-                                    end = min(len(clean_content), idx + 400)
-                                    snippet = f"...{clean_content[start:end]}..."
-                                else:
-                                    # Keyword in title, show start of content
-                                    snippet = clean_content[:500] + "..."
+                            # Find keyword in content (case insensitive)
+                            idx = clean_content.lower().find(search_kw.lower())
+                            if idx != -1:
+                                # Extract around keyword: -100 chars to +400 chars
+                                start = max(0, idx - 100)
+                                end = min(len(clean_content), idx + 400)
+                                snippet = f"...{clean_content[start:end]}..."
                             else:
+                                # Keyword in title, show start of content
                                 snippet = clean_content[:500] + "..."
                                 
                             tool_result_text += f"- Tiêu đề: {clean_title}\n  Nội dung: {snippet}\n"
                         tool_result_text += "]"
                     else:
                         tool_result_text = f"\n\n[TÔI ĐÃ TÌM KIẾM NHƯNG KHÔNG TÌM THẤY GHI CHÚ NÀO VỚI TỪ KHÓA '{search_kw}']"
-                
-                with open('debug_log.txt', 'a', encoding='utf-8') as f:
-                    f.write(f"[SEARCH] Final text: {tool_result_text[:200]}...\n")
         
         # Detect "list all notes" intent
         elif any(phrase in user_message.lower() for phrase in ['tất cả ghi chú', 'all notes', 'danh sách ghi chú']):
@@ -314,69 +301,241 @@ QUAN TRỌNG:
 
         ai_response = ""
 
-        # 4. Call AI Provider
-        if not api_key:
-             ai_response = f"Please configure your API Key for {provider} in Settings."
-        elif provider == 'openai':
-            try:
-                import openai
-                client = openai.OpenAI(api_key=api_key)
-                messages = [{'role': 'system', 'content': full_system_prompt}] + history
-                completion = client.chat.completions.create(
-                    model=model_name,
-                    messages=messages
-                )
-                ai_response = completion.choices[0].message.content
-            except Exception as e:
-                ai_response = f"OpenAI Error: {str(e)}"
-                
-        elif provider == 'gemini':
-            try:
-                import google.generativeai as genai
-                genai.configure(api_key=api_key)
-                
-                # Model mapping: auto-upgrade deprecated models to newer versions
-                model_mapping = {
-                    'gemini-pro': 'gemini-2.5-flash',
-                    'gemini-1.5-pro': 'gemini-2.5-pro',
-                    'gemini-1.5-flash': 'gemini-2.5-flash',
-                    'gemini': 'gemini-2.5-flash',
+        # 4. Call AI Provider with Tool Loop
+        
+        # Prepare tools list for Gemini/OpenAI
+        # AVAILABLE_TOOLS is imported at module level
+        
+        # List of actual function objects for Gemini
+        gemini_tools = [tool_def['function'] for tool_def in AVAILABLE_TOOLS.values()]
+        
+        # Helper to convert to OpenAI tools format
+        openai_tools = []
+        for name, tool_def in AVAILABLE_TOOLS.items():
+            openai_tools.append({
+                "type": "function",
+                "function": {
+                    "name": name,
+                    "description": tool_def['description'],
+                    "parameters": {
+                        "type": "object",
+                        "properties": tool_def['parameters'],
+                        "required": [k for k, v in tool_def['parameters'].items() if not v.get('optional')]
+                    }
                 }
-                
-                # Default model if not specified
-                if not model_name or model_name.strip() == '':
-                    model_name = 'gemini-2.5-flash'
-                
-                # Clean up model name (remove extra spaces, lowercase)
-                clean_model = model_name.strip().lower()
-                
-                # Auto-upgrade to newer model if using deprecated one
-                if clean_model in model_mapping:
-                    clean_model = model_mapping[clean_model]
-                    print(f"INFO: Auto-upgraded '{model_name}' -> '{clean_model}'")
-                
-                # Remove 'models/' prefix if user added it (SDK adds it automatically)
-                if clean_model.startswith('models/'):
-                    clean_model = clean_model.replace('models/', '', 1)
-                
-                print(f"DEBUG: Using Gemini Model: '{clean_model}'") 
-                
-                model = genai.GenerativeModel(clean_model)
-                
-                # Construct prompt with history manually for stateless call
-                prompt_parts = [full_system_prompt]
-                for msg in history:
-                    role_label = "User" if msg['role'] == 'user' else "Model"
-                    prompt_parts.append(f"{role_label}: {msg['content']}")
-                
-                # The last message is already in history (user message), so we just generate
+            })
 
-                response = model.generate_content("\n".join(prompt_parts))
-                ai_response = response.text
+        max_turns = 5
+        turn_count = 0
+        final_response_text = ""
+        
+        # Handle Image Input
+        image_data = data.get('image')
+        pil_image = None
+        if image_data:
+            try:
+                import base64
+                import io
+                from PIL import Image
+                if 'base64,' in image_data:
+                    image_data = image_data.split('base64,')[1]
+                image_bytes = base64.b64decode(image_data)
+                pil_image = Image.open(io.BytesIO(image_bytes))
             except Exception as e:
-                ai_response = f"Gemini Error: {str(e)}"
-        else:
-            ai_response = f"Unknown provider: {provider}"
+                print(f"Error decoding image: {e}")
+
+        # Initial messages list
+        current_messages = [{'role': 'system', 'content': full_system_prompt}] + history
+        
+        # Add image to OpenAI messages if present
+        if pil_image and provider == 'openai':
+            # For OpenAI, we need to add the image to the latest user message
+            # But here 'user_message' is already in 'history' or we need to construct it
+            # The current structure adds 'history' to 'current_messages'
+            # We need to append the NEW user message with image
+            
+            # Re-construct the last user message to include image
+            content_part = [{"type": "text", "text": user_message}]
+            content_part.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{image_data}"
+                }
+            })
+            # Replace the last message if it was added to history, or append new
+            # In this code, we haven't added the current user_message to current_messages yet?
+            # Ah, 'history' variable comes from DB, which includes the message we just saved in step 1.
+            # So we need to modify the last item of current_messages
+            if current_messages and current_messages[-1]['role'] == 'user':
+                current_messages[-1]['content'] = content_part
+        
+        while turn_count < max_turns:
+            turn_count += 1
+            
+            if not api_key:
+                 ai_response = f"Please configure your API Key for {provider} in Settings."
+                 break
+            
+            if provider == 'openai':
+                try:
+                    import openai
+                    client = openai.OpenAI(api_key=api_key)
+                    
+                    completion = client.chat.completions.create(
+                        model=model_name,
+                        messages=current_messages,
+                        tools=openai_tools,
+                        tool_choice="auto"
+                    )
+                    
+                    message = completion.choices[0].message
+                    
+                    # If content, we might be done, but check for tool_calls
+                    if message.content:
+                        final_response_text = message.content
+
+                    if message.tool_calls:
+                        # Append assistant message with tool calls
+                        current_messages.append(message)
+                        
+                        # Execute each tool call
+                        for tool_call in message.tool_calls:
+                            function_name = tool_call.function.name
+                            import json
+                            function_args = json.loads(tool_call.function.arguments)
+                            
+                            # Execute
+                            if function_name in AVAILABLE_TOOLS:
+                                tool_func = AVAILABLE_TOOLS[function_name]['function']
+                                tool_result = tool_func(**function_args)
+                                
+                                # Append tool result
+                                current_messages.append({
+                                    "tool_call_id": tool_call.id,
+                                    "role": "tool",
+                                    "name": function_name,
+                                    "content": json.dumps(tool_result, ensure_ascii=False)
+                                })
+                        # Loop continues to send tool outputs back to model
+                    else:
+                        # No tool calls, we are done
+                        ai_response = final_response_text
+                        break
+                        
+                except Exception as e:
+                    ai_response = f"OpenAI Error: {str(e)}"
+                    break
+                    
+            elif provider == 'gemini':
+                try:
+                    import google.generativeai as genai
+                    from google.protobuf import struct_pb2
+                    genai.configure(api_key=api_key)
+                    
+                    # Model mapping logic (Fixed to valid models)
+                    model_mapping = {
+                        'gemini-pro': 'gemini-1.5-flash',
+                        'gemini-1.5-pro': 'gemini-1.5-pro',
+                        'gemini-1.5-flash': 'gemini-1.5-flash',
+                        'gemini': 'gemini-1.5-flash',
+                        'gemini-2.5-flash': 'gemini-1.5-flash', # Fallback fix
+                        'gemini-2.5-pro': 'gemini-1.5-pro',     # Fallback fix
+                    }
+                    if not model_name or model_name.strip() == '': model_name = 'gemini-1.5-flash'
+                    clean_model = model_name.strip().lower()
+                    if clean_model in model_mapping: clean_model = model_mapping[clean_model]
+                    if clean_model.startswith('models/'): clean_model = clean_model.replace('models/', '', 1)
+                    
+                    # Initialize model with tools
+                    model = genai.GenerativeModel(clean_model, tools=gemini_tools)
+                    
+                    # Convert history to Gemini format
+                    chat_history = []
+                    
+                    # Add actual history (excluding the very last message which is the current user message, 
+                    # because we want to send it with image in send_message)
+                    # The DB history includes the current message. We should exclude it from 'history' param 
+                    # and send it explicitly.
+                    
+                    # history variable contains dicts: {'role': 'user', 'content': ...}
+                    # The last item is the current message.
+                    history_to_load = history[:-1] if history else []
+                    
+                    for msg in history_to_load:
+                        role = 'user' if msg['role'] == 'user' else 'model'
+                        chat_history.append({'role': role, 'parts': [msg['content']]})
+                    
+                    # Start chat session
+                    chat = model.start_chat(history=chat_history)
+                    
+                    # Prepare message parts
+                    msg_parts = []
+                    
+                    # Inject system prompt if it's the start (or always? Gemini handles system instruction in model init usually, 
+                    # but here we inject in first message or context)
+                    # We'll prepend it to the text.
+                    
+                    text_content = user_message
+                    if turn_count == 1:
+                        text_content = f"{full_system_prompt}\n\nUser: {user_message}"
+                    
+                    msg_parts.append(text_content)
+                    
+                    if pil_image:
+                        msg_parts.append(pil_image)
+                        
+                    # Send message
+                    # Enable automatic function calling if available, otherwise manual loop
+                    
+                    response = chat.send_message(msg_parts)
+                    
+                    # Check for function calls
+                    # We need to inspect response.candidates[0].content.parts
+                    
+                    if not response.candidates:
+                         ai_response = "Error: No response candidates from Gemini."
+                         break
+
+                    part = response.candidates[0].content.parts[0]
+                    
+                    if part.function_call:
+                        # It wants to call a function
+                        fc = part.function_call
+                        fn_name = fc.name
+                        fn_args = dict(fc.args)
+                        
+                        # Execute
+                        if fn_name in AVAILABLE_TOOLS:
+                            tool_func = AVAILABLE_TOOLS[fn_name]['function']
+                            tool_result = tool_func(**fn_args)
+                            
+                            # Send result back
+                            response = chat.send_message(
+                                genai.protos.Content(
+                                    parts=[genai.protos.Part(
+                                        function_response=genai.protos.FunctionResponse(
+                                            name=fn_name,
+                                            response={'result': tool_result}
+                                        )
+                                    )]
+                                )
+                            )
+                            # The response after sending function_response is the final text
+                            ai_response = response.text
+                            break # Done after one tool call for now (can loop if needed)
+                        else:
+                            ai_response = f"Error: Tool {fn_name} not found."
+                            break
+                    else:
+                        ai_response = response.text
+                        break
+
+                except Exception as e:
+                    ai_response = f"Gemini Error: {str(e)}"
+                    break
+            else:
+                ai_response = f"Unknown provider: {provider}"
+                break
 
         # 5. Save AI Response
         conn = get_db_connection()

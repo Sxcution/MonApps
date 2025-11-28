@@ -113,7 +113,8 @@ def process_base64_images(content_html):
             return match.group(0)
 
     # Find and replace Base64 images
-    return re.sub(r'data:image/[a-zA-Z0-9+.-]+;base64,[^"\'\s>]+', replace_match, content_html)
+    # Exclude '&' to prevent consuming HTML entities like &quot;
+    return re.sub(r'data:image/[a-zA-Z0-9+.-]+;base64,[^"\'\s>&]+', replace_match, content_html)
 
 @notes_bp.route("/api/add", methods=["POST"])
 def api_add_note():

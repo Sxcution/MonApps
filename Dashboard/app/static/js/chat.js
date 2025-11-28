@@ -25,17 +25,19 @@ document.addEventListener('DOMContentLoaded', function () {
     loadAISettings();
 
     // Check if we're returning to this tab or loading fresh
-    const savedSessionId = sessionStorage.getItem('currentSessionId'); // Use sessionStorage for tab-specific persistence
-    const wasOnHomePage = sessionStorage.getItem('wasOnHomePage');
+    // Check if we're returning to this tab or loading fresh
+    // const savedSessionId = sessionStorage.getItem('currentSessionId'); // Use sessionStorage for tab-specific persistence
+    // const wasOnHomePage = sessionStorage.getItem('wasOnHomePage');
 
-    if (savedSessionId && wasOnHomePage === 'true') {
-        // Returning from another tab - restore the session
-        loadSession(savedSessionId);
-    } else {
-        // Fresh load or first time - start new chat
-        startNewChat();
-        sessionStorage.removeItem('currentSessionId');
-    }
+    // FORCE NEW CHAT ON LOAD as requested
+    // if (savedSessionId && wasOnHomePage === 'true') {
+    //    // Returning from another tab - restore the session
+    //    loadSession(savedSessionId);
+    // } else {
+    // Fresh load or first time - start new chat
+    startNewChat();
+    sessionStorage.removeItem('currentSessionId');
+    // }
 
     // Mark that we're on the home page
     sessionStorage.setItem('wasOnHomePage', 'true');
@@ -72,6 +74,24 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    // Paste Event Listener
+    document.getElementById('user-input').addEventListener('paste', function (e) {
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        for (let index in items) {
+            const item = items[index];
+            if (item.kind === 'file' && item.type.includes('image/')) {
+                const blob = item.getAsFile();
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    const base64 = event.target.result;
+                    showImagePreview(base64);
+                };
+                reader.readAsDataURL(blob);
+                e.preventDefault(); // Prevent pasting the file name
+            }
+        }
+    });
+
     // Provider Change Listener
     document.getElementById('ai-provider').addEventListener('change', function (e) {
         updateSettingsUI(e.target.value);
@@ -80,6 +100,23 @@ document.addEventListener('DOMContentLoaded', function () {
     // Setup context menu for chat history
     setupChatHistoryContextMenu();
 });
+
+// Image Preview Functions
+let currentImageBase64 = null;
+
+function showImagePreview(base64) {
+    currentImageBase64 = base64;
+    document.getElementById('image-preview').src = base64;
+    document.getElementById('image-preview-container').classList.remove('d-none');
+    // Focus back on input
+    document.getElementById('user-input').focus();
+}
+
+function clearImagePreview() {
+    currentImageBase64 = null;
+    document.getElementById('image-preview').src = '';
+    document.getElementById('image-preview-container').classList.add('d-none');
+}
 
 // Context Menu Functions
 function setupChatHistoryContextMenu() {
@@ -211,8 +248,10 @@ function startNewChat() {
         </div>
     `;
     // Center input when empty
-    document.querySelector('.chat-input-container').classList.add('centered');
+    const container = document.querySelector('.chat-input-container');
+    if (container) container.classList.add('centered');
     document.querySelectorAll('.chat-history-item').forEach(el => el.classList.remove('active'));
+    clearImagePreview();
 }
 
 async function loadSession(sessionId) {
@@ -234,7 +273,8 @@ async function loadSession(sessionId) {
             chatMessages.scrollTop = chatMessages.scrollHeight;
             // Remove centered class when loading existing chat
             if (data.history && data.history.length > 0) {
-                document.querySelector('.chat-input-container').classList.remove('centered');
+                const container = document.querySelector('.chat-input-container');
+                if (container) container.classList.remove('centered');
             }
         }
     } catch (error) {
@@ -248,7 +288,8 @@ function appendMessage(role, content, modelName = null) {
     if (emptyState) {
         emptyState.remove();
         // Move input to bottom when first message appears
-        document.querySelector('.chat-input-container').classList.remove('centered');
+        const container = document.querySelector('.chat-input-container');
+        if (container) container.classList.remove('centered');
     }
 
     const messageRow = document.createElement('div');
@@ -272,6 +313,10 @@ function appendMessage(role, content, modelName = null) {
             else if (provider === 'gemini') displayName = providerSettings.gemini_model || 'Gemini Pro';
         }
     }
+
+    // Handle Image Content (if content is JSON-like or contains image marker)
+    // For now, assume content is text. If we support images in history, we need to parse.
+    // Simple check for image tag in content (if we save it as HTML)
 
     let formattedContent = content
         .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
@@ -303,12 +348,18 @@ async function sendMessage() {
     const input = document.getElementById('user-input');
     const message = input.value.trim();
 
-    if (!message) return;
+    // Allow sending if there is an image, even if text is empty
+    if (!message && !currentImageBase64) return;
 
     input.value = '';
     input.style.height = '24px';
 
-    appendMessage('user', message);
+    // Display User Message
+    let displayContent = message;
+    if (currentImageBase64) {
+        displayContent = `<img src="${currentImageBase64}" style="max-width: 200px; border-radius: 8px; display: block; margin-bottom: 5px;">` + message;
+    }
+    appendMessage('user', displayContent);
 
     const chatMessages = document.getElementById('chat-messages');
     const loadingId = 'loading-' + Date.now();
@@ -338,15 +389,21 @@ async function sendMessage() {
         // Get selected model from localStorage
         const selectedModel = JSON.parse(localStorage.getItem('selectedModel') || '{}');
 
+        const payload = {
+            message: message,
+            session_id: currentSessionId,
+            provider: selectedModel.provider,
+            model: selectedModel.model
+        };
+
+        if (currentImageBase64) {
+            payload.image = currentImageBase64;
+        }
+
         const response = await fetch('/api/chat/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                message: message,
-                session_id: currentSessionId,
-                provider: selectedModel.provider,
-                model: selectedModel.model
-            })
+            body: JSON.stringify(payload)
         });
         const data = await response.json();
         document.getElementById(loadingId).remove();
@@ -366,7 +423,8 @@ async function sendMessage() {
         document.getElementById(loadingId).remove();
         appendMessage('assistant', 'Network Error: ' + error.message, currentModelName);
     } finally {
-        sendBtn.disabled = false;
+        // Clear image after sending
+        clearImagePreview();
     }
 }
 

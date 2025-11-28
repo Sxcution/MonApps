@@ -1504,6 +1504,17 @@ body {
 
 .message-row.user .message-container {
     flex-direction: row-reverse;
+    gap: 0.5rem !important;
+    /* Reduced gap from 1.5rem */
+}
+
+.message-row.user .message-content {
+    background-color: #3a3b3c;
+    /* Dark gray background */
+    padding: 10px 15px;
+    border-radius: 15px;
+    border-top-right-radius: 2px;
+    color: #e4e6eb;
 }
 
 .message-row:hover {

@@ -10,8 +10,14 @@ from app.database import get_db_connection
 
 # ===== NOTES TOOLS =====
 
+# ===== NOTES TOOLS =====
+
 def get_all_notes():
-    """Lấy tất cả ghi chú từ database"""
+    """
+    Lấy danh sách tất cả ghi chú.
+    Returns:
+        dict: {'success': True, 'notes': [...]}
+    """
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -37,7 +43,13 @@ def get_all_notes():
         return {'success': False, 'error': str(e)}
 
 def search_notes(keyword):
-    """Tìm kiếm ghi chú theo từ khóa"""
+    """
+    Tìm kiếm ghi chú theo từ khóa trong tiêu đề hoặc nội dung.
+    Args:
+        keyword (str): Từ khóa cần tìm.
+    Returns:
+        dict: {'success': True, 'notes': [...], 'count': int}
+    """
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -64,7 +76,15 @@ def search_notes(keyword):
         return {'success': False, 'error': str(e)}
 
 def add_note(title, content, due_time=None):
-    """Tạo ghi chú mới"""
+    """
+    Tạo một ghi chú mới.
+    Args:
+        title (str): Tiêu đề ghi chú.
+        content (str): Nội dung ghi chú.
+        due_time (str, optional): Thời gian nhắc nhở (ISO format).
+    Returns:
+        dict: {'success': True, 'note_id': str}
+    """
     try:
         import uuid
         conn = get_db_connection()
@@ -82,7 +102,18 @@ def add_note(title, content, due_time=None):
         return {'success': False, 'error': str(e)}
 
 def update_note(note_id, title=None, content=None, due_time=None):
-    """Cập nhật ghi chú"""
+    """
+    Cập nhật nội dung của một ghi chú đã tồn tại.
+    QUAN TRỌNG: Để nối thêm nội dung, bạn phải lấy nội dung cũ trước, nối chuỗi, rồi gọi hàm này với nội dung mới đầy đủ.
+    
+    Args:
+        note_id (str): ID của ghi chú (BẮT BUỘC phải tìm kiếm để lấy ID trước).
+        title (str, optional): Tiêu đề mới (nếu muốn đổi).
+        content (str, optional): Nội dung mới (sẽ GHI ĐÈ toàn bộ nội dung cũ).
+        due_time (str, optional): Thời gian nhắc nhở mới.
+    Returns:
+        dict: {'success': True}
+    """
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -97,6 +128,10 @@ def update_note(note_id, title=None, content=None, due_time=None):
         if due_time is not None:
             updates.append('due_time = ?')
             values.append(due_time)
+        
+        if not updates:
+            return {'success': False, 'error': 'No fields to update'}
+
         updates.append('modified_at = ?')
         values.append(datetime.now().isoformat())
         values.append(note_id)
@@ -109,7 +144,13 @@ def update_note(note_id, title=None, content=None, due_time=None):
         return {'success': False, 'error': str(e)}
 
 def delete_note(note_id):
-    """Xóa ghi chú"""
+    """
+    Xóa vĩnh viễn một ghi chú.
+    Args:
+        note_id (str): ID của ghi chú cần xóa.
+    Returns:
+        dict: {'success': True}
+    """
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
