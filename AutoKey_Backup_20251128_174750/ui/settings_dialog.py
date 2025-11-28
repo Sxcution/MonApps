@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                              QLineEdit, QPushButton, QFormLayout, QKeySequenceEdit,
-                             QTabWidget, QWidget, QSpinBox, QComboBox, QDoubleSpinBox)
+                             QTabWidget, QWidget, QSpinBox, QComboBox)
 from PyQt6.QtCore import QSettings
 from PyQt6.QtGui import QKeySequence
 
@@ -34,11 +34,6 @@ class SettingsDialog(QDialog):
         self.mini_mode_tab = QWidget()
         self.setup_mini_mode_tab()
         self.tabs.addTab(self.mini_mode_tab, "Mini Mode")
-        
-        # Tab 4: Mouse (New)
-        self.mouse_tab = QWidget()
-        self.setup_mouse_tab()
-        self.tabs.addTab(self.mouse_tab, "Mouse")
         
         # Buttons
         btn_layout = QHBoxLayout()
@@ -189,49 +184,6 @@ class SettingsDialog(QDialog):
         layout.addWidget(info_label)
         layout.addStretch()
 
-    def setup_mouse_tab(self):
-        layout = QVBoxLayout(self.mouse_tab)
-        form_layout = QFormLayout()
-        
-        # Mouse Mode
-        self.combo_mouse_mode = QComboBox()
-        self.combo_mouse_mode.addItems([
-            "Auto (Detect 2D/3D)",
-            "Force UI (Absolute)",
-            "Force 3D (Relative Delta)"
-        ])
-        form_layout.addRow("Mouse Mode:", self.combo_mouse_mode)
-        
-        # Tick Hz
-        self.spin_tick_hz = QSpinBox()
-        self.spin_tick_hz.setRange(60, 1000)
-        self.spin_tick_hz.setSingleStep(10)
-        self.spin_tick_hz.setSuffix(" Hz")
-        self.spin_tick_hz.setSuffix(" Hz")
-        form_layout.addRow("Playback Tick Rate:", self.spin_tick_hz)
-        
-        # Mouse Gain
-        self.spin_gain = QDoubleSpinBox()
-        self.spin_gain.setRange(0.1, 5.0)
-        self.spin_gain.setSingleStep(0.1)
-        self.spin_gain.setValue(1.0)
-        form_layout.addRow("Mouse Gain (Sensitivity):", self.spin_gain)
-        
-        # Info
-        info_label = QLabel(
-            "• Auto: Tự động chuyển đổi giữa chuột tuyệt đối (UI) và tương đối (Game 3D).\n"
-            "• Force UI: Luôn dùng toạ độ tuyệt đối (cho ứng dụng văn phòng/web).\n"
-            "• Force 3D: Luôn dùng delta (cho game FPS/TPS xoay camera).\n"
-            "• Tick Rate: Tần số gửi sự kiện chuột (cao hơn = mượt hơn nhưng tốn CPU).\n"
-            "• Mouse Gain: Hệ số nhân quãng đường chuột (1.0 = chuẩn). Tăng lên nếu thấy chuột di chuyển thiếu."
-        )
-        info_label.setWordWrap(True)
-        info_label.setStyleSheet("color: #666; font-size: 9pt; margin-top: 10px;")
-        
-        layout.addLayout(form_layout)
-        layout.addWidget(info_label)
-        layout.addStretch()
-
     def validate_hotkeys(self):
         hotkeys = {}
         duplicates = []
@@ -294,25 +246,6 @@ class SettingsDialog(QDialog):
         index = self.combo_position.findText(display_position)
         if index >= 0:
             self.combo_position.setCurrentIndex(index)
-            
-        # Load Mouse Settings
-        mouse_mode = self.settings.value("mouse_mode", "auto")
-        mode_map = {
-            "auto": "Auto (Detect 2D/3D)",
-            "force_ui": "Force UI (Absolute)",
-            "force_3d": "Force 3D (Relative Delta)"
-        }
-        display_mode = mode_map.get(mouse_mode, "Auto (Detect 2D/3D)")
-        index = self.combo_mouse_mode.findText(display_mode)
-        if index >= 0:
-            self.combo_mouse_mode.setCurrentIndex(index)
-            
-        tick_hz = int(self.settings.value("mouse_tick_hz", 240))
-        tick_hz = int(self.settings.value("mouse_tick_hz", 240))
-        self.spin_tick_hz.setValue(tick_hz)
-        
-        gain = float(self.settings.value("mouse_gain", 1.0))
-        self.spin_gain.setValue(gain)
 
     def save_settings(self):
         # Save hotkeys
@@ -340,16 +273,3 @@ class SettingsDialog(QDialog):
         display_position = self.combo_position.currentText()
         internal_position = position_map.get(display_position, "top_left")
         self.settings.setValue("overlay_position", internal_position)
-        
-        # Save Mouse Settings
-        mode_map_inv = {
-            "Auto (Detect 2D/3D)": "auto",
-            "Force UI (Absolute)": "force_ui",
-            "Force 3D (Relative Delta)": "force_3d"
-        }
-        display_mode = self.combo_mouse_mode.currentText()
-        internal_mode = mode_map_inv.get(display_mode, "auto")
-        self.settings.setValue("mouse_mode", internal_mode)
-        
-        self.settings.setValue("mouse_tick_hz", self.spin_tick_hz.value())
-        self.settings.setValue("mouse_gain", self.spin_gain.value())

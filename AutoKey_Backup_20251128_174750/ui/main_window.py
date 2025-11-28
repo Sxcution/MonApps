@@ -12,8 +12,7 @@ import uuid
 from ui.toolbar import MainToolbar
 from ui.styles import MAIN_STYLESHEET
 from ui.playback_overlay import PlaybackOverlay
-from core.recorder_v2 import RecorderV2
-from core.player_v2 import PlayerV2
+from core.recorder import Recorder
 from core.player import Player
 
 from ui.delegates import ActionDelegate, NumberDelegate
@@ -194,7 +193,7 @@ class MainWindow(QMainWindow):
             widget.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
 
         # Logic Components
-        self.recorder = RecorderV2()
+        self.recorder = Recorder()
         self.recorder.event_recorded.connect(self.add_event_to_table)
         self.player = None
         self.stop_playback_event = threading.Event()
@@ -214,15 +213,6 @@ class MainWindow(QMainWindow):
         
         # Setup Hotkeys
         self.setup_global_hotkeys()
-        
-        # Apply Recorder Settings
-        self.update_recorder_settings()
-
-    def update_recorder_settings(self):
-        """Update recorder settings from QSettings"""
-        mouse_mode = self.settings.value("mouse_mode", "auto")
-        if hasattr(self, 'recorder'):
-            self.recorder.set_mode(mouse_mode)
 
     def new_recording(self):
         self.model.removeRows(0, self.model.rowCount())
@@ -285,7 +275,7 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Playing...")
             self.stop_playback_event.clear()
             self.pause_playback_event.clear()  # Start unpaused
-            self.player = PlayerV2(self.recorded_events, self.stop_playback_event, self.pause_playback_event)
+            self.player = Player(self.recorded_events, self.stop_playback_event, self.pause_playback_event)
             
             # Connect signals
             self.player.progress_updated.connect(self.overlay.update_loop)
@@ -789,7 +779,6 @@ class MainWindow(QMainWindow):
         if dialog.exec():
             dialog.save_settings()
             self.setup_global_hotkeys() 
-            self.update_recorder_settings()
             self.statusBar().showMessage("Settings saved.")
         else:
             self.setup_global_hotkeys()
