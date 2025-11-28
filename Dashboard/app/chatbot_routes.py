@@ -5,6 +5,7 @@ import os
 import uuid
 from datetime import datetime
 from .database import get_db_connection
+from app.chatbot_tools import AVAILABLE_TOOLS
 
 chatbot_bp = Blueprint('chatbot', __name__, url_prefix='/api/chat')
 
@@ -120,6 +121,8 @@ def send_message():
         data = request.json
         user_message = data.get('message')
         session_id = data.get('session_id')
+        request_provider = data.get('provider')  # Get provider from request
+        request_model = data.get('model')        # Get model from request
         
         if not user_message:
             return jsonify({'success': False, 'error': 'Message is required'}), 400
@@ -146,26 +149,119 @@ def send_message():
         conn.commit()
         # 2. Get Settings & Context
         settings = get_ai_settings()
-        provider = settings.get('provider', 'openai')
-        system_prompt = settings.get('system_prompt', 'You are a helpful Dashboard Assistant.')
+        # Use request provider/model if provided, otherwise fallback to settings
+        provider = request_provider if request_provider else settings.get('provider', 'gemini')
+        # Build simple system prompt - NO TOOL INSTRUCTIONS
+        base_prompt = settings.get('system_prompt', 'Bạn là Dashboard Assistant - trợ lý thông minh.')
+        
+        # CRITICAL: Add explicit instruction to NEVER return JSON
+        anti_json_instruction = """
+
+QUAN TRỌNG: 
+- KHÔNG BAO GIỜ trả lời bằng JSON format
+- KHÔNG BAO GIỜ trả về {'action': 'use_tool', ...}
+- CHỈ trả lời bằng ngôn ngữ tự nhiên, thân thiện
+- Nếu câu hỏi có chứa dữ liệu từ database (trong dấu ngoặc vuông [...]), hãy đọc và tóm tắt cho user
+- Trả lời ngắn gọn, súc tích bằng tiếng Việt
+"""
+        
+        system_prompt = base_prompt + anti_json_instruction
+        
+        # Get context
+        context = get_context_data()
+        full_system_prompt = f"{system_prompt}\n\nCURRENT DASHBOARD CONTEXT:\n{context}"
+        
+        # PRE-EXECUTE TOOLS BEFORE CALLING AI
+        # Detect and execute tools based on keywords, then inject results into user message
+        tool_result_text = ""
+        
+        # Detect search intent
+        if any(kw in user_message.lower() for kw in ['tìm', 'search', 'có', 'xem', 'coi', 'hiển thị']):
+            # Extract search keyword intelligently
+            search_kw = None
+            
+            # Pattern 1: "tìm <keyword>"
+            import re
+            match = re.search(r'tìm\s+(.+?)(?:\s+trong|\s+không|\?|$)', user_message.lower())
+            if match:
+                search_kw = match.group(1).strip()
+            
+            # Pattern 2: "có <keyword> không"
+            if not search_kw:
+                match = re.search(r'có\s+(.+?)\s+không', user_message.lower())
+                if match:
+                    search_kw = match.group(1).strip()
+            
+            # Pattern 3: Just check if specific keywords exist
+            if not search_kw:
+                for word in ['thắng nguyễn', 'thang nguyen']:
+                    if word in user_message.lower():
+                        search_kw = word
+                        break
+            
+            # Execute search if keyword found
+            if search_kw and 'ghi chú' in user_message.lower():
+                result = AVAILABLE_TOOLS['search_notes']['function'](search_kw)
+                if result.get('success'):
+                    notes = result.get('notes', [])
+                    if notes:
+                        tool_result_text = f"\n\n[TÔI ĐÃ TÌM THẤY {len(notes)} GHI CHÚ:\n"
+                        for note in notes[:5]:  # Limit to 5 results
+                            tool_result_text += f"- Tiêu đề: {note['title']}\n  Nội dung: {note['content'][:100]}...\n"
+                        tool_result_text += "]"
+                    else:
+                        tool_result_text = f"\n\n[TÔI ĐÃ TÌM KIẾM NHƯNG KHÔNG TÌM THẤY GHI CHÚ NÀO VỚI TỪ KHÓA '{search_kw}']"
+        
+        # Detect "list all notes" intent
+        elif any(phrase in user_message.lower() for phrase in ['tất cả ghi chú', 'all notes', 'danh sách ghi chú']):
+            result = AVAILABLE_TOOLS['get_all_notes']['function']()
+            if result.get('success'):
+                notes = result.get('notes', [])
+                tool_result_text = f"\n\n[DANH SÁCH {len(notes)} GHI CHÚ:\n"
+                for note in notes[:10]:  # Limit to 10
+                    tool_result_text += f"- {note['title']}: {note['content'][:80]}...\n"
+                tool_result_text += "]"
+        
+        # Detect MXH intent 
+        elif any(kw in user_message.lower() for kw in ['mxh', 'facebook', 'tiktok', 'social']):
+            result = AVAILABLE_TOOLS['get_all_mxh_cards']['function']()
+            if result.get('success'):
+                cards = result.get('cards', [])
+                tool_result_text = f"\n\n[DANH SÁCH {len(cards)} THẺ MXH:\n"
+                for card in cards[:10]:
+                    tool_result_text += f"- {card['platform']}: {card['card_name']}\n"
+                tool_result_text += "]"
+        
+        # Detect Telegram intent
+        elif 'telegram' in user_message.lower():
+            result = AVAILABLE_TOOLS['get_telegram_sessions']['function']()
+            if result.get('success'):
+                sessions = result.get('sessions', [])
+                tool_result_text = f"\n\n[DANH SÁCH {len(sessions)} TELEGRAM SESSIONS:\n"
+                for sess in sessions[:10]:
+                    tool_result_text += f"- {sess['filename']}: {sess['status_text']} (Live: {sess['is_live']})\n"
+                tool_result_text += "]"
+        
+        # Inject tool results into user message for AI to process
+        if tool_result_text:
+            user_message = user_message + tool_result_text
+        
+        # 3. Get History (Last 10 messages for context window)
+        history_rows = conn.execute('SELECT role, content FROM chat_history WHERE session_id = ? ORDER BY id DESC LIMIT 10', (session_id,)).fetchall()
+        history = [{'role': row['role'], 'content': row['content']} for row in reversed(history_rows)]
+        conn.close()
         
         api_key = ''
         model_name = ''
         
         if provider == 'openai':
             api_key = settings.get('openai_api_key', '')
-            model_name = settings.get('openai_model', 'gpt-3.5-turbo').strip()
+            # Use request model if provided, otherwise use settings, default to gpt-3.5-turbo
+            model_name = (request_model if request_model else settings.get('openai_model', 'gpt-3.5-turbo')).strip()
         elif provider == 'gemini':
             api_key = settings.get('gemini_api_key', '')
-            model_name = settings.get('gemini_model', 'gemini-pro').strip()
-        
-        context = get_context_data()
-        full_system_prompt = f"{system_prompt}\n\nCURRENT DASHBOARD CONTEXT:\n{context}"
-        
-        # 3. Get History (Last 10 messages for context window)
-        history_rows = conn.execute('SELECT role, content FROM chat_history WHERE session_id = ? ORDER BY id DESC LIMIT 10', (session_id,)).fetchall()
-        history = [{'role': row['role'], 'content': row['content']} for row in reversed(history_rows)]
-        conn.close()
+            # Use request model if provided, otherwise use settings, default to gemini-2.5-flash
+            model_name = (request_model if request_model else settings.get('gemini_model', 'gemini-2.5-flash')).strip()
 
         ai_response = ""
 
@@ -190,11 +286,33 @@ def send_message():
                 import google.generativeai as genai
                 genai.configure(api_key=api_key)
                 
-                # Sanitize model name for Gemini (e.g. ensure no spaces, maybe add 'models/' if needed but usually not)
-                # Common error is "unexpected model name format" if it has spaces or invalid chars
-                print(f"DEBUG: Using Gemini Model: '{model_name}'") 
+                # Model mapping: auto-upgrade deprecated models to newer versions
+                model_mapping = {
+                    'gemini-pro': 'gemini-2.5-flash',
+                    'gemini-1.5-pro': 'gemini-2.5-pro',
+                    'gemini-1.5-flash': 'gemini-2.5-flash',
+                    'gemini': 'gemini-2.5-flash',
+                }
                 
-                model = genai.GenerativeModel(model_name)
+                # Default model if not specified
+                if not model_name or model_name.strip() == '':
+                    model_name = 'gemini-2.5-flash'
+                
+                # Clean up model name (remove extra spaces, lowercase)
+                clean_model = model_name.strip().lower()
+                
+                # Auto-upgrade to newer model if using deprecated one
+                if clean_model in model_mapping:
+                    clean_model = model_mapping[clean_model]
+                    print(f"INFO: Auto-upgraded '{model_name}' -> '{clean_model}'")
+                
+                # Remove 'models/' prefix if user added it (SDK adds it automatically)
+                if clean_model.startswith('models/'):
+                    clean_model = clean_model.replace('models/', '', 1)
+                
+                print(f"DEBUG: Using Gemini Model: '{clean_model}'") 
+                
+                model = genai.GenerativeModel(clean_model)
                 
                 # Construct prompt with history manually for stateless call
                 prompt_parts = [full_system_prompt]

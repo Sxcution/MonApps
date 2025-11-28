@@ -2,8 +2,43 @@ let currentSessionId = null;
 let providerSettings = {}; // Store settings for all providers
 
 document.addEventListener('DOMContentLoaded', function () {
+    // Set default model if not already set
+    if (!localStorage.getItem('selectedModel')) {
+        localStorage.setItem('selectedModel', JSON.stringify({
+            provider: 'gemini',
+            model: 'gemini-2.5-flash'
+        }));
+        document.getElementById('current-model-name').textContent = 'Gemini 2.5 Flash';
+    } else {
+        // Restore selected model display
+        const selected = JSON.parse(localStorage.getItem('selectedModel'));
+        const displayNames = {
+            'gpt-4o': 'GPT-4o',
+            'gpt-3.5-turbo': 'GPT-3.5',
+            'gemini-2.5-flash': 'Gemini 2.5 Flash',
+            'gemini-2.5-pro': 'Gemini 2.5 Pro'
+        };
+        document.getElementById('current-model-name').textContent = displayNames[selected.model] || selected.model;
+    }
+
     loadSessions();
     loadAISettings();
+
+    // Check if we're returning to this tab or loading fresh
+    const savedSessionId = sessionStorage.getItem('currentSessionId'); // Use sessionStorage for tab-specific persistence
+    const wasOnHomePage = sessionStorage.getItem('wasOnHomePage');
+
+    if (savedSessionId && wasOnHomePage === 'true') {
+        // Returning from another tab - restore the session
+        loadSession(savedSessionId);
+    } else {
+        // Fresh load or first time - start new chat
+        startNewChat();
+        sessionStorage.removeItem('currentSessionId');
+    }
+
+    // Mark that we're on the home page
+    sessionStorage.setItem('wasOnHomePage', 'true');
 
     // Auto-resize textarea
     const textarea = document.getElementById('user-input');
@@ -41,11 +76,99 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('ai-provider').addEventListener('change', function (e) {
         updateSettingsUI(e.target.value);
     });
+
+    // Setup context menu for chat history
+    setupChatHistoryContextMenu();
 });
+
+// Context Menu Functions
+function setupChatHistoryContextMenu() {
+    document.addEventListener('contextmenu', function (e) {
+        const historyItem = e.target.closest('.chat-history-item');
+        if (historyItem) {
+            e.preventDefault();
+            showContextMenu(e.clientX, e.clientY, historyItem.dataset.id);
+        }
+    });
+
+    // Close context menu on click elsewhere
+    document.addEventListener('click', hideContextMenu);
+}
+
+function showContextMenu(x, y, sessionId) {
+    hideContextMenu(); // Remove existing menu if any
+
+    const menu = document.createElement('div');
+    menu.id = 'chat-context-menu';
+    menu.className = 'context-menu';
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+    menu.innerHTML = `
+        <div class="context-menu-item" onclick="deleteChat('${sessionId}')">
+            <i class="bi bi-trash me-2"></i>Delete Chat
+        </div>
+    `;
+    document.body.appendChild(menu);
+}
+
+function hideContextMenu() {
+    const menu = document.getElementById('chat-context-menu');
+    if (menu) menu.remove();
+}
+
+async function deleteChat(sessionId) {
+    if (!confirm('Are you sure you want to delete this chat?')) return;
+
+    try {
+        const response = await fetch(`/api/chat/delete_session/${sessionId}`, {
+            method: 'DELETE'
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            // If deleted chat was current session, start new chat
+            if (currentSessionId === sessionId) {
+                startNewChat();
+                sessionStorage.removeItem('currentSessionId');
+            }
+            loadSessions(); // Refresh history list
+        }
+    } catch (error) {
+        console.error('Error deleting chat:', error);
+    }
+    hideContextMenu();
+}
 
 function toggleSidebar() {
     document.getElementById('chatSidebar').classList.toggle('show');
 }
+
+function selectModel(provider, model) {
+    // Update display name
+    const displayNames = {
+        'gpt-4o': 'GPT-4o',
+        'gpt-3.5-turbo': 'GPT-3.5',
+        'gemini-2.5-flash': 'Gemini 2.5 Flash',
+        'gemini-2.5-pro': 'Gemini 2.5 Pro'
+    };
+
+    const displayName = displayNames[model] || model;
+    document.getElementById('current-model-name').textContent = displayName;
+
+    // Update settings
+    document.getElementById('ai-provider').value = provider;
+    document.getElementById('ai-model').value = model;
+
+    // Save to localStorage
+    const settings = {
+        provider: provider,
+        model: model
+    };
+    localStorage.setItem('selectedModel', JSON.stringify(settings));
+
+    console.log(`Selected model: ${provider} - ${model}`);
+}
+
 
 async function loadSessions() {
     try {
@@ -84,19 +207,17 @@ function startNewChat() {
                     <i class="bi bi-robot fs-1"></i>
                 </div>
             </div>
-            <h3 class="mb-3 fw-bold">What's on your mind today?</h3>
-            <div class="d-flex flex-wrap justify-content-center gap-2" id="suggestion-chips">
-                <button class="btn btn-suggestion" onclick="sendSuggestion('Check my recent notes')">Check my recent notes</button>
-                <button class="btn btn-suggestion" onclick="sendSuggestion('Analyze Telegram sessions')">Analyze Telegram sessions</button>
-                <button class="btn btn-suggestion" onclick="sendSuggestion('List my social accounts')">List my social accounts</button>
-            </div>
+            <h3 class="mb-4 fw-bold">Hello Sếp</h3>
         </div>
     `;
+    // Center input when empty
+    document.querySelector('.chat-input-container').classList.add('centered');
     document.querySelectorAll('.chat-history-item').forEach(el => el.classList.remove('active'));
 }
 
 async function loadSession(sessionId) {
     currentSessionId = sessionId;
+    sessionStorage.setItem('currentSessionId', sessionId);  // Persist session in current tab
     document.querySelectorAll('.chat-history-item').forEach(el => {
         el.classList.toggle('active', el.dataset.id === sessionId);
     });
@@ -111,6 +232,10 @@ async function loadSession(sessionId) {
         if (data.success) {
             data.history.forEach(msg => appendMessage(msg.role, msg.content));
             chatMessages.scrollTop = chatMessages.scrollHeight;
+            // Remove centered class when loading existing chat
+            if (data.history && data.history.length > 0) {
+                document.querySelector('.chat-input-container').classList.remove('centered');
+            }
         }
     } catch (error) {
         chatMessages.innerHTML = `<div class="text-danger text-center mt-5">Error loading chat: ${error.message}</div>`;
@@ -120,7 +245,11 @@ async function loadSession(sessionId) {
 function appendMessage(role, content, modelName = null) {
     const chatMessages = document.getElementById('chat-messages');
     const emptyState = chatMessages.querySelector('.empty-state');
-    if (emptyState) emptyState.remove();
+    if (emptyState) {
+        emptyState.remove();
+        // Move input to bottom when first message appears
+        document.querySelector('.chat-input-container').classList.remove('centered');
+    }
 
     const messageRow = document.createElement('div');
     messageRow.className = `message-row ${role === 'user' ? 'user' : 'ai'}`; // Add specific class
@@ -128,18 +257,16 @@ function appendMessage(role, content, modelName = null) {
     const avatarClass = role === 'user' ? 'user-avatar-img' : 'ai-avatar-img';
     const avatarIcon = role === 'user' ? '<i class="bi bi-person"></i>' : '<i class="bi bi-robot"></i>';
 
-    // Determine Display Name
-    let displayName = 'ChatGPT'; // Default fallback
+    // Determine Display Name - NO NAME for user messages
+    let displayName = '';
     if (role === 'user') {
-        displayName = 'You';
+        displayName = ''; // No label for user
     } else {
         // Use passed model name, or current setting, or fallback
         if (modelName) {
             displayName = modelName;
         } else {
             // Try to get from settings if not passed (e.g. history load)
-            // Note: History doesn't save model name per msg yet, so this might be generic on reload
-            // For now, use the current provider's model setting as a best guess for history
             const provider = providerSettings.provider || 'openai';
             if (provider === 'openai') displayName = providerSettings.openai_model || 'GPT-3.5 Turbo';
             else if (provider === 'gemini') displayName = providerSettings.gemini_model || 'Gemini Pro';
@@ -151,11 +278,14 @@ function appendMessage(role, content, modelName = null) {
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\n/g, '<br>');
 
+    // Only show name if it exists (AI messages only)
+    const nameHtml = displayName ? `<div class="fw-bold mb-1">${displayName}</div>` : '';
+
     messageRow.innerHTML = `
         <div class="message-container">
             <div class="message-avatar ${avatarClass}">${avatarIcon}</div>
             <div class="message-content">
-                <div class="fw-bold mb-1">${displayName}</div>
+                ${nameHtml}
                 <div>${formattedContent}</div>
             </div>
         </div>
@@ -205,10 +335,18 @@ async function sendMessage() {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
     try {
+        // Get selected model from localStorage
+        const selectedModel = JSON.parse(localStorage.getItem('selectedModel') || '{}');
+
         const response = await fetch('/api/chat/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: message, session_id: currentSessionId })
+            body: JSON.stringify({
+                message: message,
+                session_id: currentSessionId,
+                provider: selectedModel.provider,
+                model: selectedModel.model
+            })
         });
         const data = await response.json();
         document.getElementById(loadingId).remove();
@@ -216,6 +354,7 @@ async function sendMessage() {
         if (data.success) {
             if (!currentSessionId || currentSessionId !== data.session_id) {
                 currentSessionId = data.session_id;
+                sessionStorage.setItem('currentSessionId', currentSessionId);  // Persist session in current tab
                 loadSessions();
             }
             // Pass the model name used (we assume it's the same as what we sent)
@@ -320,4 +459,22 @@ async function saveAISettings() {
             modal.hide();
         } else { alert('Error: ' + data.error); }
     } catch (error) { alert('Error: ' + error.message); }
+}
+
+// Clear Dashboard Cache
+function clearDashboardCache() {
+    if (confirm('Clear browser cache and reload? This will refresh all cached files.')) {
+        // Clear localStorage (optional - keeps chat history in database)
+        // localStorage.clear();
+
+        // Force hard reload to clear cache
+        window.location.reload(true);
+
+        // Alternative: Use Cache API if available
+        if ('caches' in window) {
+            caches.keys().then(function (names) {
+                for (let name of names) caches.delete(name);
+            });
+        }
+    }
 }

@@ -26,55 +26,49 @@
     --hover-color: #3d4453;
 }
 
+html,
+body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+}
+
 body {
     background-color: var(--dark-bg);
     color: var(--text-color);
-    padding: 1rem;
     font-family: 'Roboto', sans-serif;
-    min-height: 100vh;
-    /* Mở rộng full chiều cao màn hình */
-    margin: 0;
-    /* Xóa margin mặc định */
 }
 
 .main-nav .nav-link {
     font-weight: 500;
     color: var(--text-color);
-    padding-top: 0.25rem !important;
-    padding-bottom: 0.25rem !important;
-    min-height: 1.5rem !important;
-    font-size: 0.95rem !important;
+    padding-top: 0.15rem !important;
+    padding-bottom: 0.15rem !important;
+    min-height: 1.2rem !important;
+    font-size: 0.9rem !important;
 }
 
 .main-nav .nav-link.active {
     background-color: var(--primary-color) !important;
     color: #fff !important;
-    padding-top: 0.25rem !important;
-    padding-bottom: 0.25rem !important;
-    min-height: 1.5rem !important;
-    font-size: 0.95rem !important;
+    padding-top: 0.15rem !important;
+    padding-bottom: 0.15rem !important;
+    min-height: 1.2rem !important;
+    font-size: 0.9rem !important;
 }
 
 .tab-content {
-    border: 1px solid var(--border-color);
-    border-top: none;
+    border: none;
     padding: 0;
-    border-radius: 0 0 0.375rem 0.375rem;
+    margin: 0;
     background-color: var(--card-bg);
 }
 
 /* Nền màu cho container-fluid trong tab MXH */
 .tab-content .container-fluid {
     background-color: #1a1a1a;
-    /* Nền màu container MXH */
     min-height: calc(100vh - 65px);
-    /* Mở rộng full chiều cao trừ navbar */
-}
-
-/* Nền màu cho navbar */
-body .container-fluid {
-    background-color: #0f0f0fbb;
-    /* Nền màu navbar */
 }
 
 .tool-card {
@@ -230,11 +224,11 @@ body .container-fluid {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
-    margin-right: 10px;
+    width: 24px;
+    height: 24px;
+    margin-right: 8px;
     border-radius: 50%;
-    font-size: 16px;
+    font-size: 14px;
     color: #fff;
     flex-shrink: 0;
 }
@@ -1319,11 +1313,12 @@ body .container-fluid {
 
 /* Layout Overrides */
 .chat-wrapper {
-    height: calc(100vh - 70px);
-    /* Adjust based on navbar height */
+    height: calc(100vh - 38px);
     background-color: var(--chat-bg);
     color: var(--text-primary);
     overflow: hidden;
+    margin: 0;
+    padding: 0;
 }
 
 /* Sidebar */
@@ -1366,25 +1361,34 @@ body .container-fluid {
 
 .search-box i {
     position: absolute;
-    left: 10px;
+    left: 12px;
     top: 50%;
     transform: translateY(-50%);
     color: #888;
+    font-size: 0.9rem;
 }
 
 .search-box input {
     width: 100%;
-    background-color: #2f2f2f;
-    border: none;
+    background-color: transparent;
+    border: 1px solid #444;
     border-radius: 0.5rem;
-    padding: 0.5rem 0.5rem 0.5rem 2rem;
+    padding: 0.75rem 0.75rem 0.75rem 2.25rem;
     color: var(--text-primary);
     outline: none;
+    font-size: 0.9rem;
+    height: auto;
+    transition: all 0.2s;
+}
+
+.search-box input:focus {
+    background-color: #2f2f2f;
+    border-color: #666;
 }
 
 .chat-history-item {
-    padding: 0.75rem;
-    margin: 0.25rem 0.5rem;
+    padding: 0.5rem 0.75rem;
+    margin: 0.15rem 0.5rem;
     border-radius: 0.5rem;
     cursor: pointer;
     color: var(--text-primary);
@@ -1394,6 +1398,7 @@ body .container-fluid {
     overflow: hidden;
     text-overflow: ellipsis;
     transition: background 0.2s;
+    font-size: 0.9rem;
 }
 
 .chat-history-item:hover,
@@ -1421,9 +1426,68 @@ body .container-fluid {
     background-color: #2f2f2f;
 }
 
+/* Dropdown submenu styles */
+.dropend:hover>.dropdown-menu {
+    display: block;
+    position: absolute;
+    left: 100%;
+    top: 0;
+    margin-left: 0.125rem;
+}
+
+.dropend>.dropdown-menu {
+    display: none;
+}
+
+.dropdown-item.dropdown-toggle::after {
+    display: inline-block;
+    margin-left: 0.5em;
+    vertical-align: 0.1em;
+    content: "";
+    border-top: 0.3em solid transparent;
+    border-right: 0;
+    border-bottom: 0.3em solid transparent;
+    border-left: 0.3em solid;
+}
+
+/* Context Menu */
+.context-menu {
+    position: fixed;
+    background-color: #2f2f2f;
+    border: 1px solid #444;
+    border-radius: 0.375rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    z-index: 9999;
+    min-width: 150px;
+}
+
+.context-menu-item {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    color: #ececec;
+    transition: background-color 0.2s;
+}
+
+.context-menu-item:hover {
+    background-color: #3f3f3f;
+}
+
+.context-menu-item:first-child {
+    border-radius: 0.375rem 0.375rem 0 0;
+}
+
+.context-menu-item:last-child {
+    border-radius: 0 0 0.375rem 0.375rem;
+}
+
 /* Messages */
 .chat-messages {
     scroll-behavior: smooth;
+}
+
+/* Empty state - move content up slightly */
+.chat-messages .empty-state {
+    margin-top: -15vh !important;
 }
 
 .message-row {
@@ -1431,6 +1495,15 @@ body .container-fluid {
     display: flex;
     justify-content: center;
     border-bottom: 1px solid transparent;
+}
+
+/* User messages on the right */
+.message-row.user {
+    justify-content: flex-end;
+}
+
+.message-row.user .message-container {
+    flex-direction: row-reverse;
 }
 
 .message-row:hover {
@@ -1485,7 +1558,22 @@ body .container-fluid {
 
 /* Input Area */
 .chat-input-container {
+    position: relative;
     background-image: linear-gradient(180deg, rgba(33, 33, 33, 0), #212121 20%);
+    transition: all 0.3s ease;
+    padding: 1rem;
+    margin: 0;
+}
+
+/* Center input when in empty state - positioned below title */
+.chat-input-container.centered {
+    position: absolute;
+    bottom: 40%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 800px;
+    background: transparent;
 }
 
 .chat-input-wrapper {
@@ -1743,3 +1831,4 @@ body .container-fluid {
         align-items: flex-start;
         /* Align avatar to top of message */
     }
+}
