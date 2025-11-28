@@ -12,8 +12,7 @@ import uuid
 from ui.toolbar import MainToolbar
 from ui.styles import MAIN_STYLESHEET
 from ui.playback_overlay import PlaybackOverlay
-from core.recorder_v2 import RecorderV2
-from core.player_v2 import PlayerV2
+from core.recorder import Recorder
 from core.player import Player
 
 from ui.delegates import ActionDelegate, NumberDelegate
@@ -194,7 +193,7 @@ class MainWindow(QMainWindow):
             widget.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
 
         # Logic Components
-        self.recorder = RecorderV2()
+        self.recorder = Recorder()
         self.recorder.event_recorded.connect(self.add_event_to_table)
         self.player = None
         self.stop_playback_event = threading.Event()
@@ -214,15 +213,6 @@ class MainWindow(QMainWindow):
         
         # Setup Hotkeys
         self.setup_global_hotkeys()
-        
-        # Apply Recorder Settings
-        self.update_recorder_settings()
-
-    def update_recorder_settings(self):
-        """Update recorder settings from QSettings"""
-        mouse_mode = self.settings.value("mouse_mode", "auto")
-        if hasattr(self, 'recorder'):
-            self.recorder.set_mode(mouse_mode)
 
     def new_recording(self):
         self.model.removeRows(0, self.model.rowCount())
@@ -285,7 +275,7 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Playing...")
             self.stop_playback_event.clear()
             self.pause_playback_event.clear()  # Start unpaused
-            self.player = PlayerV2(self.recorded_events, self.stop_playback_event, self.pause_playback_event)
+            self.player = Player(self.recorded_events, self.stop_playback_event, self.pause_playback_event)
             
             # Connect signals
             self.player.progress_updated.connect(self.overlay.update_loop)
@@ -362,6 +352,9 @@ class MainWindow(QMainWindow):
              action_text = "Mouse Wheel"
         elif event['type'] == 'detect_image':
              action_text = "Detect Image"
+        elif event['type'] == 'text_search':
+             query = event.get('query', '')
+             action_text = f"Text Search: {query[:30]}..." if len(query) > 30 else f"Text Search: {query}"
 
         action_item = QStandardItem(action_text)
         action_item.setEditable(False) # Disable inline edit, use Dialog instead
@@ -546,6 +539,8 @@ class MainWindow(QMainWindow):
             self.open_keyboard_dialog(row)
         elif event['type'] == 'detect_image':
             self.open_image_search_dialog(row)
+        elif event['type'] == 'text_search':
+            self.open_text_search_dialog(row)
         elif event['type'] == 'undefined':
             index = self.model.index(row, 1)
             self.show_setup_menu(index)
@@ -591,6 +586,11 @@ class MainWindow(QMainWindow):
         detect_image_action = image_menu.addAction("Detect image [I]")
         menu.addMenu(image_menu)
         
+        # Add Text submenu
+        text_menu = QMenu("Text", self)
+        text_search_action = text_menu.addAction("Search Text [T]")
+        menu.addMenu(text_menu)
+        
         action = menu.exec(self.table_view.viewport().mapToGlobal(self.table_view.visualRect(index).bottomLeft()))
         
         if action == mouse_action:
@@ -599,6 +599,8 @@ class MainWindow(QMainWindow):
             self.open_keyboard_dialog(index.row())
         elif action == detect_image_action:
             self.open_image_search_dialog(index.row())
+        elif action == text_search_action:
+            self.open_text_search_dialog(index.row())
 
 
     def open_mouse_dialog(self, row):
@@ -621,6 +623,30 @@ class MainWindow(QMainWindow):
         if dialog.exec():
             new_data = dialog.get_data()
             self.update_event(row, new_data)
+
+    def open_text_search_dialog(self, row):
+        """Open text search configuration dialog"""
+        from ui.text_search_dialog import TextSearchDialog
+        dialog = TextSearchDialog(self)
+        if dialog.exec():
+            event = self.recorded_events[row] if row < len(self.recorded_events) else None
+            if event is None:
+                return
+            
+            # Update event with dialog config
+            config = dialog.get_config()
+            config['type'] = 'text_search'  # Ensure type is set
+            event.update(config)
+            
+            # Update table display
+            if row < self.model.rowCount():
+                query = event.get('query', '')
+                action_text = f"Text Search: {query[:30]}..." if len(query) > 30 else f"Text Search: {query}"
+                self.model.item(row, 1).setText(action_text)
+                self.model.item(row, 3).setText(f"Query: {query}")
+            
+            self.has_unsaved_changes = True
+            self.statusBar().showMessage(f"Updated text_search at row {row + 1}")
 
 
 
@@ -657,6 +683,9 @@ class MainWindow(QMainWindow):
              action_text = "Mouse Wheel"
         elif event['type'] == 'detect_image':
              action_text = "Detect Image"
+        elif event['type'] == 'text_search':
+             query = event.get('query', '')
+             action_text = f"Text Search: {query[:30]}..." if len(query) > 30 else f"Text Search: {query}"
 
              
         self.model.item(row, 1).setText(action_text)
@@ -714,6 +743,9 @@ class MainWindow(QMainWindow):
                         item.setSizeHint(QSize(0, 40))
             else:
                 details = "No image set"
+        elif event['type'] == 'text_search':
+            query = event.get('query', '')
+            details = f"Query: {query}"
 
         item.setText(details)
 
@@ -789,7 +821,6 @@ class MainWindow(QMainWindow):
         if dialog.exec():
             dialog.save_settings()
             self.setup_global_hotkeys() 
-            self.update_recorder_settings()
             self.statusBar().showMessage("Settings saved.")
         else:
             self.setup_global_hotkeys()

@@ -13,6 +13,9 @@ from pynput.keyboard import Controller as KeyboardController
 from pynput.mouse import Controller as MouseController, Button
 from utils.direct_input import press_key, release_key
 from utils.mouse_backend import MouseBackend, HighPrecisionTicker
+from utils.text_search import TextSearchEngine
+from utils.roi_manager import ROIManager, Region
+import queue
 
 class PlayerV2(QThread):
     # Signals
@@ -55,6 +58,10 @@ class PlayerV2(QThread):
         self.drift_total = 0
         self.drift_max = 0
         self.coalesce_count = 0
+        
+        # Text search engine (lazy init)
+        self.text_search_engine = None
+        self.roi_manager = None
     
     def run(self):
         """Main playback loop"""
@@ -128,8 +135,9 @@ class PlayerV2(QThread):
             if self.stop_event.is_set():
                 break
             
-            # Emit step progress
-            self.step_progress_updated.emit(current_idx + 1, total_steps)
+            # Emit step progress (throttled)
+            if current_idx % 50 == 0 or current_idx == total_steps - 1:
+                self.step_progress_updated.emit(current_idx + 1, total_steps)
             
             # Handle delay
             delay = event.get('time', 0.0)
@@ -228,6 +236,101 @@ class PlayerV2(QThread):
         
         elif etype == 'key_release':
             release_key(event['key'])
+        
+        elif etype == 'text_search':
+            return self.execute_text_search(event, current_idx)
+        
+        return None
+    
+    def execute_text_search(self, event, current_idx):
+        """Execute text search event"""
+        # Lazy init
+        if self.text_search_engine is None:
+            languages = event.get('languages', ['en', 'vi', 'ch_sim'])
+            self.text_search_engine = TextSearchEngine(languages=languages)
+        
+        if self.roi_manager is None:
+            rate_limit_fps = int(self.settings.value("ocr_rate_limit_fps", 10))
+            self.roi_manager = ROIManager(rate_limit_fps=rate_limit_fps)
+        
+        # Get parameters
+        query = event.get('query', '')
+        match_mode = event.get('match', 'fuzzy')
+        min_score = event.get('min_score', 85)
+        timeout = event.get('timeout', 3.0)
+        interval = event.get('interval', 0.15)
+        preproc = event.get('preproc', False)
+        region_mode = event.get('region_mode', 'screen')
+        action = event.get('action', 'none')
+        goto_found = event.get('goto_found', 'Next')
+        goto_not_found = event.get('goto_not_found', 'Next')
+        
+        # Determine region
+        if region_mode == 'screen':
+            region = self.roi_manager.get_screen_region()
+        elif region_mode == 'window':
+            region = self.roi_manager.get_window_region()
+            if region is None:
+                print("⚠️ Text Search: Failed to get window region, falling back to screen")
+                region = self.roi_manager.get_screen_region()
+        else:  # custom
+            region_rect = event.get('region_rect')
+            if region_rect:
+                x, y, w, h = region_rect
+                region = Region(x=x, y=y, width=w, height=h)
+            else:
+                region = self.roi_manager.get_screen_region()
+        
+        # Search loop with timeout
+        start_time = time.perf_counter()
+        result = None
+        
+        while time.perf_counter() - start_time < timeout and not self.stop_event.is_set():
+            # Capture screen
+            img = self.roi_manager.capture(region)
+            if img is None:
+                time.sleep(interval)
+                continue
+            
+            # Search for text
+            result = self.text_search_engine.search(
+                img, query,
+                match_mode=match_mode,
+                min_score=min_score,
+                preproc=preproc
+            )
+            
+            if result:
+                print(f"✅ Text Search: Found '{result.text}' (score: {result.match_score}, conf: {result.ocr_conf:.2f})")
+                break
+            
+            time.sleep(interval)
+        
+        # Handle result
+        if result:
+            # Perform action
+            if action == 'click':
+                self.mouse_controller.position = result.center
+                time.sleep(0.05)
+                self.mouse_controller.click(Button.left)
+            elif action == 'double':
+                self.mouse_controller.position = result.center
+                time.sleep(0.05)
+                self.mouse_controller.click(Button.left, 2)
+            elif action == 'right':
+                self.mouse_controller.position = result.center
+                time.sleep(0.05)
+                self.mouse_controller.click(Button.right)
+            
+            # Handle goto_found
+            if goto_found == 'Start':
+                return 0  # Jump to start
+            # 'Next' or other -> continue normally
+        else:
+            print(f"⚠️ Text Search: '{query}' not found after {timeout}s")
+            # Handle goto_not_found
+            if goto_not_found == 'Start':
+                return 0  # Jump to start
         
         return None
     

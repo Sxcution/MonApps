@@ -87,11 +87,29 @@ DIK_NUMPAD0 = 0x52
 DIK_DECIMAL = 0x53
 DIK_F11 = 0x57
 DIK_F12 = 0x58
-DIK_UP = 0x48      # Same as DIK_NUMPAD8
-DIK_LEFT = 0x4B    # Same as DIK_NUMPAD4
-DIK_RIGHT = 0x4D   # Same as DIK_NUMPAD6
-DIK_DOWN = 0x50    # Same as DIK_NUMPAD2
-DIK_DELETE = 0x53  # Same as DIK_DECIMAL
+
+# Extended scan codes (require KEYEVENTF_EXTENDEDKEY flag)
+DIK_RCONTROL = 0x9D  # Right Control (extended)
+DIK_RMENU = 0xB8     # Right Alt / AltGr (extended)
+DIK_HOME = 0xC7      # Home (extended)
+DIK_UP_EXT = 0xC8    # Up Arrow (extended)
+DIK_PRIOR = 0xC9     # Page Up (extended)
+DIK_LEFT_EXT = 0xCB  # Left Arrow (extended)
+DIK_RIGHT_EXT = 0xCD # Right Arrow (extended)
+DIK_END = 0xCF       # End (extended)
+DIK_DOWN_EXT = 0xD0  # Down Arrow (extended)
+DIK_NEXT = 0xD1      # Page Down (extended)
+DIK_INSERT = 0xD2    # Insert (extended)
+DIK_DELETE_EXT = 0xD3 # Delete (extended)
+DIK_LWIN = 0xDB      # Left Windows key (extended)
+DIK_RWIN = 0xDC      # Right Windows key (extended)
+
+# Compatibility aliases (use non-extended for numpad compatibility)
+DIK_UP = 0x48      # Can be NUMPAD8 or Up Arrow
+DIK_LEFT = 0x4B    # Can be NUMPAD4 or Left Arrow
+DIK_RIGHT = 0x4D   # Can be NUMPAD6 or Right Arrow
+DIK_DOWN = 0x50    # Can be NUMPAD2 or Down Arrow
+DIK_DELETE = 0x53  # Can be DECIMAL or Delete
 
 # C struct redefinitions 
 PUL = ctypes.POINTER(ctypes.c_ulong)
@@ -149,20 +167,41 @@ KEY_MAPPING = {
     '-': DIK_MINUS, '=': DIK_EQUALS, 'backspace': DIK_BACK, 'tab': DIK_TAB,
     'q': DIK_Q, 'w': DIK_W, 'e': DIK_E, 'r': DIK_R, 't': DIK_T, 'y': DIK_Y, 'u': DIK_U, 'i': DIK_I, 'o': DIK_O, 'p': DIK_P,
     '[': DIK_LBRACKET, ']': DIK_RBRACKET, 'enter': DIK_RETURN, 'return': DIK_RETURN,
-    'ctrl': DIK_LCONTROL, 'control': DIK_LCONTROL,
+    # Control keys
+    'ctrl': DIK_LCONTROL, 'ctrl_l': DIK_LCONTROL, 'ctrl_r': DIK_RCONTROL,
+    'control': DIK_LCONTROL, 'control_l': DIK_LCONTROL, 'control_r': DIK_RCONTROL,
+    # Letter keys
     'a': DIK_A, 's': DIK_S, 'd': DIK_D, 'f': DIK_F, 'g': DIK_G, 'h': DIK_H, 'j': DIK_J, 'k': DIK_K, 'l': DIK_L,
     ';': DIK_SEMICOLON, "'": DIK_APOSTROPHE, '`': DIK_GRAVE,
-    'shift': DIK_LSHIFT, '\\': DIK_BACKSLASH,
+    # Shift keys
+    'shift': DIK_LSHIFT, 'shift_l': DIK_LSHIFT, 'shift_r': DIK_RSHIFT, '\\': DIK_BACKSLASH,
     'z': DIK_Z, 'x': DIK_X, 'c': DIK_C, 'v': DIK_V, 'b': DIK_B, 'n': DIK_N, 'm': DIK_M,
     ',': DIK_COMMA, '.': DIK_PERIOD, '/': DIK_SLASH,
-    'space': DIK_SPACE,
+    # Special keys
+    'space': DIK_SPACE, 'caps_lock': DIK_CAPITAL,
+    # Alt keys
+    'alt': DIK_LMENU, 'alt_l': DIK_LMENU, 'alt_r': DIK_RMENU, 'alt_gr': DIK_RMENU,
+    # Windows keys
+    'cmd': DIK_LWIN, 'cmd_l': DIK_LWIN, 'cmd_r': DIK_RWIN,
+    # Function keys
     'f1': DIK_F1, 'f2': DIK_F2, 'f3': DIK_F3, 'f4': DIK_F4, 'f5': DIK_F5, 'f6': DIK_F6,
     'f7': DIK_F7, 'f8': DIK_F8, 'f9': DIK_F9, 'f10': DIK_F10, 'f11': DIK_F11, 'f12': DIK_F12,
-    'up': DIK_UP, 'down': DIK_DOWN, 'left': DIK_LEFT, 'right': DIK_RIGHT,
-    'delete': DIK_DELETE, 'del': DIK_DELETE
+    # Arrow keys (extended)
+    'up': DIK_UP_EXT, 'down': DIK_DOWN_EXT, 'left': DIK_LEFT_EXT, 'right': DIK_RIGHT_EXT,
+    # Navigation keys (extended)
+    'insert': DIK_INSERT, 'delete': DIK_DELETE_EXT, 'del': DIK_DELETE_EXT,
+    'home': DIK_HOME, 'end': DIK_END,
+    'page_up': DIK_PRIOR, 'page_down': DIK_NEXT,
+    'pageup': DIK_PRIOR, 'pagedown': DIK_NEXT  # Alternative naming
 }
 
-EXTENDED_KEYS = ['up', 'down', 'left', 'right', 'delete', 'del', 'home', 'end', 'pageup', 'pagedown', 'insert']
+EXTENDED_KEYS = [
+    'up', 'down', 'left', 'right',
+    'delete', 'del', 'insert',
+    'home', 'end', 'page_up', 'page_down', 'pageup', 'pagedown',
+    'shift_r', 'ctrl_r', 'control_r', 'alt_r', 'alt_gr',
+    'cmd', 'cmd_l', 'cmd_r'
+]
 
 def press_key(key_name):
     key_name = str(key_name).lower().replace("key.", "")

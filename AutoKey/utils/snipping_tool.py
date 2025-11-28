@@ -8,9 +8,10 @@ class SnippingWidget(QWidget):
     region_selected = pyqtSignal(QRect) # New signal for region selection
     closed = pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, region_only=False):
         super().__init__(parent)
-        print("🔍 DEBUG: SnippingWidget __init__")
+        self.region_only = region_only  # If True, only emit rect, don't save image
+        print(f"🔍 DEBUG: SnippingWidget __init__ (region_only: {region_only})")
         # Fix 1: Use Window flag (not Tool) and Frameless
         self.setWindowFlags(
             Qt.WindowType.Window |
@@ -154,27 +155,28 @@ class SnippingWidget(QWidget):
             self.closed.emit()
             return
 
-        print(f"🔍 DEBUG: Saving snippet: {rect.width()}x{rect.height()}")
-        # Save logic
-        import os, time
-        # Determine AutoKey root directory (parent of utils)
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        autokey_root = os.path.dirname(current_dir)
-        captures_dir = os.path.join(autokey_root, "captures")
-        
-        if not os.path.exists(captures_dir):
-            os.makedirs(captures_dir)
+        # Only save image if NOT region_only mode
+        if not self.region_only:
+            print(f"🔍 DEBUG: Saving snippet: {rect.width()}x{rect.height()}")
+            import os, time
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            autokey_root = os.path.dirname(current_dir)
+            captures_dir = os.path.join(autokey_root, "captures")
             
-        filename = f"snip_{int(time.time())}.png"
-        full_path = os.path.join(captures_dir, filename)
-        
-        # Crop from original
-        self.original_pixmap.copy(rect).save(full_path)
-        print(f"🔍 DEBUG: Saved to {full_path}")
+            if not os.path.exists(captures_dir):
+                os.makedirs(captures_dir)
+                
+            filename = f"snip_{int(time.time())}.png"
+            full_path = os.path.join(captures_dir, filename)
+            
+            self.original_pixmap.copy(rect).save(full_path)
+            print(f"🔍 DEBUG: Saved to {full_path}")
+            self.snippet_taken.emit(full_path)
+        else:
+            print(f"🔍 DEBUG: Region-only mode, not saving image")
         
         self.close()
-        self.snippet_taken.emit(full_path)
-        self.region_selected.emit(rect) # Emit the selected region
+        self.region_selected.emit(rect)
 
     def keyPressEvent(self, event):
         print(f"🔍 DEBUG: keyPressEvent - key: {event.key()}")

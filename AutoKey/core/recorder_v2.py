@@ -25,7 +25,7 @@ class RecorderV2(QObject):
         self.record_mode = "delta"  # "delta", "absolute", "auto"
         self.last_mouse_pos = None
         self.mouse_threshold_px = 0  # 0 to capture all micro-movements for 3D
-        self.mouse_threshold_time = 0.008  # 8ms
+        self.mouse_threshold_time = 0.001  # 1ms (1000Hz) - Optimized for file size vs accuracy
         
         # Timing
         self.last_time = 0

@@ -353,3 +353,4 @@ class SettingsDialog(QDialog):
         
         self.settings.setValue("mouse_tick_hz", self.spin_tick_hz.value())
         self.settings.setValue("mouse_gain", self.spin_gain.value())
+
