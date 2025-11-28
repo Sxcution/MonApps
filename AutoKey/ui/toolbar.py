@@ -9,6 +9,7 @@ class MainToolbar(QToolBar):
         self.setFloatable(False)
         self.setOrientation(Qt.Orientation.Horizontal)
         self.setIconSize(QSize(24, 24))
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)  # Disable right-click menu
         
         # Setup Actions
         # File Menu Actions

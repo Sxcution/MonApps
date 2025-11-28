@@ -30,6 +30,11 @@ class SettingsDialog(QDialog):
         self.setup_play_tab()
         self.tabs.addTab(self.play_tab, "Play")
         
+        # Tab 3: Mini Mode
+        self.mini_mode_tab = QWidget()
+        self.setup_mini_mode_tab()
+        self.tabs.addTab(self.mini_mode_tab, "Mini Mode")
+        
         # Buttons
         btn_layout = QHBoxLayout()
         self.save_btn = QPushButton("Save")
@@ -51,14 +56,25 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(self.hotkey_tab)
         form_layout = QFormLayout()
         
+        # Custom QKeySequenceEdit that allows Backspace to clear
+        class ClearableKeySequenceEdit(QKeySequenceEdit):
+            def keyPressEvent(self, event):
+                from PyQt6.QtCore import Qt
+                if event.key() == Qt.Key.Key_Backspace:
+                    # Clear the sequence
+                    self.clear()
+                    event.accept()
+                else:
+                    super().keyPressEvent(event)
+        
         # Hotkey Fields
-        self.record_hotkey = QKeySequenceEdit()
+        self.record_hotkey = ClearableKeySequenceEdit()
         self.record_hotkey.setMaximumSequenceLength(1)
         
-        self.stop_record_hotkey = QKeySequenceEdit()
+        self.stop_record_hotkey = ClearableKeySequenceEdit()
         self.stop_record_hotkey.setMaximumSequenceLength(1)
         
-        self.play_hotkey = QKeySequenceEdit()
+        self.play_hotkey = ClearableKeySequenceEdit()
         self.play_hotkey.setMaximumSequenceLength(1)
         
         form_layout.addRow("Start Record Hotkey:", self.record_hotkey)
@@ -141,6 +157,32 @@ class SettingsDialog(QDialog):
             QPushButton:hover { background-color: #106ebe; }
             QPushButton:disabled { background-color: #cccccc; }
         """)
+    
+    def setup_mini_mode_tab(self):
+        layout = QVBoxLayout(self.mini_mode_tab)
+        form_layout = QFormLayout()
+        
+        # Overlay Position
+        self.combo_position = QComboBox()
+        self.combo_position.addItems([
+            "Top Left",
+            "Top Center",
+            "Top Right",
+            "Center",
+            "Bottom Left",
+            "Bottom Center",
+            "Bottom Right"
+        ])
+        form_layout.addRow("Vị trí xuất hiện Overlay:", self.combo_position)
+        
+        # Add info label
+        info_label = QLabel("Chọn vị trí mà bảng Playback sẽ xuất hiện khi bắt đầu phát macro.")
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: #666; font-size: 9pt; margin-top: 10px;")
+        
+        layout.addLayout(form_layout)
+        layout.addWidget(info_label)
+        layout.addStretch()
 
     def validate_hotkeys(self):
         hotkeys = {}
@@ -149,7 +191,9 @@ class SettingsDialog(QDialog):
         # Helper to check
         def check(name, widget):
             seq = widget.keySequence().toString()
-            if not seq: return
+            if not seq:
+                return  # Empty is OK (None/disabled)
+            
             if seq in hotkeys:
                 duplicates.append(f"{name} conflicts with {hotkeys[seq]}")
             else:
@@ -185,6 +229,23 @@ class SettingsDialog(QDialog):
         index = self.combo_after.findText(after_action)
         if index >= 0:
             self.combo_after.setCurrentIndex(index)
+        
+        # Load Mini Mode Settings
+        overlay_position = self.settings.value("overlay_position", "top_left")
+        # Map internal values to display values
+        position_map = {
+            "top_left": "Top Left",
+            "top_center": "Top Center",
+            "top_right": "Top Right",
+            "center": "Center",
+            "bottom_left": "Bottom Left",
+            "bottom_center": "Bottom Center",
+            "bottom_right": "Bottom Right"
+        }
+        display_position = position_map.get(overlay_position, "Top Left")
+        index = self.combo_position.findText(display_position)
+        if index >= 0:
+            self.combo_position.setCurrentIndex(index)
 
     def save_settings(self):
         # Save hotkeys
@@ -197,3 +258,18 @@ class SettingsDialog(QDialog):
         self.settings.setValue("play_hours", self.spin_hours.value())
         self.settings.setValue("play_minutes", self.spin_minutes.value())
         self.settings.setValue("play_after_action", self.combo_after.currentText())
+        
+        # Save Mini Mode Settings
+        # Map display values to internal values
+        position_map = {
+            "Top Left": "top_left",
+            "Top Center": "top_center",
+            "Top Right": "top_right",
+            "Center": "center",
+            "Bottom Left": "bottom_left",
+            "Bottom Center": "bottom_center",
+            "Bottom Right": "bottom_right"
+        }
+        display_position = self.combo_position.currentText()
+        internal_position = position_map.get(display_position, "top_left")
+        self.settings.setValue("overlay_position", internal_position)

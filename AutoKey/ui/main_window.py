@@ -11,6 +11,7 @@ import uuid
 
 from ui.toolbar import MainToolbar
 from ui.styles import MAIN_STYLESHEET
+from ui.playback_overlay import PlaybackOverlay
 from core.recorder import Recorder
 from core.player import Player
 
@@ -102,10 +103,9 @@ class MainWindow(QMainWindow):
         
         # Table View
         self.table_view = QTableView()
-        self.model = QStandardItemModel(0, 4)
-        # Reordered Columns: Step | Action | Delay (ms) | Details
-        self.model.setHorizontalHeaderLabels(["Step", "Action", "Delay (ms)", "Details"])
-        self.table_view.setModel(self.model)
+        self.model = QStandardItemModel(0, 5)
+        # Reordered Columns: Step | Action | Delay (ms) | Details | Note
+        self.model.setHorizontalHeaderLabels(["Step", "Action", "Delay (ms)", "Details", "Note"])
         self.table_view.setModel(self.model)
         
         # Configure Column Resizing
@@ -119,7 +119,10 @@ class MainWindow(QMainWindow):
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         self.table_view.setColumnWidth(2, 80) # Delay (approx 6 digits)
         
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch) # Details
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive) # Details
+        self.table_view.setColumnWidth(3, 200)
+        
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch) # Note
         
         self.table_view.setAlternatingRowColors(True)
         self.table_view.setShowGrid(True)
@@ -177,6 +180,9 @@ class MainWindow(QMainWindow):
         play_settings_action = settings_menu.addAction("Play Settings")
         play_settings_action.triggered.connect(lambda: self.open_settings(1))
         
+        mini_mode_action = settings_menu.addAction("Mini Mode")
+        mini_mode_action.triggered.connect(lambda: self.open_settings(2))
+        
         self.toolbar.settings_action.setMenu(settings_menu)
         
 
@@ -191,8 +197,19 @@ class MainWindow(QMainWindow):
         self.recorder.event_recorded.connect(self.add_event_to_table)
         self.player = None
         self.stop_playback_event = threading.Event()
+        self.pause_playback_event = threading.Event()  # For pause/resume
         self.recorded_events = []
         self.current_filename = None # Track current file
+        
+        # Playback Overlay
+        self.overlay = PlaybackOverlay(self)
+        self.overlay.stop_btn.clicked.connect(self.stop_playback_from_overlay)
+        self.overlay.pause_btn.toggled.connect(self.pause_playback)
+        
+        # Timer for updating overlay time
+        self.overlay_timer = QTimer(self)
+        self.overlay_timer.timeout.connect(self.update_overlay_time)
+        self.overlay_start_time = 0
         
         # Setup Hotkeys
         self.setup_global_hotkeys()
@@ -236,13 +253,72 @@ class MainWindow(QMainWindow):
                 self.toolbar.play_action.setChecked(False)
                 return
             
+            # Hide main window and show overlay
+            self.hide()
+            self.overlay.show()
+            self.overlay.position_overlay()
+            
+            # Reset overlay
+            play_count = int(self.settings.value("play_count", 1))
+            self.overlay.update_loop(0, play_count)
+            self.overlay.update_time(0)
+            self.overlay.progress_bar.setValue(0)
+            
+            # Start timer for time updates
+            self.overlay_start_time = time.time()
+            self.overlay_timer.start(1000)  # Update every second
+            
             self.statusBar().showMessage("Playing...")
             self.stop_playback_event.clear()
-            self.player = Player(self.recorded_events, self.stop_playback_event)
+            self.pause_playback_event.clear()  # Start unpaused
+            self.player = Player(self.recorded_events, self.stop_playback_event, self.pause_playback_event)
+            
+            # Connect signals
+            self.player.progress_updated.connect(self.overlay.update_loop)
+            self.player.time_updated.connect(self.overlay.update_time)
+            self.player.playback_finished.connect(self.on_playback_finished)
+            self.player.step_progress_updated.connect(self.overlay.update_step_progress)
+            
             self.player.start()
         else:
+            # Stop playback - hide overlay immediately and show main window
             self.statusBar().showMessage("Stopping playback...")
             self.stop_playback_event.set()
+            self.overlay_timer.stop()
+            self.overlay.hide()
+            self.show()
+    
+    def stop_playback_from_overlay(self):
+        """Stop playback when stop button is clicked in overlay"""
+        # Immediately hide overlay and show main window
+        self.overlay.hide()
+        self.show()
+        self.toolbar.play_action.setChecked(False)
+    
+    def pause_playback(self, paused):
+        """Pause/resume playback - keeps overlay visible"""
+        if paused:
+            self.pause_playback_event.set()  # Set event to pause
+            self.overlay_timer.stop()  # Stop time updates when paused
+            self.overlay.pause_btn.setText("▶️ Resume")
+        else:
+            self.pause_playback_event.clear()  # Clear event to resume
+            self.overlay_timer.start(1000)  # Resume time updates
+            self.overlay.pause_btn.setText("⏸️ Pause")
+    
+    def update_overlay_time(self):
+        """Update overlay time display"""
+        if self.overlay.isVisible():
+            elapsed = time.time() - self.overlay_start_time
+            self.overlay.update_time(elapsed)
+    
+    def on_playback_finished(self):
+        """Called when playback finishes"""
+        self.overlay_timer.stop()
+        self.overlay.hide()
+        self.show()
+        self.toolbar.play_action.setChecked(False)
+        self.statusBar().showMessage("Playback finished.")
 
     def add_event_to_table(self, event):
         # Add row to table
@@ -300,10 +376,15 @@ class MainWindow(QMainWindow):
         self.update_details_item(details_item, event)
         details_item.setEditable(False) # Disable inline edit
         
+        # Note Column (4) - Editable for user notes
+        note_item = QStandardItem(event.get('note', ''))
+        note_item.setEditable(True)
+        
         self.model.setItem(row, 0, step_item)
         self.model.setItem(row, 1, action_item)
         self.model.setItem(row, 2, delay_item)
         self.model.setItem(row, 3, details_item)
+        self.model.setItem(row, 4, note_item)
         self.table_view.scrollToBottom()
 
     def on_item_changed(self, item):
@@ -316,7 +397,9 @@ class MainWindow(QMainWindow):
             
         event = self.recorded_events[row]
         
-        if col == 1: # Action
+        if col == 4: # Note column
+            event['note'] = item.text()
+        elif col == 1: # Action
             text = item.text()
             # Smart Action Logic
             if text.startswith("Key ") and " Down" not in text and " Up" not in text:
@@ -377,8 +460,8 @@ class MainWindow(QMainWindow):
     def on_table_double_clicked(self, index):
         if not index.isValid():
             return
-        # Allow inline edit for Delay column (2)
-        if index.column() == 2:
+        # Allow inline edit for Delay column (2) and Note column (4)
+        if index.column() == 2 or index.column() == 4:
             return
         self.edit_event(index.row())
 
@@ -703,19 +786,32 @@ class MainWindow(QMainWindow):
                 k = k.replace("<<f", "<f") 
             return k
 
-        self.hotkey_map = {
-            to_pynput(rec_key): self.on_hotkey_record,
-            to_pynput(stop_rec_key): self.on_hotkey_stop_record,
-            to_pynput(play_key): self.on_hotkey_play
-        }
+        # Only add non-empty hotkeys to the map
+        self.hotkey_map = {}
+        
+        if rec_key and rec_key.strip():
+            self.hotkey_map[to_pynput(rec_key)] = self.on_hotkey_record
+        
+        if stop_rec_key and stop_rec_key.strip():
+            self.hotkey_map[to_pynput(stop_rec_key)] = self.on_hotkey_stop_record
+        
+        if play_key and play_key.strip():
+            self.hotkey_map[to_pynput(play_key)] = self.on_hotkey_play
+        
+        # Only register if we have at least one hotkey
+        if not self.hotkey_map:
+            print("⚠️ No hotkeys configured")
+            self.hotkey_listener = None
+            return
         
         try:
             from pynput import keyboard
             self.hotkey_listener = keyboard.GlobalHotKeys(self.hotkey_map)
             self.hotkey_listener.start()
-            print(f"Hotkeys registered: {self.hotkey_map.keys()}")
+            print(f"✓ Hotkeys registered: {list(self.hotkey_map.keys())}")
         except Exception as e:
-            print(f"Failed to register hotkeys: {e}")
+            print(f"⚠️ Failed to register hotkeys: {e}")
+            self.hotkey_listener = None
 
     def on_hotkey_record(self):
         from PyQt6.QtCore import QMetaObject, Qt, Q_ARG

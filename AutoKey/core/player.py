@@ -1,22 +1,29 @@
 import time
-import threading
 import pyautogui
 import random
 import ctypes
 import os
-from PyQt6.QtCore import QSettings
+from PyQt6.QtCore import QSettings, QThread, pyqtSignal
 from pynput.keyboard import Controller as KeyboardController
 from pynput.mouse import Controller as MouseController, Button
 from utils.direct_input import press_key, release_key
 
-class Player(threading.Thread):
-    def __init__(self, events, stop_event):
+class Player(QThread):
+    # Signals for UI updates
+    progress_updated = pyqtSignal(int, int)  # current_run, total_runs
+    time_updated = pyqtSignal(float)  # elapsed_seconds
+    status_updated = pyqtSignal(str)  # status message
+    playback_finished = pyqtSignal()  # playback completed
+    step_progress_updated = pyqtSignal(int, int)  # current_step, total_steps
+    
+    
+    def __init__(self, events, stop_event, pause_event=None):
         super().__init__()
         self.events = events
         self.stop_event = stop_event
+        self.pause_event = pause_event if pause_event else threading.Event()
         self.mouse = MouseController()
         self.keyboard = KeyboardController()
-        self.daemon = True
         
         # Load Play Settings
         self.settings = QSettings("MonSoft", "MacroRecorder")
@@ -30,6 +37,7 @@ class Player(threading.Thread):
 
     def run(self):
         print("Player started")
+        self.status_updated.emit("Đang khởi động...")
         
         self.start_time = time.time()
         current_run = 0
@@ -38,6 +46,7 @@ class Player(threading.Thread):
             # Check Run Count (0 means infinite)
             if self.play_count > 0 and current_run >= self.play_count:
                 print("Reached run count limit.")
+                self.status_updated.emit("Đã hoàn thành số lần chạy")
                 break
                 
             # Check Duration
@@ -45,28 +54,52 @@ class Player(threading.Thread):
                 elapsed = time.time() - self.start_time
                 if elapsed >= self.max_duration:
                     print("Reached duration limit.")
+                    self.status_updated.emit("Đã hết thời gian chạy")
                     break
             
+            # Update progress
+            self.progress_updated.emit(current_run + 1, self.play_count)
+            
             print(f"--- Starting Run {current_run + 1} ---")
+            self.status_updated.emit(f"Đang chạy vòng lặp {current_run + 1}")
             self.execute_macro()
             
             current_run += 1
+            
+            # Update time periodically
+            elapsed = time.time() - self.start_time
+            self.time_updated.emit(elapsed)
             
             # Small delay between runs to prevent CPU hogging if macro is empty
             time.sleep(0.1)
             
         print("Player finished")
+        self.status_updated.emit("Đã dừng")
         
         # Perform After Action if not stopped manually
         if not self.stop_event.is_set():
             self.perform_after_action()
+        
+        self.playback_finished.emit()
 
     def execute_macro(self):
         """Executes one pass of the macro"""
         current_idx = 0
+        total_steps = len(self.events)
         
-        while current_idx < len(self.events) and not self.stop_event.is_set():
+        while current_idx < total_steps and not self.stop_event.is_set():
             event = self.events[current_idx]
+            
+            # Check if paused - wait until resumed
+            while self.pause_event.is_set() and not self.stop_event.is_set():
+                time.sleep(0.1)  # Check every 100ms
+            
+            # If stopped while paused, exit
+            if self.stop_event.is_set():
+                break
+            
+            # Emit step progress (1-indexed for display)
+            self.step_progress_updated.emit(current_idx + 1, total_steps)
             
             # Check duration limit
             if self.max_duration > 0:
@@ -78,6 +111,7 @@ class Player(threading.Thread):
             # Handle delay (Relative)
             delay = event.get('time', 0.0)
             if delay > 0:
+                self.status_updated.emit(f"Đang chờ {delay:.1f}s...")
                 time.sleep(delay)
 
             # Execute event
@@ -87,6 +121,7 @@ class Player(threading.Thread):
                 current_idx = next_idx
             else:
                 current_idx += 1
+
 
     def execute_event(self, event, current_idx):
         """
@@ -149,6 +184,7 @@ class Player(threading.Thread):
         if confidence < 0.1: confidence = 0.1
         
         print(f"Waiting for image: {image_path}, timeout={timeout}, conf={confidence}")
+        self.status_updated.emit(f"Đang tìm ảnh...")
         
         grayscale = event.get('grayscale', False)
         multi_scale = event.get('multi_scale', False)
