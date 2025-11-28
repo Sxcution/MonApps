@@ -1,71 +1,71 @@
 [
     {
-        "type": "key_press",
+        "type": "key_click",
         "text": "Click to setup",
         "time": 0.5,
-        "id": "17408ac4-ec18-4996-a622-724e58bab2f1",
+        "id": "69ae3dab-026c-46d9-84db-aad8f9a32187",
         "key": "F"
     },
     {
-        "type": "key_press",
+        "type": "key_click",
         "text": "Click to setup",
         "time": 0.5,
-        "id": "c1fa33e9-4a00-4543-8e93-e842387f9ba0",
+        "id": "ed9aa7f9-0139-49ef-a412-18e801b83c8a",
         "key": "Down"
     },
     {
-        "type": "key_press",
+        "type": "key_click",
         "text": "Click to setup",
         "time": 0.5,
-        "id": "c5455c7d-e077-4860-9b14-24d4e66db18f",
+        "id": "17d14bea-122d-49c5-ba2d-ea5a98d1ac69",
         "key": "F"
     },
     {
         "type": "detect_image",
         "text": "Click to setup",
         "time": 0.5,
-        "id": "dda20e57-a662-4c6e-a487-db30d15a9950",
-        "image_path": "c:\\Users\\Mon\\Desktop\\Mon\\AutoKey\\captures\\snip_1764282250.png",
+        "id": "c9ba7a42-2b88-4389-8edb-70b4472ad143",
+        "image_path": "c:\\Users\\Mon\\Desktop\\Mon\\AutoKey\\captures\\snip_1764284995.png",
         "restrict_area": true,
         "search_area": "custom region",
         "custom_region": {
-            "left": 1565,
-            "top": 969,
-            "width": 242,
-            "height": 100
+            "left": 1503,
+            "top": 946,
+            "width": 312,
+            "height": 147
         },
-        "tolerance": 20,
+        "tolerance": 255,
         "grayscale": true,
-        "multi_scale": false,
+        "multi_scale": true,
         "mouse_action_enabled": false,
         "mouse_action": "Move",
         "mouse_position": "Centered",
         "save_x": false,
         "save_y": false,
-        "wait_timeout": 999999,
+        "wait_timeout": 65535,
         "goto_found": "Next",
         "goto_not_found": "Start"
     },
     {
-        "type": "key_press",
+        "type": "key_click",
         "text": "Click to setup",
         "time": 0.5,
-        "id": "625affe5-0348-44f1-bac1-aa75e7aa826b",
+        "id": "a8a2155b-db8b-411d-9c05-47dd9deea1a8",
         "key": "F"
     },
     {
         "type": "detect_image",
         "text": "Click to setup",
         "time": 0.5,
-        "id": "a5d86dab-7342-46d8-b609-56d757903821",
-        "image_path": "c:\\Users\\Mon\\Desktop\\Mon\\AutoKey\\captures\\snip_1764282312.png",
+        "id": "20eea8f0-82f4-46ac-b3e0-0331fa850632",
+        "image_path": "c:\\Users\\Mon\\Desktop\\Mon\\AutoKey\\captures\\snip_1764285081.png",
         "restrict_area": true,
         "search_area": "custom region",
         "custom_region": {
-            "left": 984,
-            "top": 469,
-            "width": 608,
-            "height": 409
+            "left": 927,
+            "top": 445,
+            "width": 696,
+            "height": 511
         },
         "tolerance": 255,
         "grayscale": true,

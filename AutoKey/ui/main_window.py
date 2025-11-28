@@ -441,8 +441,21 @@ class MainWindow(QMainWindow):
 
     def edit_event(self, row):
         if row >= len(self.recorded_events):
-            # Let's re-use show_setup_menu logic or just open mouse dialog as default
-            # But better to show the setup menu if it's undefined
+            # For undefined/new rows, show setup menu
+            index = self.model.index(row, 1)
+            self.show_setup_menu(index)
+            return
+
+        event = self.recorded_events[row]
+        
+        # Determine which dialog to open based on event type
+        if event['type'] in ['mouse_move', 'mouse_click', 'mouse_scroll']:
+            self.open_mouse_dialog(row)
+        elif event['type'] in ['key_press', 'key_release', 'key_click']:
+            self.open_keyboard_dialog(row)
+        elif event['type'] == 'detect_image':
+            self.open_image_search_dialog(row)
+        elif event['type'] == 'undefined':
             index = self.model.index(row, 1)
             self.show_setup_menu(index)
 

@@ -87,11 +87,11 @@ DIK_NUMPAD0 = 0x52
 DIK_DECIMAL = 0x53
 DIK_F11 = 0x57
 DIK_F12 = 0x58
-DIK_UP = 0xC8
-DIK_LEFT = 0xCB
-DIK_RIGHT = 0xCD
-DIK_DOWN = 0xD0
-DIK_DELETE = 0xD3
+DIK_UP = 0x48      # Same as DIK_NUMPAD8
+DIK_LEFT = 0x4B    # Same as DIK_NUMPAD4
+DIK_RIGHT = 0x4D   # Same as DIK_NUMPAD6
+DIK_DOWN = 0x50    # Same as DIK_NUMPAD2
+DIK_DELETE = 0x53  # Same as DIK_DECIMAL
 
 # C struct redefinitions 
 PUL = ctypes.POINTER(ctypes.c_ulong)
@@ -125,17 +125,19 @@ class Input(ctypes.Structure):
                 ("ii", Input_I)]
 
 # Actuals Functions
-def PressKey(hexKeyCode):
+def PressKey(hexKeyCode, flags=0, wVk=0):
     extra = ctypes.c_ulong(0)
     ii_ = Input_I()
-    ii_.ki = KeyBdInput( 0, hexKeyCode, 0x0008, 0, ctypes.pointer(extra) )
+    # 0x0008 is KEYEVENTF_SCANCODE
+    ii_.ki = KeyBdInput( wVk, hexKeyCode, 0x0008 | flags, 0, ctypes.pointer(extra) )
     x = Input( ctypes.c_ulong(1), ii_ )
     ctypes.windll.user32.SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
 
-def ReleaseKey(hexKeyCode):
+def ReleaseKey(hexKeyCode, flags=0, wVk=0):
     extra = ctypes.c_ulong(0)
     ii_ = Input_I()
-    ii_.ki = KeyBdInput( 0, hexKeyCode, 0x0008 | 0x0002, 0, ctypes.pointer(extra) )
+    # 0x0008 is KEYEVENTF_SCANCODE, 0x0002 is KEYEVENTF_KEYUP
+    ii_.ki = KeyBdInput( wVk, hexKeyCode, 0x0008 | 0x0002 | flags, 0, ctypes.pointer(extra) )
     x = Input( ctypes.c_ulong(1), ii_ )
     ctypes.windll.user32.SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
 
@@ -160,16 +162,28 @@ KEY_MAPPING = {
     'delete': DIK_DELETE, 'del': DIK_DELETE
 }
 
+EXTENDED_KEYS = ['up', 'down', 'left', 'right', 'delete', 'del', 'home', 'end', 'pageup', 'pagedown', 'insert']
+
 def press_key(key_name):
     key_name = str(key_name).lower().replace("key.", "")
     if key_name in KEY_MAPPING:
-        print(f"🎮 DirectInput: Pressing '{key_name}' (Code: {hex(KEY_MAPPING[key_name])})")
-        PressKey(KEY_MAPPING[key_name])
+        scancode = KEY_MAPPING[key_name]
+        flags = 0x0001 if key_name in EXTENDED_KEYS else 0
+        # Map Scancode to Virtual Key (MAPVK_VSC_TO_VK = 1)
+        vk = ctypes.windll.user32.MapVirtualKeyW(scancode, 1)
+        
+        print(f"🎮 DirectInput: Pressing '{key_name}' (Scan: {hex(scancode)}, VK: {hex(vk)}, Flags: {flags})")
+        PressKey(scancode, flags, vk)
     else:
         print(f"❌ DirectInput: Unknown key '{key_name}'")
 
 def release_key(key_name):
     key_name = str(key_name).lower().replace("key.", "")
     if key_name in KEY_MAPPING:
-        print(f"🎮 DirectInput: Releasing '{key_name}' (Code: {hex(KEY_MAPPING[key_name])})")
-        ReleaseKey(KEY_MAPPING[key_name])
+        scancode = KEY_MAPPING[key_name]
+        flags = 0x0001 if key_name in EXTENDED_KEYS else 0
+        # Map Scancode to Virtual Key (MAPVK_VSC_TO_VK = 1)
+        vk = ctypes.windll.user32.MapVirtualKeyW(scancode, 1)
+        
+        print(f"🎮 DirectInput: Releasing '{key_name}' (Scan: {hex(scancode)}, VK: {hex(vk)}, Flags: {flags})")
+        ReleaseKey(scancode, flags, vk)
