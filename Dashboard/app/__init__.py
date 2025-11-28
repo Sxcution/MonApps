@@ -39,5 +39,8 @@ def create_app():
         app.register_blueprint(image_routes.image_bp)
         app.register_blueprint(telegram_routes.telegram_bp)
         app.register_blueprint(automatic_routes.automatic_bp)
+        
+        from . import chatbot_routes
+        app.register_blueprint(chatbot_routes.chatbot_bp)
     
     return app

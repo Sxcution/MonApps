@@ -52,7 +52,15 @@ class WindowsOCR:
         """Initialize OCR engine for specified language"""
         try:
             # Try to get language-specific engine
-            languages = OcrEngine.available_recognizer_languages
+            try:
+                languages = OcrEngine.available_recognizer_languages
+            except Exception as lang_err:
+                # Fallback: just use default engine
+                print(f"⚠️ Cannot enumerate languages: {lang_err}")
+                self.engine = OcrEngine.try_create_from_user_profile_languages()
+                print(f"✅ Windows OCR: Using default system language")
+                return
+            
             lang_found = False
             
             for lang in languages:

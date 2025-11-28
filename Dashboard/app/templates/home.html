@@ -1,18 +1,149 @@
 {% extends "layouts/base.html" %}
 
 {% block content %}
-<div class="p-4">
-    <div class="row g-4">
-        <div class="col-lg-3 col-md-6 d-flex">
-            <div class="card tool-card w-100">
-                  <div class="card-body text-center d-flex flex-column justify-content-center">
-                        <div class="card-icon mb-3" style="background: linear-gradient(135deg, #66BB6A 0%, #26A69A 100%);">
-                              <i class="bi bi-journal-richtext"></i>
-                        </div>
-                        <h5 class="card-title">Ghi Chú & Nhắc Việc</h5>
-                  </div>
+<style>
+    /* Force Dark Background */
+    .chat-wrapper,
+    .chat-main,
+    .chat-messages,
+    .empty-state {
+        background-color: #212121 !important;
+        color: #ececec !important;
+    }
+
+    .chat-input-wrapper {
+        background-color: #2f2f2f !important;
+    }
+
+    .chat-textarea {
+        background-color: transparent !important;
+        color: white !important;
+    }
+</style>
+<div class="chat-wrapper d-flex">
+    <!-- Sidebar -->
+    <div class="chat-sidebar d-flex flex-column" id="chatSidebar">
+        <div class="p-3">
+            <button class="btn btn-new-chat w-100 d-flex align-items-center gap-2 mb-3" onclick="startNewChat()">
+                <i class="bi bi-plus-lg"></i>
+                <span>New chat</span>
+            </button>
+
+            <div class="search-box mb-3">
+                <i class="bi bi-search"></i>
+                <input type="text" placeholder="Search chats..." id="chatSearch">
             </div>
         </div>
+
+        <div class="chat-history flex-grow-1 overflow-auto custom-scrollbar" id="chatHistoryList">
+            <!-- History items will be loaded here -->
+            <div class="text-center text-muted small mt-3">Loading history...</div>
         </div>
-</div>
-{% endblock %}
+
+        <div class="p-3 border-top border-secondary">
+            <div class="dropdown w-100">
+                <button class="btn btn-user w-100 d-flex align-items-center gap-2" type="button"
+                    data-bs-toggle="dropdown">
+                    <div class="user-avatar">
+                        <i class="bi bi-person-fill"></i>
+                    </div>
+                    <div class="text-start flex-grow-1 overflow-hidden">
+                        <div class="fw-bold text-truncate">User</div>
+                    </div>
+                    <i class="bi bi-three-dots"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-dark w-100">
+                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#aiSettingsModal"><i
+                                class="bi bi-gear me-2"></i>Settings</a></li>
+                    <li>
+                        <hr class="dropdown-divider">
+                    </li>
+                    <li><a class="dropdown-item text-danger" href="#" onclick="clearAllChats()"><i
+                                class="bi bi-trash me-2"></i>Clear all chats</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Chat Area -->
+    <div class="chat-main flex-grow-1 d-flex flex-column position-relative">
+        <!-- Mobile Toggle -->
+        <button class="btn btn-dark d-md-none position-absolute top-0 start-0 m-3 z-3" onclick="toggleSidebar()">
+            <i class="bi bi-list"></i>
+        </button>
+
+        <!-- Header -->
+        <div class="chat-header p-2 d-flex justify-content-center align-items-center">
+            <div class="model-selector d-flex align-items-center gap-2">
+                <span class="fw-bold" id="current-model-name">ChatGPT 5.1 Instant</span>
+                <i class="bi bi-chevron-down small text-muted"></i>
+            </div>
+        </div>
+
+        <!-- Messages Area -->
+        <div class="chat-messages flex-grow-1 overflow-auto custom-scrollbar p-0" id="chat-messages">
+            <div class="h-100 d-flex flex-column justify-content-center align-items-center text-center p-4 empty-state">
+                <div class="mb-4">
+                    <div class="logo-circle">
+                        <i class="bi bi-robot fs-1"></i>
+                    </div>
+                </div>
+                <h3 class="mb-3 fw-bold">What's on your mind today?</h3>
+                <div class="d-flex flex-wrap justify-content-center gap-2" id="suggestion-chips">
+                    <button class="btn btn-suggestion" onclick="sendSuggestion('Check my recent notes')">Check my
+                        recent notes</button>
+                    <button class="btn btn-suggestion" onclick="sendSuggestion('Analyze Telegram sessions')">Analyze
+                        Telegram sessions</button>
+                    <button class="btn btn-suggestion" onclick="sendSuggestion('List my social accounts')">List my
+                        social accounts</button>
+                </div>
+                <!-- AI Settings Modal -->
+                <div class="modal fade" id="aiSettingsModal" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content bg-dark text-light border-secondary">
+                            <div class="modal-header border-secondary">
+                                <h5 class="modal-title">Settings</h5>
+                                <button type="button" class="btn-close btn-close-white"
+                                    data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="ai-settings-form">
+                                    <div class="mb-3">
+                                        <label class="form-label">Provider</label>
+                                        <select class="form-select bg-dark text-light border-secondary" name="provider"
+                                            id="ai-provider">
+                                            <option value="openai">OpenAI (ChatGPT)</option>
+                                            <option value="gemini">Google Gemini</option>
+                                        </select>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">API Key</label>
+                                            <input type="password"
+                                                class="form-control bg-dark text-light border-secondary" name="api_key"
+                                                id="ai-api-key" placeholder="sk-...">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Model</label>
+                                            <input type="text" class="form-control bg-dark text-light border-secondary"
+                                                name="model" id="ai-model" placeholder="e.g. gpt-4o">
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">System Prompt</label>
+                                        <textarea class="form-control bg-dark text-light border-secondary"
+                                            name="system_prompt" id="ai-system-prompt"
+                                            rows="3">You are a helpful Dashboard Assistant.</textarea>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="modal-footer border-secondary">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <button type="button" class="btn btn-primary" onclick="saveAISettings()">Save</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+                {% endblock %}

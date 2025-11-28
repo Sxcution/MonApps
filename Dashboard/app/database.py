@@ -143,6 +143,36 @@ def init_database():
         )"""
     )
     
+
+
+    # Chatbot tables
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS chat_sessions (
+            id TEXT PRIMARY KEY,
+            title TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )"""
+    )
+
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS chat_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            session_id TEXT,
+            FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+        )"""
+    )
+
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS ai_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )"""
+    )
+    
     conn.commit()
     conn.close()
 

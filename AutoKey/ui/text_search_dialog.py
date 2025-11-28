@@ -287,19 +287,31 @@ class TextSearchDialog(QDialog):
                     ocr = WindowsOCR(language=config['languages'][0] if config['languages'] else 'en')
                     ocr_results = ocr.recognize(img)
                     
-                    # Simple fuzzy matching
+                    # Fuzzy matching - search in full lines AND individual words
                     from rapidfuzz import fuzz
                     best_match = None
                     best_score = 0
+                    best_text = ""
                     
                     for ocr_result in ocr_results:
+                        # Try matching full line
                         score = fuzz.ratio(query.lower(), ocr_result.text.lower())
                         if score > best_score and score >= self.min_score.value():
                             best_score = score
                             best_match = ocr_result
+                            best_text = ocr_result.text
+                        
+                        # Also try matching individual words (for short queries like "Ba", "We")
+                        words = ocr_result.text.split()
+                        for word in words:
+                            word_score = fuzz.ratio(query.lower(), word.lower())
+                            if word_score > best_score and word_score >= self.min_score.value():
+                                best_score = word_score
+                                best_match = ocr_result
+                                best_text = word
                     
                     if best_match:
-                        self.test_result_label.setText(f"✅ Tìm thấy: '{best_match.text}' (điểm: {best_score:.0f})")
+                        self.test_result_label.setText(f"✅ Tìm thấy: '{best_text}' (điểm: {best_score:.0f})")
                         self.test_result_label.setStyleSheet("color: green; font-weight: bold; padding: 8px;")
                     else:
                         self.test_result_label.setText(f"❌ Không tìm thấy '{query}'")
