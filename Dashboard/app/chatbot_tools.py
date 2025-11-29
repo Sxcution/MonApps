@@ -78,13 +78,8 @@ def search_notes(keyword):
 def add_note(title, content, due_time=None):
     """
     Tạo một ghi chú mới.
-    Args:
-        title (str): Tiêu đề ghi chú.
-        content (str): Nội dung ghi chú.
-        due_time (str, optional): Thời gian nhắc nhở (ISO format).
-    Returns:
-        dict: {'success': True, 'note_id': str}
     """
+    conn = None
     try:
         import uuid
         conn = get_db_connection()
@@ -96,24 +91,18 @@ def add_note(title, content, due_time=None):
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (note_id, title, content, due_time, 'active', now, 0))
         conn.commit()
-        conn.close()
         return {'success': True, 'note_id': note_id}
     except Exception as e:
         return {'success': False, 'error': str(e)}
+    finally:
+        if conn:
+            conn.close()
 
 def update_note(note_id, title=None, content=None, due_time=None):
     """
     Cập nhật nội dung của một ghi chú đã tồn tại.
-    QUAN TRỌNG: Để nối thêm nội dung, bạn phải lấy nội dung cũ trước, nối chuỗi, rồi gọi hàm này với nội dung mới đầy đủ.
-    
-    Args:
-        note_id (str): ID của ghi chú (BẮT BUỘC phải tìm kiếm để lấy ID trước).
-        title (str, optional): Tiêu đề mới (nếu muốn đổi).
-        content (str, optional): Nội dung mới (sẽ GHI ĐÈ toàn bộ nội dung cũ).
-        due_time (str, optional): Thời gian nhắc nhở mới.
-    Returns:
-        dict: {'success': True}
     """
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -138,58 +127,162 @@ def update_note(note_id, title=None, content=None, due_time=None):
         query = f"UPDATE notes SET {', '.join(updates)} WHERE id = ?"
         cursor.execute(query, values)
         conn.commit()
-        conn.close()
         return {'success': True}
     except Exception as e:
         return {'success': False, 'error': str(e)}
+    finally:
+        if conn:
+            conn.close()
 
 def delete_note(note_id):
     """
     Xóa vĩnh viễn một ghi chú.
-    Args:
-        note_id (str): ID của ghi chú cần xóa.
-    Returns:
-        dict: {'success': True}
     """
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM notes WHERE id = ?', (note_id,))
         conn.commit()
-        conn.close()
         return {'success': True}
     except Exception as e:
         return {'success': False, 'error': str(e)}
+    finally:
+        if conn:
+            conn.close()
+
+def add_mxh_card(card_name, platform, group_id=None):
+    """
+    Tạo một thẻ MXH mới.
+    """
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        now = datetime.now().isoformat()
+        cursor.execute('''
+            INSERT INTO mxh_cards (card_name, platform, group_id, created_at, is_muted, is_disabled)
+            VALUES (?, ?, ?, ?, 0, 0)
+        ''', (card_name, platform, group_id, now))
+        card_id = cursor.lastrowid
+        conn.commit()
+        return {'success': True, 'card_id': card_id}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        if conn:
+            conn.close()
+
+def update_mxh_card(card_id, card_name=None, platform=None, group_id=None, is_muted=None, is_disabled=None):
+    """
+    Cập nhật thẻ MXH.
+    """
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        updates = []
+        values = []
+        
+        if card_name is not None:
+            updates.append('card_name = ?')
+            values.append(card_name)
+        if platform is not None:
+            updates.append('platform = ?')
+            values.append(platform)
+        if group_id is not None:
+            updates.append('group_id = ?')
+            values.append(group_id)
+        if is_muted is not None:
+            updates.append('is_muted = ?')
+            values.append(int(is_muted))
+        if is_disabled is not None:
+            updates.append('is_disabled = ?')
+            values.append(int(is_disabled))
+            
+        if not updates:
+            return {'success': False, 'error': 'No fields to update'}
+            
+        values.append(card_id)
+        query = f"UPDATE mxh_cards SET {', '.join(updates)} WHERE id = ?"
+        cursor.execute(query, values)
+        conn.commit()
+        return {'success': True}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        if conn:
+            conn.close()
+
+def delete_mxh_card(card_id):
+    """
+    Xóa thẻ MXH.
+    """
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM mxh_cards WHERE id = ?', (card_id,))
+        conn.commit()
+        return {'success': True}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        if conn:
+            conn.close()
 
 # ===== MXH TOOLS =====
 
 def get_all_mxh_cards():
-    """Lấy tất cả thẻ MXH"""
+    """Lấy tất cả thẻ MXH kèm thông tin tài khoản chi tiết"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        # Fetch cards with group info
         cursor.execute('''
-            SELECT c.id, c.card_name, c.platform, c.is_muted, c.is_disabled,
+            SELECT c.id, c.card_name, c.platform,
                    g.name as group_name, g.color as group_color
             FROM mxh_cards c
             LEFT JOIN mxh_groups g ON c.group_id = g.id
-            ORDER BY c.created_at DESC
+            ORDER BY c.card_name ASC
         ''')
-        cards = []
+        
+        cards_map = {}
         for row in cursor.fetchall():
-            cards.append({
+            cards_map[row['id']] = {
                 'id': row['id'],
                 'card_name': row['card_name'],
                 'platform': row['platform'],
-                'is_muted': row['is_muted'],
-                'is_disabled': row['is_disabled'],
                 'group_name': row['group_name'],
-                'group_color': row['group_color']
-            })
-        conn.close()
-        return {'success': True, 'cards': cards}
+                'group_color': row['group_color'],
+                'accounts': [] # Initialize accounts list
+            }
+            
+        # Fetch all accounts
+        cursor.execute('''
+            SELECT card_id, account_name, username, login_username, login_password, phone, notice, wechat_status
+            FROM mxh_accounts
+        ''')
+        
+        for row in cursor.fetchall():
+            card_id = row['card_id']
+            if card_id in cards_map:
+                cards_map[card_id]['accounts'].append({
+                    'account_name': row['account_name'],
+                    'username': row['username'],
+                    'password': row['login_password'], # Mapped from login_password
+                    'phone': row['phone'],
+                    'notes': row['notice'], # Mapped from notice
+                    'status': row['wechat_status']
+                })
+        
+        return {'success': True, 'cards': list(cards_map.values())}
     except Exception as e:
         return {'success': False, 'error': str(e)}
+    finally:
+        if conn:
+            conn.close()
 
 def search_mxh_accounts(keyword):
     """Tìm kiếm tài khoản MXH"""
@@ -300,6 +393,33 @@ AVAILABLE_TOOLS = {
         'description': 'Tìm kiếm tài khoản MXH',
         'parameters': {
             'keyword': {'type': 'string', 'description': 'Từ khóa tìm kiếm'}
+        }
+    },
+    'add_mxh_card': {
+        'function': add_mxh_card,
+        'description': 'Tạo thẻ MXH mới (WeChat, Facebook, etc.)',
+        'parameters': {
+            'card_name': {'type': 'string', 'description': 'Tên thẻ'},
+            'platform': {'type': 'string', 'description': 'Nền tảng (wechat, facebook, tiktok...)'},
+            'group_id': {'type': 'integer', 'optional': True, 'description': 'ID nhóm'}
+        }
+    },
+    'update_mxh_card': {
+        'function': update_mxh_card,
+        'description': 'Cập nhật thẻ MXH',
+        'parameters': {
+            'card_id': {'type': 'integer', 'description': 'ID của thẻ'},
+            'card_name': {'type': 'string', 'optional': True, 'description': 'Tên mới'},
+            'platform': {'type': 'string', 'optional': True, 'description': 'Nền tảng mới'},
+            'is_muted': {'type': 'boolean', 'optional': True, 'description': 'Tắt thông báo'},
+            'is_disabled': {'type': 'boolean', 'optional': True, 'description': 'Vô hiệu hóa'}
+        }
+    },
+    'delete_mxh_card': {
+        'function': delete_mxh_card,
+        'description': 'Xóa thẻ MXH',
+        'parameters': {
+            'card_id': {'type': 'integer', 'description': 'ID của thẻ cần xóa'}
         }
     },
     'get_telegram_sessions': {

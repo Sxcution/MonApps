@@ -211,8 +211,11 @@ class MainWindow(QMainWindow):
         self.overlay_timer.timeout.connect(self.update_overlay_time)
         self.overlay_start_time = 0
         
-        # Setup Hotkeys
         self.setup_global_hotkeys()
+
+    def createPopupMenu(self):
+        """Disable the right-click context menu for toolbars/docks"""
+        return None
 
     def new_recording(self):
         self.model.removeRows(0, self.model.rowCount())
@@ -245,6 +248,69 @@ class MainWindow(QMainWindow):
         else:
             # Stop Recording
             new_events = self.recorder.stop_recording()
+            
+            # Check if the last event matches the Stop Record hotkey
+            stop_rec_key = self.settings.value("hotkey_stop_record", "F10").lower()
+            
+            print(f"DEBUG: Stop Key='{stop_rec_key}'")
+            
+            if new_events and stop_rec_key:
+                # Loop backwards to remove all events related to the stop key (Press and Release)
+                # We only remove from the very end. Once we hit a non-matching event, we stop.
+                while new_events:
+                    last_event = new_events[-1]
+                    
+                    if last_event['type'] not in ['key_press', 'key_release', 'key_click']:
+                        break
+                        
+                    key = last_event['key'].lower() # e.g. "num 2", "f10", "ctrl"
+                    print(f"DEBUG: Checking last event: {key} vs {stop_rec_key}")
+                    
+                    # 1. Exact match (normalized)
+                    # "Num 2" -> "num+2"
+                    event_key_norm = key.replace("num ", "num+")
+                    
+                    # 2. Base key match
+                    # Hotkey: "ctrl+alt+f10" -> base="f10"
+                    # Hotkey: "num+2" -> base="2"
+                    # Hotkey: "2" -> base="2"
+                    hotkey_base = stop_rec_key.split('+')[-1].strip()
+                    
+                    # Event: "num 2" -> base="2"
+                    event_base = key.split(' ')[-1].strip()
+                    
+                    match = False
+                    
+                    # Check 1: Full string match
+                    if event_key_norm == stop_rec_key:
+                        match = True
+                    # Check 2: Base key match (if hotkey is just the key, or if we want to be aggressive)
+                    elif event_base == hotkey_base:
+                        # Be careful: "Ctrl+C" stop key. Event "C". match? Yes.
+                        # Event "Ctrl". match? No (base is C).
+                        # But we might want to remove modifiers too if they are part of the combo?
+                        # For now, let's just ensure we remove the main key.
+                        match = True
+                    # Check 3: "Num+2" vs "Num 2"
+                    elif "num" in stop_rec_key and "num" in key and event_base == hotkey_base:
+                        match = True
+                        
+                    if match:
+                        print(f"Removing stop hotkey event: {last_event}")
+                        new_events.pop()
+                    else:
+                        # If it's a modifier that is part of the hotkey, maybe remove it too?
+                        # e.g. Hotkey="Ctrl+Q". Events: ..., Press Ctrl, Press Q.
+                        # We removed Q. Now last is Ctrl.
+                        # stop_rec_key="ctrl+q". key="ctrl".
+                        # "ctrl" in "ctrl+q" -> True.
+                        if key in stop_rec_key and len(key) > 1: # Avoid matching single chars randomly
+                             print(f"Removing modifier/part of hotkey: {last_event}")
+                             new_events.pop()
+                        else:
+                            # Found a non-matching event, stop removing.
+                            break
+            
             self.recorded_events.extend(new_events) # Append new events
             if new_events:
                 self.has_unsaved_changes = True
@@ -833,75 +899,153 @@ class MainWindow(QMainWindow):
         stop_rec_key = self.settings.value("hotkey_stop_record", "F10")
         play_key = self.settings.value("hotkey_play", "F11")
         
-        def to_pynput(k):
-            # Handle empty strings
-            if not k or not k.strip():
-                return k
+        self.hotkey_configs = []
+        self.pressed_keys = set()
+        
+        def parse_hotkey(key_str, callback):
+            if not key_str or not key_str.strip():
+                return
+                
+            key_str = key_str.lower()
             
-            k_original = k
-            k = k.lower()
+            # Re-parsing strategy:
+            # QKeySequence.toString() format: "Ctrl+Alt+Num+1"
             
-            # First, handle modifier combinations properly
-            # Qt format: "Alt+1", "Ctrl+A", etc.
-            # pynput format: "<alt>+1", "<ctrl>+a", etc.
+            required_keys = set()
             
-            # Replace modifiers (preserve the + separators)
-            k = k.replace("ctrl+", "<ctrl>+")
-            k = k.replace("alt+", "<alt>+")
-            k = k.replace("shift+", "<shift>+")
-            k = k.replace("meta+", "<cmd>+")
+            # Modifiers
+            if "ctrl+" in key_str: required_keys.add('ctrl')
+            if "alt+" in key_str: required_keys.add('alt')
+            if "shift+" in key_str: required_keys.add('shift')
+            if "meta+" in key_str: required_keys.add('cmd')
             
-            # Handle Numpad keys specifically
-            # Qt/QKeySequence represents numpad as "Num+1", "Num+2", etc.
-            if "num+" in k:
-                # Extract the number after Num+
-                num_part = k.split("num+")[-1]
-                # pynput format for numpad: <96> for Num0, <97> for Num1, etc.
-                # But pynput also supports Key.num_lock, etc.
-                # Actually, for numpad digits, we need special handling
-                # pynput doesn't have Key.num_1, it uses KeyCode
-                # We'll use the format "<num_1>", "<num_2>", etc.
-                k = f"<{num_part}_kp>"  # kp = keypad
+            # Main Key
+            # Handle Numpad
+            if "num+" in key_str:
+                # Extract digit
+                main_part = key_str.split("num+")[-1]
+                if main_part.isdigit():
+                    # Map to VK 96-105
+                    vk = 96 + int(main_part)
+                    required_keys.add(vk)
+            elif "f" in key_str and key_str.split('+')[-1].startswith('f'):
+                # F-keys
+                f_part = key_str.split('+')[-1]
+                if f_part[1:].isdigit():
+                    # F1 is VK 112
+                    f_num = int(f_part[1:])
+                    vk = 111 + f_num
+                    required_keys.add(vk)
+            else:
+                # Standard keys (letters, etc)
+                last_part = key_str.split('+')[-1]
+                if len(last_part) == 1:
+                    # Char - Map to VK using VkKeyScanW
+                    try:
+                        res = ctypes.windll.user32.VkKeyScanW(ord(last_part))
+                        vk = res & 0xFF
+                        if vk != 0xFF and vk != 0:
+                            required_keys.add(vk)
+                        else:
+                            # Fallback to char if VK lookup fails
+                            required_keys.add(last_part)
+                    except:
+                        required_keys.add(last_part)
+                else:
+                    # Special keys?
+                    pass
             
-            # Handle Function keys (F1-F12)
-            # Qt: "F1", "F2", etc. → pynput: "<f1>", "<f2>"
-            if len(k) > 1 and k[0] == 'f' and k[1:].isdigit():
-                k = f"<{k}>"
-            elif len(k) > 1 and k.startswith('<') and k[2] == 'f' and k[3:].split('>')[0].isdigit():
-                # Already has modifier like "<ctrl>+f1"
-                parts = k.split('+')
-                if len(parts) > 1 and parts[-1][0] == 'f' and parts[-1][1:].isdigit():
-                    parts[-1] = f"<{parts[-1]}>"
-                    k = '+'.join(parts)
-            
-            return k
+            self.hotkey_configs.append({
+                'triggers': required_keys,
+                'callback': callback,
+                'original': key_str
+            })
 
-        # Only add non-empty hotkeys to the map
-        self.hotkey_map = {}
+        # Parse all hotkeys
+        parse_hotkey(rec_key, self.on_hotkey_record)
+        parse_hotkey(stop_rec_key, self.on_hotkey_stop_record)
+        parse_hotkey(play_key, self.on_hotkey_play)
         
-        if rec_key and rec_key.strip():
-            self.hotkey_map[to_pynput(rec_key)] = self.on_hotkey_record
-        
-        if stop_rec_key and stop_rec_key.strip():
-            self.hotkey_map[to_pynput(stop_rec_key)] = self.on_hotkey_stop_record
-        
-        if play_key and play_key.strip():
-            self.hotkey_map[to_pynput(play_key)] = self.on_hotkey_play
-        
-        # Only register if we have at least one hotkey
-        if not self.hotkey_map:
+        if not self.hotkey_configs:
             print("⚠️ No hotkeys configured")
             self.hotkey_listener = None
             return
-        
+            
         try:
             from pynput import keyboard
-            self.hotkey_listener = keyboard.GlobalHotKeys(self.hotkey_map)
+            self.hotkey_listener = keyboard.Listener(
+                on_press=self.on_global_key_press,
+                on_release=self.on_global_key_release)
             self.hotkey_listener.start()
-            print(f"✓ Hotkeys registered: {list(self.hotkey_map.keys())}")
+            print(f"✓ Manual Hotkey Listener registered")
         except Exception as e:
             print(f"⚠️ Failed to register hotkeys: {e}")
             self.hotkey_listener = None
+
+    def on_global_key_press(self, key):
+        try:
+            # Add to pressed set
+            # Normalize key
+            key_id = self._get_key_id(key)
+            if key_id:
+                self.pressed_keys.add(key_id)
+            
+            # Check for matches
+            for config in self.hotkey_configs:
+                triggers = config['triggers']
+                if not triggers: continue
+                
+                # Check if all triggers are pressed
+                match = True
+                for trigger in triggers:
+                    if trigger not in self.pressed_keys:
+                        match = False
+                        break
+                
+                if match:
+                    # Execute callback
+                    config['callback']()
+                    
+        except Exception as e:
+            print(f"Error in hotkey press: {e}")
+
+    def on_global_key_release(self, key):
+        try:
+            key_id = self._get_key_id(key)
+            if key_id and key_id in self.pressed_keys:
+                self.pressed_keys.remove(key_id)
+        except Exception as e:
+            print(f"Error in hotkey release: {e}")
+
+    def _get_key_id(self, key):
+        from pynput import keyboard
+        # Return a canonical ID for the key (string 'ctrl', 'alt', or int VK, or char)
+        if isinstance(key, keyboard.Key):
+            if key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r: return 'ctrl'
+            if key == keyboard.Key.alt_l or key == keyboard.Key.alt_r: return 'alt'
+            if key == keyboard.Key.shift_l or key == keyboard.Key.shift_r: return 'shift'
+            if key == keyboard.Key.cmd_l or key == keyboard.Key.cmd_r: return 'cmd'
+            # Map F-keys to VK if possible
+            if hasattr(key, 'value') and hasattr(key.value, 'vk'):
+                return key.value.vk
+            pass
+            
+        if hasattr(key, 'vk') and key.vk is not None:
+            return key.vk
+            
+        # Fallback for chars
+        if hasattr(key, 'char') and key.char:
+            # Try to get VK for char if vk was None (unlikely for standard keys but possible)
+            try:
+                res = ctypes.windll.user32.VkKeyScanW(ord(key.char))
+                vk = res & 0xFF
+                if vk != 0xFF and vk != 0:
+                    return vk
+            except:
+                pass
+            return key.char.lower()
+            
+        return None
 
     def on_hotkey_record(self):
         from PyQt6.QtCore import QMetaObject, Qt, Q_ARG

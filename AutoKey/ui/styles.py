@@ -11,6 +11,15 @@ MAIN_STYLESHEET = """
     outline: none;
 }
 
+/* --- TOOLTIPS --- */
+QToolTip {
+    background-color: #FFFFFF;
+    color: #1A1A1A;
+    border: 1px solid #CCCCCC;
+    border-radius: 4px;
+    padding: 4px;
+}
+
 /* --- WINDOWS & DIALOGS --- */
 QMainWindow, QDialog {
     background-color: #FFFFFF;

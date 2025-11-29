@@ -97,6 +97,21 @@ class Recorder(QObject):
         except AttributeError:
             k = str(key)
             
+        if k is None:
+            k = str(key)
+
+        # Normalize Modifiers
+        if k.startswith('Key.'):
+            k = k.replace('Key.', '')
+            if k.endswith('_l') or k.endswith('_r'):
+                k = k[:-2] # Remove _l or _r
+            k = k.title() # ctrl -> Ctrl, alt -> Alt
+            
+        # Handle Numpad (VK 96-105)
+        if hasattr(key, 'vk') and key.vk is not None:
+            if 96 <= key.vk <= 105:
+                k = f"Num {key.vk - 96}"
+            
         event = {
             'type': 'key_press',
             'key': k,
@@ -111,6 +126,21 @@ class Recorder(QObject):
             k = key.char
         except AttributeError:
             k = str(key)
+            
+        if k is None:
+            k = str(key)
+            
+        # Normalize Modifiers
+        if k.startswith('Key.'):
+            k = k.replace('Key.', '')
+            if k.endswith('_l') or k.endswith('_r'):
+                k = k[:-2] # Remove _l or _r
+            k = k.title() # ctrl -> Ctrl, alt -> Alt
+            
+        # Handle Numpad (VK 96-105)
+        if hasattr(key, 'vk') and key.vk is not None:
+            if 96 <= key.vk <= 105:
+                k = f"Num {key.vk - 96}"
             
         event = {
             'type': 'key_release',

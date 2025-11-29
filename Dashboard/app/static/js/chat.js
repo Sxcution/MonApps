@@ -74,9 +74,65 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Paste Event Listener
-    document.getElementById('user-input').addEventListener('paste', function (e) {
+    // --- Default Focus Logic ---
+    // 1. Activate Home Tab
+    const homeTabLink = document.getElementById('home-tab-link');
+    if (homeTabLink && !homeTabLink.classList.contains('active')) {
+        homeTabLink.click();
+    }
+
+    // 2. Start New Chat & Focus Input
+    // Wait a bit for tab animation
+    setTimeout(() => {
+        startNewChat();
+        // Focus input is handled inside startNewChat, but let's ensure it
+        const chatInput = document.getElementById('user-input');
+        if (chatInput) chatInput.focus();
+    }, 500);
+
+    // Initialize Tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+
+    // --- Mini Chat Bubble Logic ---
+    const miniChatBubble = document.getElementById('mini-chat-bubble');
+    const miniChatWindow = document.getElementById('mini-chat-window');
+    const chatTabLink = document.querySelector('button[data-bs-target="#v-pills-chat"]');
+
+    // Show/Hide Bubble based on Active Tab
+    if (chatTabLink) {
+        chatTabLink.addEventListener('shown.bs.tab', function (e) {
+            miniChatBubble.style.display = 'none';
+            miniChatWindow.style.display = 'none'; // Close window if returning to main chat
+        });
+
+        // Listen for other tabs showing
+        document.querySelectorAll('button[data-bs-toggle="pill"]').forEach(tab => {
+            if (tab !== chatTabLink) {
+                tab.addEventListener('shown.bs.tab', function (e) {
+                    miniChatBubble.style.display = 'flex';
+                });
+            }
+        });
+    }
+
+    // Initial check
+    const activeTab = document.querySelector('.nav-link.active');
+    if (activeTab && activeTab.getAttribute('data-bs-target') !== '#v-pills-chat') {
+        if (miniChatBubble) miniChatBubble.style.display = 'flex';
+    }
+
+    // Global Paste Event Listener
+    document.addEventListener('paste', function (e) {
+        // Only handle if we are on the chat page (user-input exists)
+        const userInput = document.getElementById('user-input');
+        if (!userInput) return;
+
+        console.log('Global paste event detected');
         const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+
         for (let index in items) {
             const item = items[index];
             if (item.kind === 'file' && item.type.includes('image/')) {
@@ -87,7 +143,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     showImagePreview(base64);
                 };
                 reader.readAsDataURL(blob);
-                e.preventDefault(); // Prevent pasting the file name
+                e.preventDefault(); // Prevent default paste behavior for images
+                return; // Stop processing other items
             }
         }
     });
@@ -107,7 +164,9 @@ let currentImageBase64 = null;
 function showImagePreview(base64) {
     currentImageBase64 = base64;
     document.getElementById('image-preview').src = base64;
-    document.getElementById('image-preview-container').classList.remove('d-none');
+    const container = document.getElementById('image-preview-container');
+    container.classList.remove('d-none');
+    container.style.display = 'block'; // Force show (resetting inline style from clearImagePreview)
     // Focus back on input
     document.getElementById('user-input').focus();
 }
@@ -115,7 +174,9 @@ function showImagePreview(base64) {
 function clearImagePreview() {
     currentImageBase64 = null;
     document.getElementById('image-preview').src = '';
-    document.getElementById('image-preview-container').classList.add('d-none');
+    const container = document.getElementById('image-preview-container');
+    container.classList.add('d-none');
+    container.style.display = 'none'; // Force hide
 }
 
 // Context Menu Functions
@@ -296,7 +357,8 @@ function appendMessage(role, content, modelName = null) {
     messageRow.className = `message-row ${role === 'user' ? 'user' : 'ai'}`; // Add specific class
 
     const avatarClass = role === 'user' ? 'user-avatar-img' : 'ai-avatar-img';
-    const avatarIcon = role === 'user' ? '<i class="bi bi-person"></i>' : '<i class="bi bi-robot"></i>';
+    // User requested to remove the user icon symbol but keep the colored circle
+    const avatarIcon = role === 'user' ? '' : '<i class="bi bi-robot"></i>';
 
     // Determine Display Name - NO NAME for user messages
     let displayName = '';
@@ -361,6 +423,10 @@ async function sendMessage() {
     }
     appendMessage('user', displayContent);
 
+    // Clear image immediately after adding to UI
+    const imageToSend = currentImageBase64; // Store for payload
+    clearImagePreview();
+
     const chatMessages = document.getElementById('chat-messages');
     const loadingId = 'loading-' + Date.now();
     const loadingRow = document.createElement('div');
@@ -396,8 +462,8 @@ async function sendMessage() {
             model: selectedModel.model
         };
 
-        if (currentImageBase64) {
-            payload.image = currentImageBase64;
+        if (imageToSend) {
+            payload.image = imageToSend;
         }
 
         const response = await fetch('/api/chat/send', {
@@ -423,8 +489,7 @@ async function sendMessage() {
         document.getElementById(loadingId).remove();
         appendMessage('assistant', 'Network Error: ' + error.message, currentModelName);
     } finally {
-        // Clear image after sending
-        clearImagePreview();
+        // Image already cleared
     }
 }
 
@@ -442,10 +507,16 @@ async function loadAISettings() {
         if (data.success) {
             providerSettings = data.settings; // Store all settings
 
-            // Set current provider (default to openai if not set)
+            // Set current provider
             const currentProvider = providerSettings.provider || 'openai';
             document.getElementById('ai-provider').value = currentProvider;
-            document.getElementById('ai-system-prompt').value = providerSettings.system_prompt || 'You are a helpful Dashboard Assistant.';
+
+            // Load System Prompts
+            document.getElementById('system-prompt-general').value = providerSettings.system_prompt_general || '';
+            document.getElementById('system-prompt-mxh').value = providerSettings.system_prompt_mxh || '';
+            document.getElementById('system-prompt-notes').value = providerSettings.system_prompt_notes || '';
+            document.getElementById('system-prompt-telegram').value = providerSettings.system_prompt_telegram || '';
+            document.getElementById('system-prompt-image').value = providerSettings.system_prompt_image || '';
 
             updateSettingsUI(currentProvider);
             updateHeaderModelName(currentProvider);
@@ -464,8 +535,8 @@ function updateSettingsUI(provider) {
         modelInput.placeholder = 'e.g. gpt-4o';
     } else if (provider === 'gemini') {
         apiKeyInput.value = providerSettings.gemini_api_key || '';
-        modelInput.value = providerSettings.gemini_model || 'gemini-pro';
-        modelInput.placeholder = 'e.g. gemini-1.5-pro';
+        modelInput.value = providerSettings.gemini_model || 'gemini-2.5-flash';
+        modelInput.placeholder = 'e.g. gemini-2.5-flash';
     }
 }
 
@@ -476,12 +547,10 @@ function updateHeaderModelName(provider) {
     if (provider === 'openai') {
         modelName = providerSettings.openai_model || 'GPT-3.5 Turbo';
     } else if (provider === 'gemini') {
-        modelName = providerSettings.gemini_model || 'Gemini Pro';
+        modelName = providerSettings.gemini_model || 'Gemini 2.5 Flash';
     }
 
-    // Capitalize provider name for display if model is empty/default
     if (!modelName) modelName = provider.charAt(0).toUpperCase() + provider.slice(1);
-
     modelNameEl.textContent = modelName;
 }
 
@@ -489,11 +558,21 @@ async function saveAISettings() {
     const provider = document.getElementById('ai-provider').value;
     const apiKey = document.getElementById('ai-api-key').value;
     const model = document.getElementById('ai-model').value;
-    const systemPrompt = document.getElementById('ai-system-prompt').value;
+
+    // Get System Prompts
+    const promptGeneral = document.getElementById('system-prompt-general').value;
+    const promptMxh = document.getElementById('system-prompt-mxh').value;
+    const promptNotes = document.getElementById('system-prompt-notes').value;
+    const promptTelegram = document.getElementById('system-prompt-telegram').value;
+    const promptImage = document.getElementById('system-prompt-image').value;
 
     // Update local state
     providerSettings.provider = provider;
-    providerSettings.system_prompt = systemPrompt;
+    providerSettings.system_prompt_general = promptGeneral;
+    providerSettings.system_prompt_mxh = promptMxh;
+    providerSettings.system_prompt_notes = promptNotes;
+    providerSettings.system_prompt_telegram = promptTelegram;
+    providerSettings.system_prompt_image = promptImage;
 
     if (provider === 'openai') {
         providerSettings.openai_api_key = apiKey;

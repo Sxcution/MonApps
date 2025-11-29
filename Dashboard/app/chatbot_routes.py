@@ -117,15 +117,20 @@ def handle_settings():
 
 @chatbot_bp.route('/send', methods=['POST'])
 def send_message():
+    global AVAILABLE_TOOLS
     try:
         data = request.json
-        user_message = data.get('message')
+        user_message = data.get('message', '')
         session_id = data.get('session_id')
         request_provider = data.get('provider')  # Get provider from request
         request_model = data.get('model')        # Get model from request
+        image_data = data.get('image')
         
-        if not user_message:
+        if not user_message and not image_data:
             return jsonify({'success': False, 'error': 'Message is required'}), 400
+            
+        if not user_message and image_data:
+            user_message = "Gửi một hình ảnh"
 
         conn = get_db_connection()
         
@@ -147,12 +152,35 @@ def send_message():
         conn.execute('INSERT INTO chat_history (role, content, timestamp, session_id) VALUES (?, ?, ?, ?)', 
                      ('user', user_message, datetime.now().isoformat(), session_id))
         conn.commit()
+
         # 2. Get Settings & Context
         settings = get_ai_settings()
         # Use request provider/model if provided, otherwise fallback to settings
         provider = request_provider if request_provider else settings.get('provider', 'gemini')
-        # Build simple system prompt - NO TOOL INSTRUCTIONS
-        base_prompt = settings.get('system_prompt', 'Bạn là Dashboard Assistant - trợ lý thông minh.')
+        
+        # 2. Get System Prompt from Settings (Granular)
+        # Default fallback if DB is empty
+        default_prompt = """Bạn là Dashboard Assistant - trợ lý thông minh quản lý hệ thống.
+        
+        QUAN TRỌNG VỀ DỮ LIỆU WECHAT/MXH:
+        - Hệ thống lưu trữ theo cấu trúc: Thẻ (Card) -> Tài khoản (Account).
+        - Một Thẻ có thể chứa nhiều Tài khoản.
+        - Thông tin quan trọng (SĐT, Mật khẩu, Mã 2FA) nằm trong chi tiết Tài khoản.
+        - LƯU Ý ĐẶC BIỆT: Thông tin về trạng thái quét QR, ngày tạo, hoặc ghi chú đăng ký thường nằm trong trường 'Notes' của Tài khoản. Hãy đọc kỹ trường này.
+        """
+        
+        general_prompt = settings.get('system_prompt_general', default_prompt)
+        mxh_prompt = settings.get('system_prompt_mxh', '')
+        notes_prompt = settings.get('system_prompt_notes', '')
+        telegram_prompt = settings.get('system_prompt_telegram', '')
+        image_prompt = settings.get('system_prompt_image', '')
+
+        # Combine prompts
+        base_prompt = general_prompt
+        if mxh_prompt: base_prompt += f"\n\n--- SOCIAL MEDIA INSTRUCTIONS ---\n{mxh_prompt}"
+        if notes_prompt: base_prompt += f"\n\n--- NOTES INSTRUCTIONS ---\n{notes_prompt}"
+        if telegram_prompt: base_prompt += f"\n\n--- TELEGRAM INSTRUCTIONS ---\n{telegram_prompt}"
+        if image_prompt: base_prompt += f"\n\n--- IMAGE INSTRUCTIONS ---\n{image_prompt}"
         
         # CRITICAL: Add explicit instruction to NEVER return JSON
         anti_json_instruction = """
@@ -248,7 +276,7 @@ QUAN TRỌNG:
         # Detect "list all notes" intent
         elif any(phrase in user_message.lower() for phrase in ['tất cả ghi chú', 'all notes', 'danh sách ghi chú']):
             result = AVAILABLE_TOOLS['get_all_notes']['function']()
-            if result.get('success'):
+            if isinstance(result, dict) and result.get('success'):
                 import re
                 notes = result.get('notes', [])
                 tool_result_text = f"\n\n[DANH SÁCH {len(notes)} GHI CHÚ:\n"
@@ -261,17 +289,28 @@ QUAN TRỌNG:
         # Detect MXH intent 
         elif any(kw in user_message.lower() for kw in ['mxh', 'facebook', 'tiktok', 'social']):
             result = AVAILABLE_TOOLS['get_all_mxh_cards']['function']()
-            if result.get('success'):
+            with open('debug_log.txt', 'a', encoding='utf-8') as f:
+                f.write(f"\n[DEBUG] MXH Result Type: {type(result)}\n")
+                f.write(f"[DEBUG] MXH Result Value: {result}\n")
+            
+            if isinstance(result, dict) and result.get('success'):
                 cards = result.get('cards', [])
-                tool_result_text = f"\n\n[DANH SÁCH {len(cards)} THẺ MXH:\n"
+                tool_result_text = f"\n\n[DANH SÁCH {len(cards)} THẺ MXH (KÈM CHI TIẾT TÀI KHOẢN):\n"
                 for card in cards[:10]:
-                    tool_result_text += f"- {card['platform']}: {card['card_name']}\n"
+                    accounts_text = ""
+                    if card.get('accounts'):
+                        for acc in card['accounts']:
+                            accounts_text += f"    + Account: {acc['account_name']} | User: {acc['username']} | Pass: {acc['password']} | Phone: {acc['phone']} | Notes: {acc['notes']}\n"
+                    else:
+                        accounts_text = "    (Không có tài khoản chi tiết)\n"
+                        
+                    tool_result_text += f"- {card['card_name']}\n{accounts_text}"
                 tool_result_text += "]"
         
         # Detect Telegram intent
         elif 'telegram' in user_message.lower():
             result = AVAILABLE_TOOLS['get_telegram_sessions']['function']()
-            if result.get('success'):
+            if isinstance(result, dict) and result.get('success'):
                 sessions = result.get('sessions', [])
                 tool_result_text = f"\n\n[DANH SÁCH {len(sessions)} TELEGRAM SESSIONS:\n"
                 for sess in sessions[:10]:
@@ -341,7 +380,11 @@ QUAN TRỌNG:
                     image_data = image_data.split('base64,')[1]
                 image_bytes = base64.b64decode(image_data)
                 pil_image = Image.open(io.BytesIO(image_bytes))
+                with open('debug_log.txt', 'a', encoding='utf-8') as f:
+                    f.write(f"\n[DEBUG] Image decoded successfully. Size: {pil_image.size}\n")
             except Exception as e:
+                with open('debug_log.txt', 'a', encoding='utf-8') as f:
+                    f.write(f"\n[ERROR] Image decoding failed: {e}\n")
                 print(f"Error decoding image: {e}")
 
         # Initial messages list
@@ -427,112 +470,138 @@ QUAN TRỌNG:
                     break
                     
             elif provider == 'gemini':
-                try:
-                    import google.generativeai as genai
-                    from google.protobuf import struct_pb2
-                    genai.configure(api_key=api_key)
-                    
-                    # Model mapping logic (Fixed to valid models)
-                    model_mapping = {
-                        'gemini-pro': 'gemini-1.5-flash',
-                        'gemini-1.5-pro': 'gemini-1.5-pro',
-                        'gemini-1.5-flash': 'gemini-1.5-flash',
-                        'gemini': 'gemini-1.5-flash',
-                        'gemini-2.5-flash': 'gemini-1.5-flash', # Fallback fix
-                        'gemini-2.5-pro': 'gemini-1.5-pro',     # Fallback fix
-                    }
-                    if not model_name or model_name.strip() == '': model_name = 'gemini-1.5-flash'
-                    clean_model = model_name.strip().lower()
-                    if clean_model in model_mapping: clean_model = model_mapping[clean_model]
-                    if clean_model.startswith('models/'): clean_model = clean_model.replace('models/', '', 1)
-                    
-                    # Initialize model with tools
-                    model = genai.GenerativeModel(clean_model, tools=gemini_tools)
-                    
-                    # Convert history to Gemini format
-                    chat_history = []
-                    
-                    # Add actual history (excluding the very last message which is the current user message, 
-                    # because we want to send it with image in send_message)
-                    # The DB history includes the current message. We should exclude it from 'history' param 
-                    # and send it explicitly.
-                    
-                    # history variable contains dicts: {'role': 'user', 'content': ...}
-                    # The last item is the current message.
-                    history_to_load = history[:-1] if history else []
-                    
-                    for msg in history_to_load:
-                        role = 'user' if msg['role'] == 'user' else 'model'
-                        chat_history.append({'role': role, 'parts': [msg['content']]})
-                    
-                    # Start chat session
-                    chat = model.start_chat(history=chat_history)
-                    
-                    # Prepare message parts
-                    msg_parts = []
-                    
-                    # Inject system prompt if it's the start (or always? Gemini handles system instruction in model init usually, 
-                    # but here we inject in first message or context)
-                    # We'll prepend it to the text.
-                    
-                    text_content = user_message
-                    if turn_count == 1:
-                        text_content = f"{full_system_prompt}\n\nUser: {user_message}"
-                    
-                    msg_parts.append(text_content)
-                    
-                    if pil_image:
-                        msg_parts.append(pil_image)
-                        
-                    # Send message
-                    # Enable automatic function calling if available, otherwise manual loop
-                    
-                    response = chat.send_message(msg_parts)
-                    
-                    # Check for function calls
-                    # We need to inspect response.candidates[0].content.parts
-                    
-                    if not response.candidates:
-                         ai_response = "Error: No response candidates from Gemini."
-                         break
+                # Get raw keys string and split by newline
+                raw_keys = settings.get('gemini_api_key', '')
+                api_keys = [k.strip() for k in raw_keys.split('\n') if k.strip()]
+                
+                if not api_keys:
+                    ai_response = "Gemini API Key is missing. Please add at least one key in Settings."
+                    break
 
-                    part = response.candidates[0].content.parts[0]
-                    
-                    if part.function_call:
-                        # It wants to call a function
-                        fc = part.function_call
-                        fn_name = fc.name
-                        fn_args = dict(fc.args)
+                # Try each key until success or all fail
+                for key_index, current_api_key in enumerate(api_keys):
+                    try:
+                        import google.generativeai as genai
+                        from google.protobuf import struct_pb2
                         
-                        # Execute
-                        if fn_name in AVAILABLE_TOOLS:
-                            tool_func = AVAILABLE_TOOLS[fn_name]['function']
-                            tool_result = tool_func(**fn_args)
+                        with open('debug_log.txt', 'a', encoding='utf-8') as f:
+                            f.write(f"\n[DEBUG] Attempting Gemini with Key #{key_index + 1}...\n")
+
+                        genai.configure(api_key=current_api_key)
+                        
+                        # Model mapping logic (Updated to use available 2.5 models)
+                        model_mapping = {
+                            'gemini-pro': 'gemini-2.5-flash',
+                            'gemini-1.5-pro': 'gemini-2.5-pro',
+                            'gemini-1.5-flash': 'gemini-2.5-flash',
+                            'gemini': 'gemini-2.5-flash',
+                        }
+                        if not model_name or model_name.strip() == '': model_name = 'gemini-2.5-flash'
+                        clean_model = model_name.strip().lower()
+                        if clean_model in model_mapping: clean_model = model_mapping[clean_model]
+                        if clean_model.startswith('models/'): clean_model = clean_model.replace('models/', '', 1)
+                        
+                        # Initialize model with tools
+                        # Fix: Pass system_instruction explicitly for better adherence
+                        model = genai.GenerativeModel(clean_model, tools=gemini_tools, system_instruction=full_system_prompt)
+                        
+                        # Convert history to Gemini format
+                        chat_history = []
+                        history_to_load = history[:-1] if history else []
+                        
+                        for msg in history_to_load:
+                            role = 'user' if msg['role'] == 'user' else 'model'
+                            chat_history.append({'role': role, 'parts': [msg['content']]})
+                        
+                        # Start chat session
+                        chat = model.start_chat(history=chat_history)
+                        
+                        # Prepare message parts
+                        msg_parts = []
+                        text_content = user_message
+                        # Note: We don't need to prepend system prompt anymore since it's in system_instruction
+                        # But we can keep context if needed, or rely on system_instruction containing it.
+                        # full_system_prompt already contains context.
+                        
+                        msg_parts.append(text_content)
+                        
+                        if pil_image:
+                            msg_parts.append(pil_image)
                             
-                            # Send result back
-                            response = chat.send_message(
-                                genai.protos.Content(
-                                    parts=[genai.protos.Part(
-                                        function_response=genai.protos.FunctionResponse(
-                                            name=fn_name,
-                                            response={'result': tool_result}
+                        # Send message
+                        response = chat.send_message(msg_parts)
+                        
+                        # Check for function calls
+                        max_turns = 5
+                        turn = 0
+                        
+                        while turn < max_turns:
+                            turn += 1
+                            if not response.candidates:
+                                ai_response = "Error: No response candidates."
+                                break
+                                
+                            part = response.candidates[0].content.parts[0]
+                            fc = part.function_call
+                            
+                            if fc and fc.name:
+                                fn_name = fc.name
+                                fn_args = dict(fc.args)
+                                
+                                if fn_name in AVAILABLE_TOOLS:
+                                    tool_func = AVAILABLE_TOOLS[fn_name]['function']
+                                    try:
+                                        tool_result = tool_func(**fn_args)
+                                    except Exception as e:
+                                        tool_result = {'error': str(e)}
+                                    
+                                    # Send result back to model
+                                    response = chat.send_message(
+                                        genai.protos.Content(
+                                            parts=[genai.protos.Part(
+                                                function_response=genai.protos.FunctionResponse(
+                                                    name=fn_name,
+                                                    response={'result': tool_result}
+                                                )
+                                            )]
                                         )
-                                    )]
-                                )
-                            )
-                            # The response after sending function_response is the final text
-                            ai_response = response.text
-                            break # Done after one tool call for now (can loop if needed)
+                                    )
+                                else:
+                                    ai_response = f"Error: Tool {fn_name} not found."
+                                    break
+                            else:
+                                try:
+                                    ai_response = response.text
+                                except Exception as e:
+                                    ai_response = "Error parsing response: " + str(e)
+                                break
                         else:
-                            ai_response = f"Error: Tool {fn_name} not found."
-                            break
-                    else:
-                        ai_response = response.text
+                             if not ai_response:
+                                 ai_response = "Error: Too many function call turns."
+                        
+                        # If we got here, success! Break the key loop
                         break
 
-                except Exception as e:
-                    ai_response = f"Gemini Error: {str(e)}"
-                    break
+                    except Exception as e:
+                        error_msg = str(e)
+                        with open('debug_log.txt', 'a', encoding='utf-8') as f:
+                            f.write(f"[ERROR] Key #{key_index + 1} Failed: {error_msg}\n")
+                        
+                        # Check if it's a quota error (429) or similar
+                        if "429" in error_msg or "quota" in error_msg.lower() or "resource exhausted" in error_msg.lower():
+                            if key_index < len(api_keys) - 1:
+                                continue # Try next key
+                            else:
+                                ai_response = "All Gemini API Keys have been exhausted (Rate Limit)."
+                                break
+                        else:
+                            # For other errors, maybe don't retry? Or retry anyway?
+                            # Let's retry for safety if multiple keys exist
+                            if key_index < len(api_keys) - 1:
+                                continue
+                            else:
+                                ai_response = f"Gemini Error (All keys failed): {error_msg}"
+                                break
             else:
                 ai_response = f"Unknown provider: {provider}"
                 break

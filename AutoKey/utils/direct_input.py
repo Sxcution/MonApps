@@ -192,7 +192,22 @@ KEY_MAPPING = {
     'insert': DIK_INSERT, 'delete': DIK_DELETE_EXT, 'del': DIK_DELETE_EXT,
     'home': DIK_HOME, 'end': DIK_END,
     'page_up': DIK_PRIOR, 'page_down': DIK_NEXT,
-    'pageup': DIK_PRIOR, 'pagedown': DIK_NEXT  # Alternative naming
+    'pageup': DIK_PRIOR, 'pagedown': DIK_NEXT,  # Alternative naming
+    
+    # Numpad keys
+    'num 0': DIK_NUMPAD0, 'num 1': DIK_NUMPAD1, 'num 2': DIK_NUMPAD2,
+    'num 3': DIK_NUMPAD3, 'num 4': DIK_NUMPAD4, 'num 5': DIK_NUMPAD5,
+    'num 6': DIK_NUMPAD6, 'num 7': DIK_NUMPAD7, 'num 8': DIK_NUMPAD8,
+    'num 9': DIK_NUMPAD9,
+    'num0': DIK_NUMPAD0, 'num1': DIK_NUMPAD1, 'num2': DIK_NUMPAD2,
+    'num3': DIK_NUMPAD3, 'num4': DIK_NUMPAD4, 'num5': DIK_NUMPAD5,
+    'num6': DIK_NUMPAD6, 'num7': DIK_NUMPAD7, 'num8': DIK_NUMPAD8,
+    'num9': DIK_NUMPAD9,
+    '+': DIK_ADD, 'add': DIK_ADD,
+    'subtract': DIK_SUBTRACT,  # '-' is already mapped to DIK_MINUS (standard), but Numpad - is DIK_SUBTRACT
+    'decimal': DIK_DECIMAL, 'num .': DIK_DECIMAL, 'num.': DIK_DECIMAL,
+    'divide': DIK_SLASH, 'num /': DIK_SLASH, 'num/': DIK_SLASH, # Numpad / often shares DIK_SLASH or has its own? DIK_DIVIDE = 0xB5 (extended)
+    'multiply': DIK_MULTIPLY, 'num *': DIK_MULTIPLY, 'num*': DIK_MULTIPLY
 }
 
 EXTENDED_KEYS = [

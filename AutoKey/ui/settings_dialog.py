@@ -61,13 +61,27 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(self.hotkey_tab)
         form_layout = QFormLayout()
         
-        # Custom QKeySequenceEdit that allows Backspace to clear
+        # Custom QKeySequenceEdit that allows Backspace to clear and handles Numpad
         class ClearableKeySequenceEdit(QKeySequenceEdit):
             def keyPressEvent(self, event):
                 from PyQt6.QtCore import Qt
+                from PyQt6.QtGui import QKeySequence
+                
                 if event.key() == Qt.Key.Key_Backspace:
                     # Clear the sequence
                     self.clear()
+                    event.accept()
+                elif event.modifiers() & Qt.KeyboardModifier.KeypadModifier:
+                    # Explicitly handle Numpad keys to ensure "Num+X" format
+                    # QKeySequenceEdit sometimes drops the KeypadModifier for digits
+                    key = event.key()
+                    modifiers = event.modifiers()
+                    
+                    # Create sequence with KeypadModifier explicitly
+                    # We combine the key code with the KeypadModifier
+                    # Fix: Use .value for bitwise OR with int key
+                    seq = QKeySequence(key | Qt.KeyboardModifier.KeypadModifier.value)
+                    self.setKeySequence(seq)
                     event.accept()
                 else:
                     super().keyPressEvent(event)

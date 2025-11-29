@@ -1499,7 +1499,7 @@ body {
 
 /* User messages on the right */
 .message-row.user {
-    justify-content: flex-end;
+    justify-content: center;
 }
 
 .message-row.user .message-container {
@@ -1515,6 +1515,8 @@ body {
     border-radius: 15px;
     border-top-right-radius: 2px;
     color: #e4e6eb;
+    flex-grow: 0;
+    /* Don't expand to full width */
 }
 
 .message-row:hover {
@@ -1540,7 +1542,8 @@ body {
 }
 
 .user-avatar-img {
-    background-color: #555;
+    background: linear-gradient(135deg, #10a37f 0%, #0d8a6a 100%);
+    /* ChatGPT Green */
     color: white;
 }
 
@@ -1842,4 +1845,152 @@ body {
         align-items: flex-start;
         /* Align avatar to top of message */
     }
+}
+
+/* === Mini Chat Bubble === */
+.mini-chat-bubble {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    border-radius: 50%;
+    display: none;
+    /* Hidden by default */
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    z-index: 9990;
+    /* Lower than modal (1055 default) but high enough */
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Ensure Modal is on top */
+.modal {
+    z-index: 10000 !important;
+}
+
+.modal-backdrop {
+    z-index: 9995 !important;
+}
+
+/* Ensure Dropdowns are visible */
+.dropdown-menu {
+    z-index: 10000 !important;
+}
+
+.mini-chat-bubble:hover {
+    transform: scale(1.1);
+}
+
+@keyframes popIn {
+    from {
+        transform: scale(0);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* === Mini Chat Window === */
+.mini-chat-window {
+    position: fixed;
+    bottom: 90px;
+    right: 20px;
+    width: 350px;
+    height: 500px;
+    background-color: #212121;
+    border: 1px solid #444;
+    border-radius: 15px;
+    display: none;
+    /* Hidden by default */
+    flex-direction: column;
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    overflow: hidden;
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.mini-chat-header {
+    padding: 10px 15px;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    color: white;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.mini-chat-body {
+    flex-grow: 1;
+    padding: 15px;
+    overflow-y: auto;
+    background-color: #1a1a1a;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.mini-chat-footer {
+    padding: 10px;
+    border-top: 1px solid #333;
+    background-color: #212121;
+}
+
+.mini-chat-footer input {
+    background-color: #333;
+    border: 1px solid #444;
+    color: white;
+}
+
+.mini-chat-footer input:focus {
+    background-color: #444;
+    border-color: #6366f1;
+    color: white;
+    box-shadow: none;
+}
+
+/* Mini Chat Messages */
+.mini-message {
+    max-width: 85%;
+    padding: 8px 12px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    word-wrap: break-word;
+}
+
+.mini-message.user {
+    align-self: flex-end;
+    background-color: #3a3b3c;
+    color: #e4e6eb;
+    border-bottom-right-radius: 2px;
+}
+
+.mini-message.ai {
+    align-self: flex-start;
+    background-color: #2f2f2f;
+    color: #e4e6eb;
+    border-bottom-left-radius: 2px;
+    border: 1px solid #444;
 }

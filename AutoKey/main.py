@@ -22,13 +22,38 @@ def is_admin():
     except:
         return False
 
+def exception_hook(exctype, value, traceback):
+    import traceback as tb
+    error_msg = "".join(tb.format_exception(exctype, value, traceback))
+    print(error_msg)
+    with open("error.log", "a") as f:
+        f.write(error_msg + "\n")
+    sys.excepthook = sys.__excepthook__
+    sys.excepthook(exctype, value, traceback)
+
+sys.excepthook = exception_hook
+
+def qt_message_handler(mode, context, message):
+    if "QFont::setPointSize" in message:
+        return
+    # Forward other messages to default handler (or just print them)
+    # Since we can't easily call the default handler from Python, we'll just print non-suppressed warnings
+    # to stderr if they are warnings/critical
+    if mode in (1, 2, 3): # Warning, Critical, Fatal
+        print(f"Qt Msg: {message}")
+
 def main():
     # Request Admin Privileges
     if not is_admin():
-        print("⚠️ Not running as Admin. Restarting with Admin privileges...")
-        # Re-run the program with admin rights
-        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
-        sys.exit()
+        print("⚠️ WARNING: Not running as Admin.")
+        print("   Hotkeys and Recording might not work correctly.")
+        print("   Please run your terminal/IDE as Administrator if you encounter issues.")
+        # ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+        # sys.exit()
+
+    # Install Message Handler
+    from PyQt6.QtCore import qInstallMessageHandler
+    qInstallMessageHandler(qt_message_handler)
 
     app = QApplication(sys.argv)
     app.setApplicationName("Macro Recorder")
