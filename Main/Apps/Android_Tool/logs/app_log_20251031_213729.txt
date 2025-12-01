@@ -1,0 +1,23 @@
+21:37:29 | INFO | ============================================================
+21:37:29 | INFO | 🚀 TOOL HUB STARTED
+21:37:29 | INFO | ============================================================
+21:37:29 | WARNING | Telethon not installed. Telegram features will be disabled.
+21:37:29 | INFO | 📐 Sử dụng kích thước mặc định: 1200x700
+21:37:29 | INFO | ✅ Notes module loaded successfully
+21:37:29 | INFO | 💾 Config loaded from: C:\Users\Mon\Desktop\ModAndroid\Tool Android\modules\ModAndroid\config\config.json
+21:37:29 | INFO | 📋 All function logs connected to shared output panel
+21:37:29 | INFO | 📱 Shared log output connected to ModAndroid
+21:37:29 | INFO | ✅ ModAndroid module loaded successfully
+21:37:29 | INFO | 📂 Đã load cache cho 8 sessions
+21:37:29 | INFO | 📂 Đã load 2 nhóm session
+21:37:29 | INFO | 📂 Restore nhóm đã chọn: Tất cả sessions
+21:37:29 | INFO | 📊 Hiển thị tất cả 194 sessions từ 2 nhóm
+21:37:29 | INFO | 📱 Đã load 2 nhóm session
+21:37:29 | INFO | ✅ Telegram module loaded successfully
+21:37:30 | INFO | ============================================================
+21:37:30 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+21:37:30 | INFO | ============================================================
+21:37:30 | INFO | ✅ Loaded modules (2):
+21:37:30 | INFO |    - 📱 Mod Android
+21:37:30 | INFO |    - 💬 Telegram
+21:37:30 | INFO | ============================================================

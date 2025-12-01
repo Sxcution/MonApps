@@ -1,0 +1,24 @@
+19:54:49 | INFO | ============================================================
+19:54:49 | INFO | 🚀 TOOL HUB STARTED
+19:54:49 | INFO | ============================================================
+19:54:49 | INFO | 📐 Đã load kích thước cửa sổ: 1000x671
+19:54:49 | INFO | ✅ Notes module loaded successfully
+19:54:49 | INFO | 💾 Config loaded from: C:\Users\Mon\Desktop\ModAndroid\Tool Android\modules\ModAndroid\config\config.json
+19:54:49 | INFO | 📋 All function logs connected to shared output panel
+19:54:49 | INFO | 📱 Shared log output connected to ModAndroid
+19:54:49 | INFO | ✅ ModAndroid module loaded successfully
+19:54:49 | INFO | 📂 Đã load cache cho 8 sessions
+19:54:49 | INFO | 📂 Đã load 2 nhóm session
+19:54:49 | INFO | 📂 Restore nhóm đã chọn: Tất cả sessions
+19:54:49 | INFO | 📊 Hiển thị tất cả 194 sessions từ 2 nhóm
+19:54:50 | INFO | 📱 Đã load 2 nhóm session
+19:54:50 | INFO | ✅ Telegram module loaded successfully
+19:54:50 | INFO | ============================================================
+19:54:50 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+19:54:50 | INFO | ============================================================
+19:54:50 | INFO | ✅ Loaded modules (2):
+19:54:50 | INFO |    - 📱 Mod Android
+19:54:50 | INFO |    - 💬 Telegram
+19:54:50 | INFO | ============================================================
+19:54:53 | INFO | 💾 Đã lưu kích thước cửa sổ: 1000x671
+19:54:53 | INFO | 👋 Đóng tool - Đã lưu cài đặt

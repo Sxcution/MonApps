@@ -1,0 +1,40 @@
+import sys
+from PySide6.QtCore import QObject, Signal
+
+class LogManager(QObject):
+    log_signal = Signal(str)
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(LogManager, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self):
+        if self._initialized:
+            return
+        super().__init__()
+        self._initialized = True
+        self.original_stdout = sys.stdout
+        self.original_stderr = sys.stderr
+        sys.stdout = self
+        sys.stderr = self
+
+    def write(self, text):
+        self.original_stdout.write(text)
+        if "Unknown property box-shadow" not in text and "QFont::setPointSize" not in text:
+            self.log_signal.emit(text)
+
+    def flush(self):
+        self.original_stdout.flush()
+
+    @property
+    def buffer(self):
+        return self.original_stdout.buffer
+
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance

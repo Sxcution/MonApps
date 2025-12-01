@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "c:\Users\Mon\Desktop\Mon\Main\Apps\AutoKey\main.py", line 79, in <module>
+    main()
+  File "c:\Users\Mon\Desktop\Mon\Main\Apps\AutoKey\main.py", line 73, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "c:\Users\Mon\Desktop\Mon\Main\Apps\AutoKey\ui\main_window.py", line 69, in __init__
+    self.setup_ui()
+  File "c:\Users\Mon\Desktop\Mon\Main\Apps\AutoKey\ui\main_window.py", line 106, in setup_ui
+    self.steps_interface = StepsInterface(self)
+                           ^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\Mon\Desktop\Mon\Main\Apps\AutoKey\ui\steps_interface.py", line 384, in __init__
+    from PySide6.QtGui import QPainter, QPoint, QPolygon
+ImportError: cannot import name 'QPoint' from 'PySide6.QtGui' (C:\Users\Mon\AppData\Local\Programs\Python\Python311\Lib\site-packages\PySide6\QtGui.pyd)
+

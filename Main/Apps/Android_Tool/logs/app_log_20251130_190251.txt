@@ -1,0 +1,20 @@
+19:02:51 | INFO | ============================================================
+19:02:51 | INFO | 🚀 TOOL HUB STARTED
+19:02:51 | INFO | ============================================================
+19:02:51 | WARNING | Warning: Không load được ModAndroid module: f-string expression part cannot include a backslash (ModAndroid.pyw, line 313)
+19:02:52 | INFO | ✅ Notes module loaded successfully
+19:02:52 | INFO | 📂 Đã load cache cho 9 sessions
+19:02:52 | INFO | 📂 Đã load 2 nhóm session
+19:02:52 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+19:02:52 | INFO | 📂 Restore nhóm đã chọn: M1
+19:02:52 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+19:02:52 | INFO | 📱 Đã load 2 nhóm session
+19:02:52 | INFO | ✅ Telegram module loaded successfully
+19:02:52 | INFO | ============================================================
+19:02:52 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+19:02:52 | INFO | ============================================================
+19:02:52 | INFO | ✅ Loaded modules (1):
+19:02:52 | INFO |    - 💬 Telegram
+19:02:52 | INFO | ⚠️ Failed to load (1):
+19:02:52 | INFO |    - 📱 Mod Android
+19:02:52 | INFO | ============================================================

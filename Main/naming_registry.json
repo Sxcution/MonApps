@@ -1,0 +1,42 @@
+{
+    "ui_elements": {
+        "home_interface": "homeInterface",
+        "settings_interface": "settingsInterface",
+        "notes_interface": "notesInterface",
+        "embedded_notes": "embeddedNotes",
+        "btn_notes": "btn_notes",
+        "tools_interface": "toolsInterface",
+        "apps_interface": "appsInterface",
+        "app_settings_interface": "appSettingsInterface",
+        "log_interface": "logInterface",
+        "widget_samples_interface": "widgetSamplesInterface",
+        "autokey_interface": "autokeyInterface",
+        "android_interface": "androidInterface",
+        "embedded_autokey": "embeddedAutoKey",
+        "embedded_android": "embeddedAndroid",
+        "btn_play": "play_btn",
+        "playback_overlay": "overlay",
+        "pbar_playback": "progress_bar",
+        "lbl_loop_count": "loop_label",
+        "lbl_elapsed_time": "time_label",
+        "btn_pause": "pause_btn",
+        "btn_stop": "stop_btn"
+    },
+    "config_keys": {
+        "dark_mode": "dark_mode",
+        "startup": "startup",
+        "external_autokey": "external_autokey",
+        "external_android": "external_android",
+        "external_notes": "external_notes",
+        "current_theme": "current_theme"
+    },
+    "themes": {
+        "light_stylesheet": "LIGHT_STYLESHEET",
+        "dark_stylesheet": "DARK_STYLESHEET",
+        "main_stylesheet": "MAIN_STYLESHEET"
+    },
+    "GlobalConfig": {
+        "PrimaryColor": "#2986ff",
+        "ThemeColorDescription": "Brand Color. Applies to Primary Buttons, Focus States, and Accents. Standard Buttons remain default."
+    }
+}

@@ -1,0 +1,23 @@
+02:04:14 | INFO | ============================================================
+02:04:14 | INFO | 🚀 TOOL HUB STARTED
+02:04:14 | INFO | ============================================================
+02:04:14 | WARNING | Warning: Không load được ModAndroid module: cannot import name 'QFileSystemModel' from 'PySide6.QtGui' (C:\Users\Mon\AppData\Local\Programs\Python\Python313\Lib\site-packages\PySide6\QtGui.pyd)
+02:04:14 | INFO | 📐 Đã load kích thước cửa sổ: 1294x700
+02:04:14 | INFO | ✅ Notes module loaded successfully
+02:04:14 | INFO | 📂 Đã load cache cho 9 sessions
+02:04:14 | INFO | 📂 Đã load 2 nhóm session
+02:04:14 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+02:04:14 | INFO | 📂 Restore nhóm đã chọn: M1
+02:04:14 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+02:04:14 | INFO | 📱 Đã load 2 nhóm session
+02:04:14 | INFO | ✅ Telegram module loaded successfully
+02:04:14 | INFO | ============================================================
+02:04:14 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+02:04:14 | INFO | ============================================================
+02:04:14 | INFO | ✅ Loaded modules (1):
+02:04:14 | INFO |    - 💬 Telegram
+02:04:14 | INFO | ⚠️ Failed to load (1):
+02:04:14 | INFO |    - 📱 Mod Android
+02:04:14 | INFO | ============================================================
+02:04:16 | INFO | 💾 Đã lưu kích thước cửa sổ: 1294x700
+02:04:16 | INFO | 👋 Đóng tool - Đã lưu cài đặt

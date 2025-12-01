@@ -1,0 +1,79 @@
+14:39:16 | INFO | ============================================================
+14:39:16 | INFO | 🚀 TOOL HUB STARTED
+14:39:16 | INFO | ============================================================
+14:39:16 | INFO | 📐 Đã load kích thước cửa sổ: 1294x700
+14:39:17 | INFO | ✅ Notes module loaded successfully
+14:39:17 | INFO | 💾 Config loaded from: C:\Users\Mon\Desktop\ModAndroid\Tool Android\modules\ModAndroid\config\config.json
+14:39:17 | INFO | 📋 All function logs connected to shared output panel
+14:39:17 | INFO | 📱 Shared log output connected to ModAndroid
+14:39:17 | INFO | ✅ ModAndroid module loaded successfully
+14:39:17 | INFO | 📂 Đã load cache cho 9 sessions
+14:39:17 | INFO | 📂 Đã load 2 nhóm session
+14:39:17 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+14:39:17 | INFO | 📂 Restore nhóm đã chọn: M1
+14:39:17 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+14:39:17 | INFO | 📱 Đã load 2 nhóm session
+14:39:17 | INFO | ✅ Telegram module loaded successfully
+14:39:17 | INFO | ============================================================
+14:39:17 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+14:39:17 | INFO | ============================================================
+14:39:17 | INFO | ✅ Loaded modules (2):
+14:39:17 | INFO |    - 📱 Mod Android
+14:39:17 | INFO |    - 💬 Telegram
+14:39:17 | INFO | ============================================================
+14:40:38 | INFO | 👤 Đã chọn Admin session: 84928551330.session
+14:40:50 | INFO | ▶️ Bắt đầu chạy Seeding...
+14:40:50 | INFO | ==============================
+14:40:50 | INFO | 🌱 BẮT ĐẦU SEEDING
+14:40:50 | INFO | 📊 Số sessions đã chọn: 102
+14:40:50 | INFO | 🔗 Số nhóm cần seeding: 1
+14:40:50 | INFO | 📝 Số kịch bản: 73
+14:40:50 | INFO | ⏱️ Delay: 600.0s | Admin Delay: 5.0s
+14:40:50 | INFO | ==============================
+14:41:04 | INFO | 👤 Đã chọn Admin session: 84928551330.session
+14:41:07 | INFO | ⏹️ Đang dừng tác vụ...
+14:41:07 | WARNING | ⏹️ Tác vụ đã bị dừng bởi người dùng
+14:41:08 | INFO | ▶️ Bắt đầu chạy Seeding...
+14:41:08 | INFO | ==============================
+14:41:08 | INFO | 🌱 BẮT ĐẦU SEEDING
+14:41:08 | INFO | 📊 Số sessions đã chọn: 102
+14:41:08 | INFO | 🔗 Số nhóm cần seeding: 1
+14:41:08 | INFO | 📝 Số kịch bản: 73
+14:41:08 | INFO | ⏱️ Delay: 600.0s | Admin Delay: 5.0s
+14:41:08 | INFO | ==============================
+14:41:10 | INFO | ⏹️ Đang dừng tác vụ...
+14:41:10 | WARNING | ⏹️ Tác vụ đã bị dừng bởi người dùng
+14:41:14 | INFO | 👤 Đã chọn Admin session: 84928551330_admin_copy.session
+14:41:16 | INFO | ▶️ Bắt đầu chạy Seeding...
+14:41:16 | INFO | ==============================
+14:41:16 | INFO | 🌱 BẮT ĐẦU SEEDING
+14:41:16 | INFO | 📊 Số sessions đã chọn: 102
+14:41:16 | INFO | 🔗 Số nhóm cần seeding: 1
+14:41:16 | INFO | 📝 Số kịch bản: 73
+14:41:16 | INFO | ⏱️ Delay: 600.0s | Admin Delay: 5.0s
+14:41:16 | INFO | ==============================
+14:41:17 | INFO | ⏹️ Đang dừng tác vụ...
+14:41:17 | WARNING | ⏹️ Tác vụ đã bị dừng bởi người dùng
+14:41:22 | INFO | ℹ️ Tab Manager chỉ để xem thông tin session, không có tác vụ để chạy
+14:41:24 | INFO | ℹ️ Tab Manager chỉ để xem thông tin session, không có tác vụ để chạy
+14:41:27 | INFO | ▶️ Bắt đầu chạy Seeding...
+14:41:27 | INFO | ==============================
+14:41:27 | INFO | 🌱 BẮT ĐẦU SEEDING
+14:41:27 | INFO | 📊 Số sessions đã chọn: 102
+14:41:27 | INFO | 🔗 Số nhóm cần seeding: 1
+14:41:27 | INFO | 📝 Số kịch bản: 73
+14:41:27 | INFO | ⏱️ Delay: 600.0s | Admin Delay: 5.0s
+14:41:27 | INFO | ==============================
+14:41:31 | INFO | 👤 Đã chọn Admin session: 84928551330.session
+14:41:39 | INFO | ⏹️ Đang dừng tác vụ...
+14:41:39 | WARNING | ⏹️ Tác vụ đã bị dừng bởi người dùng
+14:41:41 | INFO | ▶️ Bắt đầu chạy Seeding...
+14:41:41 | INFO | ==============================
+14:41:41 | INFO | 🌱 BẮT ĐẦU SEEDING
+14:41:41 | INFO | 📊 Số sessions đã chọn: 102
+14:41:41 | INFO | 🔗 Số nhóm cần seeding: 1
+14:41:41 | INFO | 📝 Số kịch bản: 73
+14:41:41 | INFO | ⏱️ Delay: 600.0s | Admin Delay: 5.0s
+14:41:41 | INFO | ==============================
+14:41:42 | INFO | ⏹️ Đang dừng tác vụ...
+14:41:42 | WARNING | ⏹️ Tác vụ đã bị dừng bởi người dùng

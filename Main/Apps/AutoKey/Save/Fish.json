@@ -1,0 +1,191 @@
+[
+    {
+        "type": "mouse_hold",
+        "text": "Click to setup",
+        "time": 0.5,
+        "id": "053f69cf-4f31-4f6d-9ea2-c39a6e79de3c",
+        "note": "",
+        "x": 0,
+        "y": 0,
+        "ignore_coordinates": false,
+        "randomize_pixels": 0,
+        "coordinate_mode": "absolute",
+        "button": "Button.left",
+        "duration": 1500,
+        "pressed": true
+    },
+    {
+        "type": "detect_image",
+        "text": "Click to setup",
+        "time": 0.5,
+        "id": "363d8585-e8fe-4bb8-be78-e6483ad2fcac",
+        "note": "",
+        "image_path": "C:\\Users\\Mon\\Desktop\\Mon\\Main\\Apps\\AutoKey\\captures\\snip_1764555475.png",
+        "restrict_area": true,
+        "search_area": "custom region",
+        "custom_region": {
+            "left": 1205,
+            "top": 1040,
+            "width": 175,
+            "height": 141
+        },
+        "tolerance": 200,
+        "grayscale": true,
+        "multi_scale": true,
+        "mouse_action_enabled": false,
+        "mouse_action": "Move",
+        "mouse_position": "Centered",
+        "save_x": false,
+        "save_y": false,
+        "wait_timeout": 65535,
+        "goto_found": "Next",
+        "goto_not_found": "Start"
+    },
+    {
+        "type": "mouse_hold",
+        "text": "Click to setup",
+        "time": 0.5,
+        "id": "8571c9b4-1aca-4280-963a-d37cd6f68fcc",
+        "note": "",
+        "x": 0,
+        "y": 0,
+        "ignore_coordinates": false,
+        "randomize_pixels": 0,
+        "coordinate_mode": "absolute",
+        "button": "Button.left",
+        "duration": 3000,
+        "pressed": true
+    },
+    {
+        "type": "text_search",
+        "text": "Click to setup",
+        "time": 0.1,
+        "id": "b31350ac-b143-46d2-8ad4-3b7e938f4cdc",
+        "note": "",
+        "query": "D pull right",
+        "languages": [
+            "en",
+            "vi"
+        ],
+        "ocr_engine": "windows",
+        "match": "fuzzy",
+        "min_score": 70,
+        "timeout": 1.0,
+        "interval": 0.15,
+        "preproc": false,
+        "region_mode": "custom",
+        "region_rect": {
+            "left": 1375,
+            "top": 1125,
+            "width": 170,
+            "height": 71
+        },
+        "action": "none",
+        "goto_found": "Next",
+        "goto_not_found": "Step 6"
+    },
+    {
+        "type": "key_press",
+        "text": "Click to setup",
+        "time": 0.5,
+        "id": "c4636fca-4bef-4b65-bf39-ef1e53635a33",
+        "note": "",
+        "key": "D",
+        "hold_duration": 1200
+    },
+    {
+        "type": "text_search",
+        "text": "Click to setup",
+        "time": 0.1,
+        "id": "96651de1-6556-4c81-ab5a-3acff2daf9f6",
+        "note": "",
+        "query": "A Pull Left",
+        "languages": [
+            "en",
+            "vi"
+        ],
+        "ocr_engine": "windows",
+        "match": "fuzzy",
+        "min_score": 80,
+        "timeout": 1.0,
+        "interval": 0.15,
+        "preproc": false,
+        "region_mode": "custom",
+        "region_rect": {
+            "left": 1048,
+            "top": 1134,
+            "width": 153,
+            "height": 54
+        },
+        "action": "none",
+        "goto_found": "Next",
+        "goto_not_found": "Step 8"
+    },
+    {
+        "type": "key_press",
+        "text": "Click to setup",
+        "time": 0.5,
+        "id": "603377b2-d5f6-454a-9da1-7c24608fbbe3",
+        "note": "",
+        "key": "A",
+        "hold_duration": 1200
+    },
+    {
+        "type": "mouse_hold",
+        "text": "Click to setup",
+        "time": 0.5,
+        "id": "be93bf7b-9b0e-41c6-9df6-8d1c01e7e2f6",
+        "note": "",
+        "x": 0,
+        "y": 0,
+        "ignore_coordinates": false,
+        "randomize_pixels": 0,
+        "coordinate_mode": "absolute",
+        "button": "Button.left",
+        "duration": 1000,
+        "pressed": true
+    },
+    {
+        "type": "text_search",
+        "text": "Click to setup",
+        "time": 0.5,
+        "id": "1d1d0719-1d51-434e-9296-20f6b1bb0be0",
+        "note": "",
+        "query": "F Collect",
+        "languages": [
+            "en",
+            "vi"
+        ],
+        "ocr_engine": "windows",
+        "match": "fuzzy",
+        "min_score": 40,
+        "timeout": 3.0,
+        "interval": 0.15,
+        "preproc": false,
+        "region_mode": "custom",
+        "region_rect": {
+            "left": 1501,
+            "top": 711,
+            "width": 153,
+            "height": 68
+        },
+        "action": "none",
+        "goto_found": "Next",
+        "goto_not_found": "Step 4"
+    },
+    {
+        "type": "undefined",
+        "text": "Click to setup",
+        "time": 5.0,
+        "id": "abfb5d5c-1867-4b6d-88cf-4b6a1f793467",
+        "note": ""
+    },
+    {
+        "type": "key_click",
+        "text": "Click to setup",
+        "time": 0.5,
+        "id": "8ea2df97-335a-48da-91c4-1e464059077b",
+        "note": "",
+        "key": "F"
+    }
+]

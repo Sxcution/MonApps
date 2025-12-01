@@ -1,0 +1,63 @@
+{
+    "UI_TOOLBAR": {
+        "action_new": "New Macro (Ctrl+N)",
+        "action_open": "Open Macro (Ctrl+O)",
+        "action_save": "Save Macro (Ctrl+S)",
+        "action_save_as": "Save Macro As (Ctrl+Shift+S)",
+        "action_exit": "Exit Application (Alt+F4)",
+        "action_add": "Add New Step",
+        "action_play": "Play/Stop Macro",
+        "action_record": "Start/Stop Recording",
+        "action_settings": "Open Settings",
+        "btn_file": "File Menu Button",
+        "btn_settings": "Settings Button",
+        "btn_play_dropdown": "Play Settings Dropdown Button"
+    },
+    "UI_MAIN_WINDOW": {
+        "tbl_macro_list": "Main Macro Table View",
+        "col_step": "Step Number Column",
+        "col_action": "Action Description Column",
+        "col_delay": "Delay (ms) Column",
+        "col_details": "Action Details Column",
+        "col_note": "User Note Column"
+    },
+    "UI_SETTINGS": {
+        "btn_save": "Save Settings Button",
+        "btn_cancel": "Cancel Settings Button",
+        "input_record_hotkey": "Start Recording Hotkey Input",
+        "input_stop_record_hotkey": "Stop Recording Hotkey Input",
+        "input_play_hotkey": "Play/Stop Hotkey Input",
+        "spin_play_count": "Run Count SpinBox",
+        "spin_play_hours": "Duration Hours SpinBox",
+        "spin_play_minutes": "Duration Minutes SpinBox",
+        "spin_playback_speed": "Playback Speed SpinBox",
+        "combo_after_action": "After Playback Action ComboBox",
+        "combo_overlay_position": "Overlay Position ComboBox",
+        "combo_mouse_mode": "Mouse Mode ComboBox",
+        "spin_mouse_tick_hz": "Mouse Tick Rate SpinBox",
+        "spin_mouse_gain": "Mouse Gain SpinBox"
+    },
+    "UI_MOUSE_DIALOG": {
+        "combo_event_type": "Mouse Event Type ComboBox",
+        "spin_mouse_hold_duration": "Mouse Hold Duration Input (ms)"
+    },
+    "UI_KEYBOARD_DIALOG": {
+        "input_key": "Key Sequence Input",
+        "combo_key_type": "Key Event Type ComboBox (KeyPress/KeyDown/KeyUp)",
+        "spin_key_hold_duration": "Key Hold Duration Input (ms, for KeyDown)"
+    },
+    "CONFIG_KEYS": {
+        "key_hotkey_record": "hotkey_record",
+        "key_hotkey_stop_record": "hotkey_stop_record",
+        "key_hotkey_play": "hotkey_play",
+        "key_play_count": "play_count",
+        "key_play_hours": "play_hours",
+        "key_play_minutes": "play_minutes",
+        "key_playback_speed": "playback_speed",
+        "key_play_after_action": "play_after_action",
+        "key_overlay_position": "overlay_position",
+        "key_mouse_mode": "mouse_mode",
+        "key_mouse_tick_hz": "mouse_tick_hz",
+        "key_mouse_gain": "mouse_gain"
+    }
+}

@@ -1,0 +1,23 @@
+18:54:43 | INFO | ============================================================
+18:54:43 | INFO | 🚀 TOOL HUB STARTED
+18:54:43 | INFO | ============================================================
+18:54:43 | WARNING | Warning: Không load được ModAndroid module: f-string expression part cannot include a backslash (ModAndroid.pyw, line 313)
+18:54:43 | INFO | 📐 Đã load kích thước cửa sổ: 1294x700
+18:54:43 | INFO | ✅ Notes module loaded successfully
+18:54:43 | INFO | 📂 Đã load cache cho 9 sessions
+18:54:43 | INFO | 📂 Đã load 2 nhóm session
+18:54:43 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+18:54:43 | INFO | 📂 Restore nhóm đã chọn: M1
+18:54:43 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+18:54:43 | INFO | 📱 Đã load 2 nhóm session
+18:54:43 | INFO | ✅ Telegram module loaded successfully
+18:54:43 | INFO | ============================================================
+18:54:43 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+18:54:43 | INFO | ============================================================
+18:54:43 | INFO | ✅ Loaded modules (1):
+18:54:43 | INFO |    - 💬 Telegram
+18:54:43 | INFO | ⚠️ Failed to load (1):
+18:54:43 | INFO |    - 📱 Mod Android
+18:54:43 | INFO | ============================================================
+18:54:54 | INFO | 💾 Đã lưu kích thước cửa sổ: 1294x700
+18:54:54 | INFO | 👋 Đóng tool - Đã lưu cài đặt

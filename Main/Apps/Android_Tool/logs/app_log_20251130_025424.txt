@@ -1,0 +1,20 @@
+02:54:24 | INFO | ============================================================
+02:54:24 | INFO | 🚀 TOOL HUB STARTED
+02:54:24 | INFO | ============================================================
+02:54:24 | WARNING | Warning: Không load được ModAndroid module: cannot import name 'QFileSystemModel' from 'PySide6.QtGui' (C:\Users\Mon\AppData\Local\Programs\Python\Python313\Lib\site-packages\PySide6\QtGui.pyd)
+02:54:24 | INFO | ✅ Notes module loaded successfully
+02:54:24 | INFO | 📂 Đã load cache cho 9 sessions
+02:54:25 | INFO | 📂 Đã load 2 nhóm session
+02:54:25 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+02:54:25 | INFO | 📂 Restore nhóm đã chọn: M1
+02:54:25 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+02:54:25 | INFO | 📱 Đã load 2 nhóm session
+02:54:25 | INFO | ✅ Telegram module loaded successfully
+02:54:25 | INFO | ============================================================
+02:54:25 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+02:54:25 | INFO | ============================================================
+02:54:25 | INFO | ✅ Loaded modules (1):
+02:54:25 | INFO |    - 💬 Telegram
+02:54:25 | INFO | ⚠️ Failed to load (1):
+02:54:25 | INFO |    - 📱 Mod Android
+02:54:25 | INFO | ============================================================
