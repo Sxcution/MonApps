@@ -1,0 +1,21 @@
+04:38:27 | INFO | ============================================================
+04:38:27 | INFO | 🚀 TOOL HUB STARTED
+04:38:27 | INFO | ============================================================
+04:38:27 | INFO | 💾 Config loaded from: c:\Users\Mon\Desktop\Mon\Main\Apps\Android_Tool\modules\ModAndroid\config\config.json
+04:38:27 | INFO | 📋 All function logs connected to shared output panel
+04:38:27 | INFO | 📱 Shared log output connected to ModAndroid
+04:38:27 | INFO | ✅ ModAndroid module loaded successfully
+04:38:27 | INFO | 📂 Đã load cache cho 9 sessions
+04:38:27 | INFO | 📂 Đã load 2 nhóm session
+04:38:27 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+04:38:27 | INFO | 📂 Restore nhóm đã chọn: M1
+04:38:27 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+04:38:27 | INFO | 📱 Đã load 2 nhóm session
+04:38:27 | INFO | ✅ Telegram module loaded successfully
+04:38:27 | INFO | ============================================================
+04:38:27 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+04:38:27 | INFO | ============================================================
+04:38:27 | INFO | ✅ Loaded modules (2):
+04:38:27 | INFO |    - 📱 Mod Android
+04:38:27 | INFO |    - 💬 Telegram
+04:38:27 | INFO | ============================================================
