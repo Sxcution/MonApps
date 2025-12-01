@@ -1026,6 +1026,14 @@ class MainWindow(QMainWindow):
             # Refresh saved macros list
             if hasattr(self, 'steps_interface'):
                 self.steps_interface.refresh_saved_macros()
+            
+            # Run cleanup to remove unused images
+            try:
+                from utils.cleanup import cleanup_images
+                autokey_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                cleanup_images(autokey_root)
+            except Exception as e:
+                print(f"⚠️ Cleanup failed: {e}")
 
     def load_recording(self):
         filename, _ = QFileDialog.getOpenFileName(self, "Open Macro", "", "JSON Files (*.json)")

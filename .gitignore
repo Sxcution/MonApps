@@ -7,6 +7,9 @@ yarn-error.log*
 # Build outputs
 dist/
 build/
+bin/
+obj/
+out/
 
 # Environment variables
 .env
@@ -16,8 +19,9 @@ build/
 .env.production.local
 
 # IDE files
-.vscode/settings.json
+.vscode/
 .idea/
+.cursor/
 
 # OS generated files
 .DS_Store
@@ -37,11 +41,45 @@ __pycache__/
 env/
 venv/
 ENV/
+.venv/
+*.spec
 
-# Ignore repository-local data directory
+# Logs and Databases
+*.log
+*.sqlite
+*.db
+
+# Large Media & Archives
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.ico
+*.mp4
+*.mov
+*.avi
+*.zip
+*.tar
+*.gz
+*.rar
+*.7z
+*.exe
+*.dll
+*.msi
+*.apk
+*.img
+*.iso
+*.bin
+
+# Project Specific Large Folders
 data/
-
-# Android Tool data
+captured_images/
+Rebuilt/
+Main/Apps/Android_Tool/modules/ModAndroid/bin/
 Main/Apps/Android_Tool/modules/ModAndroid/data/
-Android_Tool/logs/
+Main/Apps/Android_Tool/bootlog.txt
 Main/Apps/AutoKey/Autokey/
+
+# Temporary files
+Project_Context.txt
+Mon_Lite/

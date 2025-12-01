@@ -44,6 +44,31 @@ DebugLog(message) {
     OutputDebug, 🔍 %message%
 }
 
+; =====================================================================
+; LAUNCHER HOTKEYS
+; =====================================================================
+
+PgUp::
+    RunAsUser("C:\Users\Mon\AppData\Local\Programs\Python\Python311\pythonw.exe", "c:\Users\Mon\Desktop\Mon\Main\Main.pyw", "c:\Users\Mon\Desktop\Mon\Main")
+return
+
+RunAsUser(Target, Args := "", WorkingDir := "") {
+    ; Get the ShellWindows collection
+    shellWindows := ComObjCreate("Shell.Application").Windows
+    
+    ; Find the desktop window (SWC_DESKTOP = 8, SWFO_NEEDDISPATCH = 1)
+    desktop := shellWindows.FindWindowSW(0, 0, 8, 0, 1)
+    
+    ; Check if we successfully got the desktop object
+    if (desktop) {
+        ; Use the desktop's application object to execute the command
+        ; This inherits the user's privileges (Medium Integrity)
+        desktop.Document.Application.ShellExecute(Target, Args, WorkingDir, "open", 1)
+    } else {
+        ; Fallback: If desktop not found, run normally (might be elevated)
+        Run, %Target% %Args%, %WorkingDir%
+    }
+}
 
 ; CÁC PHÍM TẮT & HOTSTRING SẼ BỊ VÔ HIỆU HÓA KHI DÙNG LDPLAYER
 ::xx::
@@ -151,6 +176,9 @@ return
 Sendinput https://github.com/monsxcution/STool_v2
 sleep 100
 return
+
+; Random words generator (Wrapped in hotkey to prevent auto-exec)
+^4::
     ; Danh sách từ (có thể thêm/sửa tùy ý) - Khoảng 60 từ
     words := "hello|hi|you|love|xinh|good|fine|chào|yêu|đẹp|ok|yes|no|thank|cảm ơn|baby|nice|like|bye|xu|rãnh|xênh|đáng|ốn|trăng|trời|sao|gió|mây|ngủ|nghĩ|nằm|ngồi|thức|đi|về|ăn|uống|chơi|học|làm|nói|nghe|nhìn|thấy|biết|hiểu|muốn|cần|thích|ghét|vui|buồn|hạnh phúc|lo lắng|bình yên|tự do|ước mơ|hy vọng"
     
@@ -237,7 +265,6 @@ return
         }
         SendInput, % selectedArray%A_Index%
     }
-    
 return
 
 #IfWinActive
