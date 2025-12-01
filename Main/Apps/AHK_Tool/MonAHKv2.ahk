@@ -44,6 +44,7 @@ DebugLog(message) {
     OutputDebug, 🔍 %message%
 }
 
+
 ; CÁC PHÍM TẮT & HOTSTRING SẼ BỊ VÔ HIỆU HÓA KHI DÙNG LDPLAYER
 ::xx::
     SendQuickText("Pé đến gặp a trực tiếp ok hết rồi a thanh toán cho pé tại phòng phục vụ a nha")
@@ -150,21 +151,6 @@ return
 Sendinput https://github.com/monsxcution/STool_v2
 sleep 100
 return
-
-!g::
-Sendinput Dạ giá e đã bao gồm tất cả rồi không thêm gì a nha, a thấy pé phục vụ a tốt a có thể cho thêm hoặc ko tùy a nha
-sleep 100
-return
-
-; Mở và chạy Main.py khi nhấn Page Up (với console terminal)
-PgUp::
-Run, python.exe "C:\Users\Mon\Desktop\Mon\Main\Main.py"
-return
-
-; =====================================================================
-; Chat Tool - Random Từ Ngữ (Ctrl + 0)
-; =====================================================================
-^5::
     ; Danh sách từ (có thể thêm/sửa tùy ý) - Khoảng 60 từ
     words := "hello|hi|you|love|xinh|good|fine|chào|yêu|đẹp|ok|yes|no|thank|cảm ơn|baby|nice|like|bye|xu|rãnh|xênh|đáng|ốn|trăng|trời|sao|gió|mây|ngủ|nghĩ|nằm|ngồi|thức|đi|về|ăn|uống|chơi|học|làm|nói|nghe|nhìn|thấy|biết|hiểu|muốn|cần|thích|ghét|vui|buồn|hạnh phúc|lo lắng|bình yên|tự do|ước mơ|hy vọng"
     

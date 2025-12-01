@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QPushButton
 from PySide6.QtCore import Qt, QTimer, QPoint, QSettings, QSize
-from PySide6.QtGui import QFont, QIcon
+from PySide6.QtGui import QFont, QIcon, QColor
 from qfluentwidgets import CardWidget, FluentIcon as FIF, Theme, isDarkTheme
 
 class PlaybackOverlay(QWidget):
@@ -72,20 +72,20 @@ class PlaybackOverlay(QWidget):
         self.pause_btn.setCheckable(True)  # Toggle behavior
         self.pause_btn.setIcon(FIF.PAUSE.icon())
         self.pause_btn.setText("")  # No text
-        self.pause_btn.setFixedSize(14, 14)
-        self.pause_btn.setIconSize(QSize(10, 10))
+        self.pause_btn.setFixedSize(24, 24)
+        self.pause_btn.setIconSize(QSize(12, 12))
         self.pause_btn.setToolTip("⏸️")
         self.pause_btn.setStyleSheet("""
             QPushButton {
                 padding: 0px;
                 margin: 0px;
                 border: 1px solid #0078D4;
-                border-radius: 3px;
+                border-radius: 4px;
                 background-color: #0078D4;
-                min-width: 14px;
-                max-width: 14px;
-                min-height: 14px;
-                max-height: 14px;
+                min-width: 24px;
+                max-width: 24px;
+                min-height: 24px;
+                max-height: 24px;
             }
             QPushButton:hover {
                 background-color: #106EBE;
@@ -100,31 +100,32 @@ class PlaybackOverlay(QWidget):
         self.pause_btn.toggled.connect(self._on_pause_toggled)
         row.addWidget(self.pause_btn)
         
-        # btn_stop - minimal size, red background (QPushButton for better control)
+        # btn_stop - Standard style (White bg, Red icon)
         self.stop_btn = QPushButton()
         self.stop_btn.setObjectName("btn_stop")
-        self.stop_btn.setIcon(FIF.CLOSE.icon())
+        self.stop_btn.setIcon(FIF.CLOSE.icon(color=QColor("#D32F2F"))) # Red icon
         self.stop_btn.setText("")  # No text
-        self.stop_btn.setFixedSize(14, 14)
-        self.stop_btn.setIconSize(QSize(10, 10))
-        self.stop_btn.setToolTip("⏹️")
+        self.stop_btn.setFixedSize(24, 24)
+        self.stop_btn.setIconSize(QSize(12, 12))
+        self.stop_btn.setToolTip("⏹️ Stop")
         self.stop_btn.setStyleSheet("""
             QPushButton {
-                background-color: #FF0000;
-                border: 1px solid #CC0000;
-                border-radius: 3px;
+                background-color: transparent;
+                border: 1px solid transparent;
+                border-radius: 4px;
                 padding: 0px;
                 margin: 0px;
-                min-width: 14px;
-                max-width: 14px;
-                min-height: 14px;
-                max-height: 14px;
+                min-width: 24px;
+                max-width: 24px;
+                min-height: 24px;
+                max-height: 24px;
             }
             QPushButton:hover {
-                background-color: #FF3333;
+                background-color: #ffebee; /* Light red hover */
+                border: 1px solid #ef9a9a;
             }
             QPushButton:pressed {
-                background-color: #CC0000;
+                background-color: #ffcdd2;
             }
         """)
         row.addWidget(self.stop_btn)

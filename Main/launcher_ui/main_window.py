@@ -80,6 +80,19 @@ class MainWindow(FluentWindow):
         try:
             # Default expanded width is ~300px, reduce to ~120px (20% less than 150)
             self.navigationInterface.setExpandWidth(120)
+            
+            # Apply stylesheet to remove indentation for child items
+            # This targets the NavigationTreeWidget items
+            self.navigationInterface.setStyleSheet("""
+                NavigationTreeWidget {
+                    border: none;
+                    background-color: transparent;
+                }
+                /* Target child items to remove indentation */
+                NavigationTreeWidget::item {
+                    padding-left: 10px; /* Reset padding to match parent items */
+                }
+            """)
         except:
             pass
         

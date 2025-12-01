@@ -5,7 +5,7 @@ Auto Detect Dialog - for configuring complex conditional detection with images a
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                             QGroupBox, QFileDialog, QWidget, QApplication,
                             QGridLayout, QScrollArea, QAbstractSpinBox)
-from PySide6.QtCore import Qt, QTimer, QRect, Signal, QPointF, QSize
+from PySide6.QtCore import Qt, QTimer, QRect, Signal, QPointF, QSize, QThread
 from PySide6.QtGui import QPixmap, QPainter, QColor, QBrush, QPen, QPalette, QIntValidator
 from qfluentwidgets import (PushButton, PrimaryPushButton, ComboBox, SpinBox, 
                            CheckBox, LineEdit, CardWidget, BodyLabel, 
@@ -14,6 +14,33 @@ from qfluentwidgets import (PushButton, PrimaryPushButton, ComboBox, SpinBox,
 import os
 import time
 from utils.image_finder import find_image_on_screen
+
+
+class ImageSearchThread(QThread):
+    """Worker thread for searching image on screen to prevent UI freeze"""
+    result_ready = Signal(object)
+
+    def __init__(self, image_path, confidence, region, grayscale, multi_scale):
+        super().__init__()
+        self.image_path = image_path
+        self.confidence = confidence
+        self.region = region
+        self.grayscale = grayscale
+        self.multi_scale = multi_scale
+
+    def run(self):
+        try:
+            result = find_image_on_screen(
+                self.image_path,
+                confidence=self.confidence,
+                region=self.region,
+                grayscale=self.grayscale,
+                multi_scale=self.multi_scale
+            )
+            self.result_ready.emit(result)
+        except Exception as e:
+            print(f"Search error: {e}")
+            self.result_ready.emit(None)
 
 
 class ImageDetectItem(QWidget):
@@ -409,13 +436,23 @@ class ImageDetectItem(QWidget):
         elif search_area_text == "vùng tùy chỉnh":
             region = self.custom_region
         
-        result = find_image_on_screen(
+        # Use Thread for searching to prevent UI freeze
+        self.search_thread = ImageSearchThread(
             self.image_path,
-            confidence=confidence,
-            region=region,
-            grayscale=self.cb_grayscale.isChecked(),
-            multi_scale=self.cb_multiscale.isChecked()
+            confidence,
+            region,
+            self.cb_grayscale.isChecked(),
+            self.cb_multiscale.isChecked()
         )
+        self.search_thread.result_ready.connect(self.on_search_result)
+        
+        # Disable button while searching
+        self.btn_test.setEnabled(False)
+        self.search_thread.start()
+        
+    def on_search_result(self, result):
+        """Handle search result from thread"""
+        self.btn_test.setEnabled(True)
         
         if result:
             x, y, w, h = result

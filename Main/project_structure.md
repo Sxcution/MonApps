@@ -15,9 +15,13 @@ This directory contains the central launcher and the sub-projects `AutoKey` and 
             - `ui/`: UI components
                 - `steps_interface.py`: Macro editor interface
                 - `styles.py`: Central stylesheet definitions (Light/Dark)
+        - `Notes/`: Notes application
+            - `notes_module.py`: Main Notes widget and logic
+            - `debug_ime.py`: Debug tool for IME/Vietnamese typing issues
     - `Android_Tool/`: Contains the Android management tool.
         - `Main.py`: Entry point for Android Tool.
-    - `AHK_Tool/`: Contains the AHK helper tool (if exists).
+    - `AHK_Tool/`: Contains the AHK helper tool.
+        - `MonAHKv2.ahk`: Main AHK script (Uses RunAsUser for correct IME support)
 - `core/`: Core functionality
     - `config_manager.py`: Handles loading/saving config.json
     - `log_manager.py`: Singleton for capturing stdout/stderr to log interface

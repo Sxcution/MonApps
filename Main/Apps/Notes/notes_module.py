@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem,
     QHeaderView, QMessageBox, QMenu, QColorDialog, QInputDialog, QStyle, QStyledItemDelegate,
-    QSplitter, QApplication
+    QSplitter, QApplication, QTextEdit
 )
 from PySide6.QtGui import (
     QFont, QColor, QFocusEvent, QAction, QTextCursor, QTextCharFormat, 
@@ -19,7 +19,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtCore import (
     Qt, QTimer, Signal, QUrl, QRect, QPoint,
-    QDateTime, QBuffer, QIODevice, QEvent, QSize, QByteArray
+    QDateTime, QBuffer, QIODevice, QEvent, QSize, QByteArray, QThread
 )
 
 import re
@@ -28,7 +28,7 @@ import json
 
 # Import qfluentwidgets components
 from qfluentwidgets import (
-    PushButton, LineEdit, TextEdit, TableWidget, CardWidget,
+    PushButton, LineEdit, TableWidget, CardWidget,
     FluentIcon as FIF, Theme, setTheme, MessageBoxBase, SubtitleLabel, BodyLabel,
     Flyout, FlyoutAnimationType, FlyoutView, MessageBox, setThemeColor
 )
@@ -39,6 +39,27 @@ data_dir = os.path.join(tool_dir, "data")
 os.makedirs(data_dir, exist_ok=True)
 
 DATABASE_PATH = os.path.join(data_dir, "notes.db")
+
+
+class NotesLoaderThread(QThread):
+    """Thread to load notes from database asynchronously"""
+    notes_loaded = Signal(list)
+    
+    def __init__(self, db_path, search_query="", filter_marked=False):
+        super().__init__()
+        self.db_path = db_path
+        self.search_query = search_query
+        self.filter_marked = filter_marked
+        
+    def run(self):
+        try:
+            # Create local DB instance for thread safety
+            db = NotesDatabase(self.db_path)
+            notes = db.get_all_notes(self.search_query, self.filter_marked)
+            self.notes_loaded.emit(notes)
+        except Exception as e:
+            print(f"Error loading notes in thread: {e}")
+            self.notes_loaded.emit([])
 
 
 class ProfileDialog(MessageBoxBase):
@@ -60,7 +81,10 @@ class ProfileDialog(MessageBoxBase):
         self.pass_input.setClearButtonEnabled(True)
         
         # Content Input
-        self.content_input = TextEdit(self)
+        # Note: Using qfluentwidgets TextEdit here for dialog is fine, or switch to QTextEdit if needed.
+        # Keeping original TextEdit for now as it wasn't reported broken in dialog.
+        from qfluentwidgets import TextEdit as FluentTextEdit
+        self.content_input = FluentTextEdit(self)
         self.content_input.setPlaceholderText("Nhập nội dung chi tiết (Ctrl+V để dán ảnh)...")
         self.content_input.setFixedHeight(100)
         self.content_input.installEventFilter(self)
@@ -152,10 +176,6 @@ class ProfileDialog(MessageBoxBase):
             lbl.setStyleSheet("border: 1px solid #ccc; border-radius: 4px;")
             
             # Delete button (overlay)
-            # Simplified: Click to remove? Or small button.
-            # Let's just make it clickable to remove for now or add a small button.
-            # Adding a button is cleaner.
-            
             btn_del = PushButton(FIF.CLOSE, "", thumb_widget)
             btn_del.setFixedSize(20, 20)
             btn_del.move(40, 0)
@@ -249,6 +269,21 @@ class NoteTitleDelegate(QStyledItemDelegate):
         # Draw time on right (gray, not bold)
         if time_str:
             time_font = QFont(font)
+            time_font.setBold(False)
+            time_font.setPointSize(font.pointSize() - 1)
+            painter.setFont(time_font)
+            painter.setPen(QColor("#666666"))
+            time_rect = QRect(option.rect.right() - 140, option.rect.top(), 
+                             130, option.rect.height())
+            painter.drawText(time_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, time_str)
+            
+        # Draw mark icon if marked
+        if is_marked:
+            icon_rect = QRect(option.rect.right() - 20, option.rect.top() + (option.rect.height() - 16)//2, 16, 16)
+            FIF.HEART.render(painter, icon_rect, QColor("#ff0000"))
+            
+        painter.restore()
+
 class AutoSaveLineEdit(LineEdit):
     """LineEdit with auto-save on focus out."""
     focusOut = Signal()
@@ -355,7 +390,7 @@ class ProfileTooltip(QWidget):
         preview = ProfilePreviewWidget(data)
         self.container_layout.addWidget(preview)
 
-class AutoSaveTextEdit(TextEdit):
+class AutoSaveTextEdit(QTextEdit):
     """TextEdit with auto-save on focus out and custom context menu."""
     focusOut = Signal()
     
@@ -367,7 +402,6 @@ class AutoSaveTextEdit(TextEdit):
         self.setMouseTracking(True)
         self.viewport().setMouseTracking(True) # Important for TextEdit
         self.current_hover_href = None
-        self.current_hover_href = None
         
         # Custom tooltip instance
         self.profile_tooltip = ProfileTooltip()
@@ -378,6 +412,13 @@ class AutoSaveTextEdit(TextEdit):
         self.save_timer.timeout.connect(self.focusOut.emit) # Reuse focusOut signal to trigger save
         
         self.textChanged.connect(self.on_text_changed)
+        
+        # Enable IME for Vietnamese typing
+        self.setAttribute(Qt.WidgetAttribute.WA_InputMethodEnabled, True)
+        
+        # Set standard font
+        font = QFont("Segoe UI", 11)
+        self.setFont(font)
         
     def on_text_changed(self):
         """Restart save timer on text change."""
@@ -1081,6 +1122,7 @@ class NotesWidget(QWidget):
                 color: #000000;
                 border: 1px solid #e0e0e0;
                 border-radius: 4px;
+                padding: 8px;
             }
         """)
         right_layout.addWidget(self.content_input)
@@ -1111,12 +1153,22 @@ class NotesWidget(QWidget):
         layout.addWidget(content_card)
     
     def load_notes(self, log_search=False):
-        """Load notes from database to table."""
+        """Load notes from database to table asynchronously."""
         search_query = self.search_input.text()
         
-        notes = self.db.get_all_notes(search_query, False)
+        # Cancel previous thread if running
+        if hasattr(self, 'loader_thread') and self.loader_thread.isRunning():
+            self.loader_thread.terminate()
+            self.loader_thread.wait()
+            
+        self.loader_thread = NotesLoaderThread(DATABASE_PATH, search_query, False)
+        self.loader_thread.notes_loaded.connect(lambda notes: self.on_notes_loaded(notes, search_query, log_search))
+        self.loader_thread.start()
         
+    def on_notes_loaded(self, notes, search_query, log_search):
+        """Handle loaded notes from thread."""
         self.notes_table.setRowCount(0)
+        self.notes_table.setSortingEnabled(False) # Disable sorting while populating
         
         # Only log when Enter is pressed
         if search_query and log_search:
@@ -1137,10 +1189,6 @@ class NotesWidget(QWidget):
             font.setBold(True)
             title_item.setFont(font)
             
-            # Gold color for marked notes - REMOVED per user request
-            # if note['is_marked'] == 1:
-            #     title_item.setForeground(QColor("#FFD700"))
-            
             # Set UserRole to store marked status for delegate to render icon
             title_item.setData(Qt.ItemDataRole.UserRole, note['is_marked'] == 1)
             
@@ -1148,6 +1196,8 @@ class NotesWidget(QWidget):
             
             # Column 1: ID (hidden)
             self.notes_table.setItem(row, 1, QTableWidgetItem(note['id']))
+            
+        self.notes_table.setSortingEnabled(True) # Re-enable sorting
     
     def toggle_mark(self, note_id):
         """Toggle mark for note."""
@@ -1335,4 +1385,3 @@ class NotesWidget(QWidget):
             else:
                 QMessageBox.warning(self, "Lỗi", "Không thể xóa ghi chú!")
                 self.log("❌ Lỗi: Không thể xóa ghi chú!")
-

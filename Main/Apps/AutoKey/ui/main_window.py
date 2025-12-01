@@ -17,8 +17,7 @@ import time
 import threading
 import uuid
 import os
-
-from ui.steps_interface import StepsInterface
+from PySide6.QtCore import QThread, Signal
 
 from ui.steps_interface import StepsInterface
 from ui.playback_overlay import PlaybackOverlay
@@ -29,6 +28,35 @@ from ui.image_search_dialog import ImageSearchDialog
 
 from core.recorder import Recorder
 from core.player import Player
+
+
+class FileWorker(QThread):
+    """Worker thread for file I/O operations"""
+    finished = Signal(object, str, str) # data, filepath, error_message
+    saved = Signal(str, str) # filepath, error_message
+    
+    def __init__(self, mode, filepath, data=None):
+        super().__init__()
+        self.mode = mode # 'load' or 'save'
+        self.filepath = filepath
+        self.data = data
+        
+    def run(self):
+        import json
+        try:
+            if self.mode == 'load':
+                with open(self.filepath, 'r') as f:
+                    data = json.load(f)
+                self.finished.emit(data, self.filepath, None)
+            elif self.mode == 'save':
+                with open(self.filepath, 'w') as f:
+                    json.dump(self.data, f, indent=4)
+                self.saved.emit(self.filepath, None)
+        except Exception as e:
+            if self.mode == 'load':
+                self.finished.emit(None, self.filepath, str(e))
+            else:
+                self.saved.emit(self.filepath, str(e))
 
 
 class MainWindow(QMainWindow):
@@ -975,95 +1003,94 @@ class MainWindow(QMainWindow):
             
             self.current_filename = filepath
             self._save_to_file(filepath)
+
+    def _save_to_file(self, filename):
+        """Save macro to file using worker thread"""
+        if hasattr(self, 'file_worker') and self.file_worker.isRunning():
+            self.file_worker.terminate()
+            self.file_worker.wait()
+            
+        self.file_worker = FileWorker('save', filename, self.recorded_events)
+        self.file_worker.saved.connect(self.on_file_saved)
+        self.file_worker.start()
+        
+    def on_file_saved(self, filepath, error_msg):
+        """Handle file saved event"""
+        if error_msg:
+            InfoBar.error("Lỗi", f"Không thể lưu: {error_msg}", parent=self)
+        else:
+            self.has_unsaved_changes = False
+            name = os.path.basename(filepath)
+            InfoBar.success("Đã lưu", f"Đã lưu macro: {name}", parent=self)
             
             # Refresh saved macros list
             if hasattr(self, 'steps_interface'):
                 self.steps_interface.refresh_saved_macros()
 
-    def _save_to_file(self, filename):
-        import json
-        try:
-            with open(filename, 'w') as f:
-                json.dump(self.recorded_events, f, indent=4)
-            self.has_unsaved_changes = False
-            
-            # Show success message
-            name = os.path.basename(filename)
-            InfoBar.success("Đã lưu", f"Đã lưu macro: {name}", parent=self)
-            
-        except Exception as e:
-            InfoBar.error("Lỗi", f"Không thể lưu: {e}", parent=self)
-
     def load_recording(self):
-        import json
-        
         filename, _ = QFileDialog.getOpenFileName(self, "Open Macro", "", "JSON Files (*.json)")
         if filename:
-            try:
-                with open(filename, 'r') as f:
-                    self.recorded_events = json.load(f)
-                
-                self.current_filename = filename
-                
-                # Temporarily disconnect itemChanged to prevent false "unsaved changes"
-                self.model.itemChanged.disconnect(self.on_item_changed)
-                
-                self.model.removeRows(0, self.model.rowCount())
-                for event in self.recorded_events:
-                    self.add_event_to_table(event)
-                
-                # Reconnect signal
-                self.model.itemChanged.connect(self.on_item_changed)
-                
-                # Set unsaved changes AFTER reconnecting
-                self.has_unsaved_changes = False
-                
-                # Reset loaded filepath in saved macros panel
-                if hasattr(self, 'steps_interface'):
-                    self.steps_interface.reset_loaded_filepath()
-                    
-                self.statusBar().showMessage(f"Loaded {len(self.recorded_events)} events from {filename}")
-            except Exception as e:
-                # Make sure to reconnect signal even on error
-                try:
-                    self.model.itemChanged.connect(self.on_item_changed)
-                except:
-                    pass
-                self.statusBar().showMessage(f"Error loading: {e}")
+            self.load_macro_from_path(filename)
     
     def load_macro_from_path(self, filepath):
-        """Load macro from specific file path (called from saved macros list)"""
-        import json
-        import os
-        from qfluentwidgets import InfoBar
-        
-        try:
-            with open(filepath, 'r') as f:
-                self.recorded_events = json.load(f)
+        """Load macro from specific file path using worker thread"""
+        if hasattr(self, 'file_worker') and self.file_worker.isRunning():
+            self.file_worker.terminate()
+            self.file_worker.wait()
             
+        self.file_worker = FileWorker('load', filepath)
+        self.file_worker.finished.connect(self.on_file_loaded)
+        self.file_worker.start()
+        
+    def on_file_loaded(self, data, filepath, error_msg):
+        """Handle file loaded event"""
+        if error_msg:
+            InfoBar.error("Lỗi", f"Không thể load: {error_msg}", parent=self)
+            return
+            
+        try:
+            self.recorded_events = data
             self.current_filename = filepath
             
-            # Temporarily disconnect itemChanged
-            self.model.itemChanged.disconnect(self.on_item_changed)
+            # CRITICAL: Disconnect ALL model signals to prevent auto-rebuild logic
+            # from wiping out self.recorded_events when we clear the table
+            try:
+                self.model.itemChanged.disconnect(self.on_item_changed)
+                self.model.rowsRemoved.disconnect(self.on_rows_removed)
+                self.model.rowsInserted.disconnect(self.on_rows_inserted)
+            except:
+                pass
             
             self.model.removeRows(0, self.model.rowCount())
             for event in self.recorded_events:
                 self.add_event_to_table(event)
             
-            # Reconnect signal
+            # Reconnect signals
             self.model.itemChanged.connect(self.on_item_changed)
+            self.model.rowsRemoved.connect(self.on_rows_removed)
+            self.model.rowsInserted.connect(self.on_rows_inserted)
             
             self.has_unsaved_changes = False
             
+            # Reset loaded filepath in saved macros panel
+            if hasattr(self, 'steps_interface'):
+                self.steps_interface.reset_loaded_filepath()
+                # Also update current loaded filepath to prevent re-load
+                self.steps_interface.current_loaded_filepath = filepath
+            
             filename = os.path.basename(filepath)
+            self.statusBar().showMessage(f"Loaded {len(self.recorded_events)} events from {filename}")
             InfoBar.success("Đã tải", f"Đã load: {filename}", parent=self)
             
         except Exception as e:
+            # Restore signals in case of error
             try:
                 self.model.itemChanged.connect(self.on_item_changed)
+                self.model.rowsRemoved.connect(self.on_rows_removed)
+                self.model.rowsInserted.connect(self.on_rows_inserted)
             except:
                 pass
-            InfoBar.error("Lỗi", f"Không thể load: {e}", parent=self)
+            InfoBar.error("Lỗi", f"Lỗi xử lý dữ liệu: {e}", parent=self)
 
 
     def open_settings(self, tab_index=0):

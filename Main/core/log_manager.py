@@ -22,12 +22,20 @@ class LogManager(QObject):
         sys.stderr = self
 
     def write(self, text):
-        self.original_stdout.write(text)
+        if self.original_stdout:
+            try:
+                self.original_stdout.write(text)
+            except Exception:
+                pass
         if "Unknown property box-shadow" not in text and "QFont::setPointSize" not in text:
             self.log_signal.emit(text)
 
     def flush(self):
-        self.original_stdout.flush()
+        if self.original_stdout:
+            try:
+                self.original_stdout.flush()
+            except Exception:
+                pass
 
     @property
     def buffer(self):
