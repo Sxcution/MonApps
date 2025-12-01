@@ -1,0 +1,22 @@
+# AutoKey - Macro Recorder & Player
+# Requirements
+
+# Qt Framework
+PySide6>=6.6.0
+PySide6-Fluent-Widgets>=1.5.0
+
+# Input/Output
+pynput>=1.7.6
+pywin32>=306
+
+# Image Processing
+opencv-python>=4.8.0
+Pillow>=10.0.0
+
+# OCR (Optional - for Text Search feature)
+# rapidfuzz>=3.5.0
+# easyocr>=1.7.0
+
+# System
+psutil>=5.9.0
+

@@ -160,6 +160,9 @@ class Player(QThread):
         if etype == 'detect_image':
             return self.handle_detect_image(event, current_idx)
         
+        elif etype == 'auto_detect':
+            return self.handle_auto_detect(event, current_idx)
+        
         elif etype == 'text_search':
             return self.handle_text_search(event, current_idx)
             
@@ -415,6 +418,137 @@ class Player(QThread):
             # Goto not found
             return self._resolve_goto(goto_not_found, current_idx)
     
+    def handle_auto_detect(self, event, current_idx):
+        """Handle auto detect - continuous scanning of multiple images"""
+        from utils.image_finder import find_image_on_screen
+        from utils.window_utils import get_foreground_window_rect
+        from pynput.mouse import Button
+        
+        image_detects = event.get('image_detects', [])
+        if not image_detects:
+            print("⚠️ Auto Detect: No images configured")
+            goto = event.get('goto_timeout', 'Next')
+            return self._resolve_goto(goto, current_idx)
+        
+        scan_interval = event.get('scan_interval', 200) / 1000.0  # Convert to seconds
+        max_duration = event.get('max_duration', 65535)
+        goto_timeout = event.get('goto_timeout', 'Next')
+        
+        print(f"🔍 Auto Detect: Scanning {len(image_detects)} images, interval={scan_interval}s, max={max_duration}s")
+        self.status_updated.emit(f"Auto Detect: Quét {len(image_detects)} ảnh...")
+        
+        start_time = time.time()
+        
+        while time.time() - start_time < max_duration and not self.stop_event.is_set():
+            # Check each image
+            for img_detect in image_detects:
+                if self.stop_event.is_set():
+                    break
+                
+                image_path = img_detect.get('image_path', '')
+                if not image_path or not os.path.exists(image_path):
+                    continue
+                
+                # Determine region
+                region = None
+                search_area = img_detect.get('search_area', 'entire screen')
+                if search_area == 'focused window':
+                    region = get_foreground_window_rect()
+                elif search_area == 'custom region':
+                    region = img_detect.get('custom_region')
+                
+                # Calculate confidence
+                tolerance = img_detect.get('tolerance', 0)
+                confidence = 1.0 - ((tolerance + 1) / 400.0)
+                if confidence < 0.1: confidence = 0.1
+                
+                # Search for image
+                result = find_image_on_screen(
+                    image_path,
+                    confidence=confidence,
+                    region=region,
+                    grayscale=img_detect.get('grayscale', False),
+                    multi_scale=img_detect.get('multi_scale', False)
+                )
+                
+                if result:
+                    x, y, w, h = result
+                    center_x = x + w // 2
+                    center_y = y + h // 2
+                    
+                    print(f"✅ Auto Detect: Found image at ({x}, {y})")
+                    self.log_status.emit(f"✅ Tìm thấy ảnh tại ({x}, {y})", "#00aa00")
+                    
+                    # Perform action
+                    action = img_detect.get('action', 'none')
+                    action_param = img_detect.get('action_param', '')
+                    
+                    if action == 'press_key' and action_param:
+                        from utils.direct_input import press_key, release_key
+                        print(f"🎮 Auto Detect: Pressing key {action_param}")
+                        self.log_status.emit(f"🎮 Nhấn phím {action_param}", "#00aa00")
+                        press_key(action_param)
+                        time.sleep(0.1)
+                        release_key(action_param)
+                    
+                    elif action == 'key_down' and action_param:
+                        from utils.direct_input import press_key, release_key
+                        # Parse format: "A:1000" hoặc "A" (mặc định 1000ms)
+                        if ':' in action_param:
+                            key, duration_str = action_param.split(':', 1)
+                            key = key.strip()
+                            try:
+                                duration_ms = int(duration_str.strip())
+                            except:
+                                duration_ms = 1000
+                        else:
+                            key = action_param.strip()
+                            duration_ms = 1000
+                        
+                        print(f"🎮 Auto Detect: Key Down {key} for {duration_ms}ms")
+                        self.log_status.emit(f"🎮 Giữ phím {key} trong {duration_ms}ms", "#00aa00")
+                        press_key(key)
+                        time.sleep(duration_ms / 1000.0)
+                        release_key(key)
+                    
+                    elif action == 'left_click':
+                        print(f"🖱️ Auto Detect: Left click at ({center_x}, {center_y})")
+                        self.mouse.position = (center_x, center_y)
+                        time.sleep(0.05)
+                        self.mouse.click(Button.left)
+                    
+                    elif action == 'right_click':
+                        print(f"🖱️ Auto Detect: Right click at ({center_x}, {center_y})")
+                        self.mouse.position = (center_x, center_y)
+                        time.sleep(0.05)
+                        self.mouse.click(Button.right)
+                    
+                    elif action == 'hold_left':
+                        duration_ms = int(action_param) if action_param.isdigit() else 1000
+                        print(f"🖱️ Auto Detect: Hold left click for {duration_ms}ms")
+                        self.mouse.position = (center_x, center_y)
+                        time.sleep(0.05)
+                        self.mouse.press(Button.left)
+                        time.sleep(duration_ms / 1000.0)
+                        self.mouse.release(Button.left)
+                    
+                    # Check if this image has a goto action
+                    goto = img_detect.get('goto', 'none')
+                    if goto and goto != 'none':
+                        print(f"🔀 Auto Detect: Goto {goto}")
+                        return self._resolve_goto(goto, current_idx)
+                    
+                    # Continue scanning (don't exit on first match - this is continuous detection)
+                    time.sleep(scan_interval)
+                    break  # Move to next scan cycle after performing action
+            
+            # Wait before next scan
+            time.sleep(scan_interval)
+        
+        print(f"⏱️ Auto Detect: Timeout reached ({max_duration}s)")
+        self.log_status.emit(f"⏱️ Auto Detect: Hết thời gian chờ", "#ff8c00")
+        return self._resolve_goto(goto_timeout, current_idx)
+    
     def _resolve_goto(self, goto_str, current_idx):
         if goto_str == 'Start':
             return 0
@@ -584,6 +718,9 @@ class Player(QThread):
             image = event.get('image_path', '')
             image_name = image.split('/')[-1] if image else 'unknown'
             return f"Detect Image: {image_name}"
+        elif event_type == 'auto_detect':
+            image_count = len(event.get('image_detects', []))
+            return f"Auto Detect: {image_count} ảnh"
         elif event_type == 'text_search':
             query = event.get('query', '')
             return f"Text Search: {query}"

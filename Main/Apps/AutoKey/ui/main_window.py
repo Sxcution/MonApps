@@ -491,6 +491,9 @@ class MainWindow(QMainWindow):
              action_text = "Mouse Hold"
         elif event['type'] == 'detect_image':
              action_text = "Detect Image"
+        elif event['type'] == 'auto_detect':
+             image_count = len(event.get('image_detects', []))
+             action_text = f"Auto Detect ({image_count} ảnh)"
         elif event['type'] == 'text_search':
              query = event.get('query', '')
              action_text = f"Text Search: {query[:30]}..." if len(query) > 30 else f"Text Search: {query}"
@@ -688,6 +691,8 @@ class MainWindow(QMainWindow):
             self.open_keyboard_dialog(row)
         elif event['type'] == 'detect_image':
             self.open_image_search_dialog(row)
+        elif event['type'] == 'auto_detect':
+            self.open_auto_detect_dialog(row)
         elif event['type'] == 'text_search':
             self.open_text_search_dialog(row)
         elif event['type'] == 'undefined':
@@ -728,6 +733,9 @@ class MainWindow(QMainWindow):
         mouse_action = menu.addAction("Mouse Action")
         keyboard_action = menu.addAction("Keyboard Action")
         
+        # Add Auto Detect menu item (between Keyboard Action and Image)
+        auto_detect_action = menu.addAction("Auto Detect")
+        
         # Add Image submenu
         image_menu = QMenu("Image", self)
         detect_image_action = image_menu.addAction("Detect image [I]")
@@ -744,6 +752,8 @@ class MainWindow(QMainWindow):
             self.open_mouse_dialog(index.row())
         elif action == keyboard_action:
             self.open_keyboard_dialog(index.row())
+        elif action == auto_detect_action:
+            self.open_auto_detect_dialog(index.row())
         elif action == detect_image_action:
             self.open_image_search_dialog(index.row())
         elif action == text_search_action:
@@ -767,6 +777,15 @@ class MainWindow(QMainWindow):
     def open_image_search_dialog(self, row):
         event = self.recorded_events[row]
         dialog = ImageSearchDialog(self, event)
+        if dialog.exec():
+            new_data = dialog.get_data()
+            self.update_event(row, new_data)
+
+    def open_auto_detect_dialog(self, row):
+        """Open auto detect configuration dialog"""
+        from ui.auto_detect_dialog import AutoDetectDialog
+        event = self.recorded_events[row]
+        dialog = AutoDetectDialog(self, event)
         if dialog.exec():
             new_data = dialog.get_data()
             self.update_event(row, new_data)
@@ -836,6 +855,9 @@ class MainWindow(QMainWindow):
              action_text = "Mouse Hold"
         elif event['type'] == 'detect_image':
              action_text = "Detect Image"
+        elif event['type'] == 'auto_detect':
+             image_count = len(event.get('image_detects', []))
+             action_text = f"Auto Detect ({image_count} ảnh)"
         elif event['type'] == 'text_search':
              query = event.get('query', '')
              action_text = f"Text Search: {query[:30]}..." if len(query) > 30 else f"Text Search: {query}"
@@ -906,6 +928,11 @@ class MainWindow(QMainWindow):
                         item.setSizeHint(QSize(0, 40))
             else:
                 details = "No image set"
+        elif event['type'] == 'auto_detect':
+            scan_interval = event.get('scan_interval', 200)
+            max_duration = event.get('max_duration', 65535)
+            image_count = len(event.get('image_detects', []))
+            details = f"Quét {image_count} ảnh mỗi {scan_interval}ms, max {max_duration}s"
         elif event['type'] == 'text_search':
             query = event.get('query', '')
             details = f"Query: {query}"

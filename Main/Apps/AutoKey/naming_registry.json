@@ -46,6 +46,34 @@
         "combo_key_type": "Key Event Type ComboBox (KeyPress/KeyDown/KeyUp)",
         "spin_key_hold_duration": "Key Hold Duration Input (ms, for KeyDown)"
     },
+    "UI_AUTO_DETECT_DIALOG": {
+        "tab_widget": "Tab Widget for Image/Text tabs",
+        "tab_image_detect": "Image Detection Tab",
+        "tab_text_detect": "Text Detection Tab",
+        "btn_add_image": "Add New Image Detection Item Button",
+        "container_image_items": "Container for ImageDetectItem widgets",
+        "spin_scan_interval": "Scan Interval (ms) SpinBox",
+        "spin_max_duration": "Max Duration (seconds) SpinBox",
+        "combo_goto_timeout": "Goto Action on Timeout ComboBox",
+        "btn_ok": "OK Button",
+        "btn_cancel": "Cancel Button"
+    },
+    "UI_IMAGE_DETECT_ITEM": {
+        "lbl_image_detect_index": "Image Detection Item Index Label",
+        "btn_remove_image": "Remove Image Button",
+        "img_preview": "Image Preview Label",
+        "btn_load_image": "Load Image from File Button",
+        "btn_capture_image": "Capture Image from Screen Button",
+        "combo_search_area": "Search Area ComboBox",
+        "btn_define_region": "Define Custom Region Button",
+        "spin_tolerance": "Color Tolerance (0-255) SpinBox",
+        "btn_test_image": "Test Image Detection Button",
+        "combo_action": "Action on Found ComboBox",
+        "input_action_param": "Action Parameter Input (key or duration)",
+        "cb_grayscale": "Grayscale Mode CheckBox",
+        "cb_multiscale": "Multi-scale Mode CheckBox",
+        "lbl_test_result": "Test Result Label"
+    },
     "CONFIG_KEYS": {
         "key_hotkey_record": "hotkey_record",
         "key_hotkey_stop_record": "hotkey_stop_record",

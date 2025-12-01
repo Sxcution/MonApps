@@ -1,0 +1,84 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# AutoKey specific
+# Thư mục Save - chứa macro đã lưu của user
+Save/
+*.json
+
+# Thư mục captures - chứa ảnh đã cắt
+captures/
+*.png
+*.jpg
+*.jpeg
+*.bmp
+
+# Log files
+*.log
+error.log
+
+# Backup files
+*.backup
+*.bak
+*.tmp
+
+# Test files
+test_*.py
+*_test.py
+
+# Work/Debug files
+work.md
+migrate_to_pyside6.py
+
+# Zip/Archive
+*.zip
+*.rar
+*.7z
+
+# Documentation files có thể giữ lại
+!README.md
+!AUTO_DETECT_FEATURE.md
+!AUTO_DETECT_UI_GUIDE.md
+!BAO_CAO_DRAG_DROP.md
+!naming_registry.json
+!project_structure.md
+
+# Sample macro (có thể uncommment nếu muốn push)
+# !FarmGym.json
+
