@@ -49,9 +49,9 @@ def main():
         print("   Hotkeys and Recording might not work correctly.")
         print("   Please run your terminal/IDE as Administrator if you encounter issues.")
     
-    # Force Light Theme Globally - This fixes the dark theme issue on standalone launch
+    # ✅ Force Dark Theme Globally - Synchronize with Main Hub's dark theme
     from qfluentwidgets import Theme, setTheme
-    setTheme(Theme.LIGHT)
+    setTheme(Theme.DARK)
     
     # Install Message Handler
     from PySide6.QtCore import qInstallMessageHandler

@@ -62,6 +62,32 @@ if __name__ == '__main__':
     LogManager.get_instance()
     
     app = QApplication(sys.argv)
+    
+    # ✅ STEP 1: Set Fluent Dark Theme
+    from qfluentwidgets import setTheme, Theme
+    setTheme(Theme.DARK)
+    
+    # ✅ STEP 2: Apply Dark Palette for non-Fluent widgets (QMessageBox, QDialog, etc.)
+    from PySide6.QtGui import QPalette, QColor
+    from PySide6.QtCore import Qt
+    
+    dark_palette = QPalette()
+    dark_bg = QColor(32, 32, 32)      # Fluent standard dark background
+    dark_text = QColor(255, 255, 255) # White text
+    
+    dark_palette.setColor(QPalette.Window, dark_bg)
+    dark_palette.setColor(QPalette.WindowText, dark_text)
+    dark_palette.setColor(QPalette.Base, QColor(25, 25, 25))  # Input/Table background
+    dark_palette.setColor(QPalette.AlternateBase, dark_bg)
+    dark_palette.setColor(QPalette.ToolTipBase, dark_text)
+    dark_palette.setColor(QPalette.ToolTipText, dark_text)
+    dark_palette.setColor(QPalette.Text, dark_text)
+    dark_palette.setColor(QPalette.Button, dark_bg)
+    dark_palette.setColor(QPalette.ButtonText, dark_text)
+    dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
+    
+    app.setPalette(dark_palette)  # Apply globally
+    
     w = MainWindow()
     w.show()
     sys.exit(app.exec())

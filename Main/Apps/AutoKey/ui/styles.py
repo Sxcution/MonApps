@@ -555,6 +555,6 @@ QInputDialog QWidget {
 }
 """
 
-# Keep backward compatibility
-MAIN_STYLESHEET = LIGHT_STYLESHEET
+# ✅ Use Dark Theme by default - Fluent standard
+MAIN_STYLESHEET = DARK_STYLESHEET
 
