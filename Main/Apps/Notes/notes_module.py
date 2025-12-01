@@ -234,8 +234,8 @@ class NoteTitleDelegate(QStyledItemDelegate):
             else:
                 color = color_data
         else:
-            # Default to black for light theme
-            color = QColor("#000000")
+            # ✅ Default to white for dark theme
+            color = QColor("#ffffff")
         
         painter.save()
         
@@ -357,14 +357,15 @@ class ProfileTooltip(QWidget):
         
         # Container for styling
         self.container = QWidget()
+        # ✅ Apply Dark Theme to Tooltip
         self.container.setStyleSheet("""
             QWidget {
-                background-color: #ffffff;
-                border: 1px solid #e0e0e0;
+                background-color: #2b2b2b;
+                border: 1px solid #454545;
                 border-radius: 8px;
             }
             QLabel {
-                color: #000000;
+                color: #ffffff;
             }
         """)
         self.container_layout = QVBoxLayout(self.container)
@@ -477,7 +478,7 @@ class AutoSaveTextEdit(QTextEdit):
         if event.key() == Qt.Key.Key_Space:
             # Reset to default format
             fmt = QTextCharFormat()
-            fmt.setForeground(QColor("black")) # Or use theme default if possible, but user asked for default
+            fmt.setForeground(QColor("white")) # ✅ White text for dark theme
             fmt.setAnchor(False)
             fmt.setAnchorHref("")
             fmt.setFontUnderline(False)
@@ -566,48 +567,41 @@ class AutoSaveTextEdit(QTextEdit):
         fmt = cursor.charFormat()
         if fmt.isAnchor():
              # We are at a link (likely end of it). Reset format for new typing.
-             # But wait, if we are INSIDE the link, we might want to edit it?
-             # User said "click vào khoảng trống... nhập chữ mới không dính".
-             # So if we clicked whitespace, we definitely want to reset.
-             
-             # Re-check whitespace condition for the *current* cursor position?
-             # No, we already know if the CLICK was in whitespace.
-             # But super().mousePressEvent moves the cursor.
-             
              # Simple logic: If we just clicked and the cursor has link format,
              # but we didn't trigger the edit dialog (meaning we clicked whitespace or edge),
              # let's reset the format so typing is clean.
              
              new_fmt = QTextCharFormat()
-             new_fmt.setForeground(QColor("black"))
+             new_fmt.setForeground(QColor("white")) # ✅ White text for dark theme
              new_fmt.setAnchor(False)
              new_fmt.setAnchorHref("")
              new_fmt.setFontUnderline(False)
              self.setCurrentCharFormat(new_fmt)
-    
+             
     def show_custom_context_menu(self, position):
         """Show custom context menu."""
         menu = QMenu(self)
-        # Apply Light Theme Styling to Context Menu
+        # ✅ Apply Dark Theme Styling to Context Menu
         menu.setStyleSheet("""
             QMenu {
-                background-color: #ffffff;
-                border: 1px solid #e0e0e0;
+                background-color: #2b2b2b;
+                border: 1px solid #454545;
                 border-radius: 8px;
                 padding: 4px 0;
             }
             QMenu::item {
-                color: #000000;
+                color: #ffffff;
                 padding: 6px 24px 6px 12px;
                 border-radius: 4px;
                 margin: 0 4px;
             }
             QMenu::item:selected {
-                background-color: #f0f0f0;
+                background-color: #0078d4;
+                color: #ffffff;
             }
             QMenu::separator {
                 height: 1px;
-                background-color: #e0e0e0;
+                background-color: #454545;
                 margin: 4px 0;
             }
         """)
@@ -1077,24 +1071,25 @@ class NotesWidget(QWidget):
         
         # Apply custom delegate for title column
         self.notes_table.setItemDelegateForColumn(0, NoteTitleDelegate(self.notes_table))
+        # ✅ Apply Dark Theme to Table
         self.notes_table.setStyleSheet("""
             QTableWidget {
-                background-color: #ffffff;
-                color: #000000;
+                background-color: #2b2b2b;
+                color: #ffffff;
                 border: none;
             }
             QTableWidget::item:selected {
-                background-color: #e0e0e0;
-                color: #000000;
+                background-color: #0078d4;
+                color: #ffffff;
             }
             QTableWidget::item:focus {
                 outline: none;
             }
             QHeaderView::section {
-                background-color: #f5f5f5;
-                color: #000000;
+                background-color: #1e1e1e;
+                color: #ffffff;
                 border: none;
-                border-bottom: 1px solid #e0e0e0;
+                border-bottom: 1px solid #454545;
                 padding: 4px;
             }
         """)
@@ -1115,14 +1110,24 @@ class NotesWidget(QWidget):
         # For now, let's stick to focusOut but ensure it works. 
         # We can also add a manual save button if needed, but focusOut is standard.
         
-        # Ensure content input has light background
+        # ✅ Apply Dark Theme to Content Editor
         self.content_input.setStyleSheet("""
             QTextEdit {
-                background-color: #ffffff;
-                color: #000000;
-                border: 1px solid #e0e0e0;
+                background-color: #2b2b2b;
+                color: #ffffff;
+                border: 1px solid #454545;
                 border-radius: 4px;
                 padding: 8px;
+                selection-background-color: #0078d4;
+                selection-color: #ffffff;
+            }
+            QScrollBar:vertical {
+                background: #2b2b2b;
+                width: 10px;
+            }
+            QScrollBar::handle:vertical {
+                background: #606060;
+                border-radius: 5px;
             }
         """)
         right_layout.addWidget(self.content_input)

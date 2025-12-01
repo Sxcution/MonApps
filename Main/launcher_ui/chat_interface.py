@@ -279,8 +279,8 @@ class ChatBubble(QWidget):
         self.chat_list = QListWidget(self.chat_card)
         self.chat_list.setFrameShape(QFrame.NoFrame)
         self.chat_list.setVerticalScrollMode(QListWidget.ScrollPerPixel)
-        # White background for chat area
-        self.chat_list.setStyleSheet("QListWidget { background: white; border-radius: 5px; }")
+        # ✅ Dark theme background for chat area
+        self.chat_list.setStyleSheet("QListWidget { background: #2b2b2b; border-radius: 5px; }")
         layout.addWidget(self.chat_list, 1)  # Give it stretch factor to fill space
         
         # --- Input Area (moved to bottom) ---
