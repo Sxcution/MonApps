@@ -3,24 +3,24 @@ Auto Detect Dialog - for configuring complex conditional detection with images a
 <!-- auto_detect_dialog : Dialog cấu hình phát hiện tự động với nhiều điều kiện ảnh/text -->
 """
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-                            QPushButton, QCheckBox, QComboBox, QSpinBox,
-                            QGroupBox, QFormLayout, QFileDialog, QWidget, QApplication,
-                            QStyleOptionButton, QStyle, QAbstractItemView, QStyleOptionComboBox,
-                            QGridLayout, QTabWidget, QScrollArea, QTextEdit, QLineEdit)
+                            QGroupBox, QFileDialog, QWidget, QApplication,
+                            QGridLayout, QScrollArea, QAbstractSpinBox)
 from PySide6.QtCore import Qt, QTimer, QRect, Signal, QPointF, QSize
-from PySide6.QtGui import QPixmap, QPainter, QColor, QBrush, QPen, QPalette
+from PySide6.QtGui import QPixmap, QPainter, QColor, QBrush, QPen, QPalette, QIntValidator
+from qfluentwidgets import (PushButton, PrimaryPushButton, ComboBox, SpinBox, 
+                           CheckBox, LineEdit, CardWidget, BodyLabel, 
+                           StrongBodyLabel, Pivot, qrouter, ScrollArea, SegmentedWidget,
+                           MessageBox, FluentIcon, ToolButton)
 import os
 import time
 from utils.image_finder import find_image_on_screen
-
-# Reuse styled components from ImageSearchDialog
-from ui.image_search_dialog import StyledComboBox, StyledCheckBox, ImagePreviewLabel
 
 
 class ImageDetectItem(QWidget):
     """Widget representing one image detection item with thumbnail and controls"""
     # btn_remove_image : Nút xóa ảnh detect này
     remove_requested = Signal(object)  # Signal when remove button is clicked
+    add_requested = Signal()           # Signal when add button is clicked
     
     def __init__(self, parent=None, item_index=0):
         super().__init__(parent)
@@ -31,210 +31,216 @@ class ImageDetectItem(QWidget):
     
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(10)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
         
-        # Container with border
-        container = QWidget()
-        container.setStyleSheet("""
-            QWidget {
+        # Container - Dùng CardWidget từ qfluentwidgets
+        container = CardWidget(self)
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(16, 16, 16, 16)
+        container_layout.setSpacing(12)
+        
+        # MAIN LAYOUT: Horizontal (Left: Image, Right: Controls)
+        main_layout = QHBoxLayout()
+        main_layout.setSpacing(0)  # Yêu cầu: không khoảng cách giữa ảnh và controls
+        
+        # --- LEFT PANEL: Image Preview + Import/Cut Buttons ---
+        left_panel = QVBoxLayout()
+        left_panel.setSpacing(8)
+        left_panel.setAlignment(Qt.AlignmentFlag.AlignTop)
+        
+        # Image preview
+        self.image_preview = QLabel()
+        self.image_preview.setFixedSize(120, 120)
+        self.image_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.image_preview.setStyleSheet("""
+            QLabel {
                 border: 2px solid #E0E0E0;
                 border-radius: 6px;
-                background-color: #F9F9F9;
+                background-color: #FFFFFF;
             }
         """)
-        container_layout = QVBoxLayout(container)
-        container_layout.setContentsMargins(10, 10, 10, 10)
-        container_layout.setSpacing(8)
+        self.show_placeholder()
+        left_panel.addWidget(self.image_preview)
         
-        # Header with index and remove button
-        header_layout = QHBoxLayout()
-        # lbl_image_detect_index : Label hiển thị số thứ tự ảnh
-        self.lbl_index = QLabel(f"Ảnh #{self.item_index + 1}")
-        self.lbl_index.setStyleSheet("font-weight: bold; font-size: 13px; color: #0078D4;")
-        header_layout.addWidget(self.lbl_index)
-        header_layout.addStretch()
+        # Buttons below preview: [Delete] [File] [Cut]
+        btn_img_layout = QHBoxLayout()
+        btn_img_layout.setSpacing(6)
         
-        # btn_remove_image : Nút xóa ảnh detect này
-        self.btn_remove = QPushButton("✖ Xóa")
-        self.btn_remove.setFixedSize(60, 24)
+        # 1. Delete Button
+        self.btn_remove = ToolButton(FluentIcon.DELETE, self)
+        self.btn_remove.setFixedSize(30, 30)
+        self.btn_remove.setToolTip("Xóa ảnh này")
+        # Style for delete button (red hover effect)
         self.btn_remove.setStyleSheet("""
-            QPushButton {
+            ToolButton:hover {
                 background-color: #D32F2F;
-                color: white;
-                border: none;
                 border-radius: 4px;
-                font-weight: bold;
-                font-size: 11px;
             }
-            QPushButton:hover {
+            ToolButton:pressed {
                 background-color: #B71C1C;
             }
         """)
-        self.btn_remove.clicked.connect(lambda: self.remove_requested.emit(self))
-        header_layout.addWidget(self.btn_remove)
-        container_layout.addLayout(header_layout)
+        self.btn_remove.clicked.connect(self.confirm_remove)
         
-        # Image preview and controls
-        content_layout = QHBoxLayout()
-        content_layout.setSpacing(15)
-        
-        # Left: Image preview
-        preview_container = QVBoxLayout()
-        preview_container.setSpacing(8)
-        # img_preview : Preview ảnh
-        self.image_preview = ImagePreviewLabel()
-        self.image_preview.setMinimumSize(150, 150)
-        self.image_preview.setMaximumSize(150, 150)
-        preview_container.addWidget(self.image_preview)
-        
-        # Buttons below preview
-        btn_container = QHBoxLayout()
-        btn_container.setSpacing(6)
-        # btn_load_image : Nút nhập ảnh từ file
-        self.btn_load = QPushButton("Nhập Ảnh")
-        self.btn_load.setMinimumHeight(26)
+        # 2. Load File Button
+        self.btn_load = ToolButton(FluentIcon.FOLDER, self)
+        self.btn_load.setFixedSize(30, 30)
+        self.btn_load.setToolTip("Nhập từ file")
         self.btn_load.clicked.connect(self.load_from_file)
-        # btn_capture_image : Nút cắt ảnh từ màn hình
-        self.btn_capture = QPushButton("Cắt Ảnh")
-        self.btn_capture.setMinimumHeight(26)
+        
+        # 3. Capture Button
+        self.btn_capture = ToolButton(FluentIcon.CUT, self)
+        self.btn_capture.setFixedSize(30, 30)
+        self.btn_capture.setToolTip("Cắt từ màn hình")
         self.btn_capture.clicked.connect(self.capture_from_screen)
         
-        btn_container.addWidget(self.btn_load)
-        btn_container.addWidget(self.btn_capture)
-        preview_container.addLayout(btn_container)
+        btn_img_layout.addWidget(self.btn_remove)
+        btn_img_layout.addWidget(self.btn_load)
+        btn_img_layout.addWidget(self.btn_capture)
+        # Add stretch to prevent buttons from expanding
+        btn_img_layout.addStretch() 
         
-        content_layout.addLayout(preview_container)
+        left_panel.addLayout(btn_img_layout)
         
-        # Right: Options
-        options_container = QVBoxLayout()
-        options_container.setSpacing(10)
+        main_layout.addLayout(left_panel)
         
-        # Grid for options
+        # --- RIGHT PANEL: Header + Inputs ---
+        right_panel = QVBoxLayout()
+        right_panel.setSpacing(8)
+        right_panel.setContentsMargins(0, 0, 0, 0) # Sát lề theo yêu cầu "không khoảng cách"
+        
+        # ROW 1: Header - Label | Grayscale | Multi-scale (No Buttons here)
+        header_row = QHBoxLayout()
+        header_row.setSpacing(10)
+        
+        # Label: Ảnh 1 (no #)
+        self.lbl_index = StrongBodyLabel(f"Ảnh {self.item_index + 1}")
+        self.lbl_index.setStyleSheet("color: #0078D4;")
+        header_row.addWidget(self.lbl_index)
+        
+        # Grayscale + Multi-scale
+        self.cb_grayscale = CheckBox("Grayscale")
+        self.cb_multiscale = CheckBox("Multi-scale")
+        header_row.addWidget(self.cb_grayscale)
+        header_row.addWidget(self.cb_multiscale)
+        
+        header_row.addStretch()
+        
+        right_panel.addLayout(header_row)
+        
+        # GRID: Vùng, Độ lệch, Hành động
         grid_layout = QGridLayout()
-        grid_layout.setSpacing(8)
+        grid_layout.setSpacing(10)
+        # Adjust column stretch to pack items to the left
+        grid_layout.setColumnStretch(4, 1) 
         
-        # Row 0: Search Area
-        search_area_label = QLabel("Vùng Tìm:")
-        search_area_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        grid_layout.addWidget(search_area_label, 0, 0)
+        # Row 0: Vùng
+        search_area_label = BodyLabel("Vùng:")
+        grid_layout.addWidget(search_area_label, 0, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         
-        # combo_search_area : ComboBox chọn vùng tìm kiếm
-        self.combo_window = StyledComboBox()
+        self.combo_window = ComboBox()
         self.combo_window.addItems(["toàn màn hình", "cửa sổ đang focus", "vùng tùy chỉnh"])
         self.combo_window.setCurrentText("toàn màn hình")
-        self.combo_window.setMinimumWidth(130)
+        self.combo_window.setFixedWidth(130)
         self.combo_window.currentTextChanged.connect(self.on_search_area_changed)
-        grid_layout.addWidget(self.combo_window, 0, 1)
+        grid_layout.addWidget(self.combo_window, 0, 1, Qt.AlignmentFlag.AlignLeft)
         
-        # btn_define_region : Nút định nghĩa vùng tìm kiếm
-        self.btn_define = QPushButton("Define")
-        self.btn_define.setMinimumHeight(26)
-        self.btn_define.setMinimumWidth(60)
+        self.btn_define = PushButton("Define")
+        self.btn_define.setFixedSize(60, 32)
         self.btn_define.clicked.connect(self.define_search_area)
         self.btn_define.setVisible(False)
-        grid_layout.addWidget(self.btn_define, 0, 2)
+        grid_layout.addWidget(self.btn_define, 0, 2, Qt.AlignmentFlag.AlignLeft)
         
-        # Row 1: Tolerance
-        tolerance_label = QLabel("Độ dung sai:")
-        tolerance_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        grid_layout.addWidget(tolerance_label, 1, 0)
+        # Row 1: Độ lệch (Dung sai) + Test
+        # "Dung sai" -> "Độ lệch"
+        tolerance_label = BodyLabel("Độ lệch:")
+        grid_layout.addWidget(tolerance_label, 1, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         
-        # spin_tolerance : Độ dung sai màu (0-255)
-        self.spin_tolerance = QSpinBox()
-        self.spin_tolerance.setRange(0, 255)
-        self.spin_tolerance.setSuffix(" / 255")
-        self.spin_tolerance.setMinimumWidth(90)
-        grid_layout.addWidget(self.spin_tolerance, 1, 1)
+        # Use LineEdit instead of SpinBox to completely remove buttons
+        self.input_tolerance = LineEdit()
+        self.input_tolerance.setValidator(QIntValidator(0, 255, self))
+        self.input_tolerance.setText("0")
+        self.input_tolerance.setFixedWidth(90)
+        grid_layout.addWidget(self.input_tolerance, 1, 1, Qt.AlignmentFlag.AlignLeft)
         
-        # btn_test_image : Nút test tìm ảnh
-        self.btn_test = QPushButton("Test")
-        self.btn_test.setMinimumHeight(26)
+        self.btn_test = PushButton("Test")
+        self.btn_test.setFixedSize(60, 32)
         self.btn_test.clicked.connect(self.test_image_search)
-        grid_layout.addWidget(self.btn_test, 1, 2)
+        grid_layout.addWidget(self.btn_test, 1, 2, Qt.AlignmentFlag.AlignLeft)
         
-        # Row 2: Action on found
-        action_label = QLabel("Hành động:")
-        action_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        grid_layout.addWidget(action_label, 2, 0)
+        # Row 2: Hành động
+        action_label = BodyLabel("Hành động:")
+        grid_layout.addWidget(action_label, 2, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         
-        # combo_action : ComboBox chọn hành động khi tìm thấy
-        self.combo_action = StyledComboBox()
+        self.combo_action = ComboBox()
         self.combo_action.addItems(["Không làm gì", "Press Key", "Key Down", "Click chuột trái", "Click chuột phải", "Hold chuột trái"])
-        self.combo_action.setMinimumWidth(130)
+        self.combo_action.setFixedWidth(130)
         self.combo_action.currentTextChanged.connect(self.on_action_changed)
-        grid_layout.addWidget(self.combo_action, 2, 1)
+        grid_layout.addWidget(self.combo_action, 2, 1, Qt.AlignmentFlag.AlignLeft)
         
-        # Bước Kế (Goto) - cùng hàng với Hành động
-        goto_label = QLabel("Bước Kế:")
-        goto_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        grid_layout.addWidget(goto_label, 2, 2)
-        
-        # combo_goto : ComboBox chọn bước kế tiếp
-        self.combo_goto = StyledComboBox()
-        self.combo_goto.addItems(["Không làm gì", "Tiếp theo", "Bắt đầu", "Kết thúc", "Chuyển Đến"])
-        self.combo_goto.setMinimumWidth(120)
-        self.combo_goto.currentTextChanged.connect(self.on_goto_changed)
-        grid_layout.addWidget(self.combo_goto, 2, 3)
-        
-        # Row 3: Action parameter (hidden by default)
-        param_label = QLabel("Tham số:")
-        param_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        grid_layout.addWidget(param_label, 3, 0)
-        
-        # input_action_param : Input cho tham số hành động (key hoặc duration)
-        self.input_action_param = QLineEdit()
-        self.input_action_param.setPlaceholderText("Ví dụ: A, D, F...")
-        self.input_action_param.setVisible(False)
-        grid_layout.addWidget(self.input_action_param, 3, 1)
-        
-        # lbl_param_label : Label tham số động
+        # Row 3: Tham số
+        param_label = BodyLabel("Tham số:")
         self.lbl_param_label = param_label
         self.lbl_param_label.setVisible(False)
+        grid_layout.addWidget(param_label, 3, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         
-        # Goto step number (hidden by default)
-        goto_step_label = QLabel("Step:")
-        goto_step_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        grid_layout.addWidget(goto_step_label, 3, 2)
+        self.input_action_param = LineEdit()
+        self.input_action_param.setPlaceholderText("A, D, F...")
+        self.input_action_param.setFixedWidth(130)
+        self.input_action_param.setVisible(False)
+        grid_layout.addWidget(self.input_action_param, 3, 1, Qt.AlignmentFlag.AlignLeft)
+        
+        # Row 4: Sau đó (Moved from Row 2)
+        goto_label = BodyLabel("Sau đó:")
+        grid_layout.addWidget(goto_label, 4, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        
+        self.combo_goto = ComboBox()
+        self.combo_goto.addItems(["Không làm gì", "Tiếp theo", "Bắt đầu", "Kết thúc", "Chuyển Đến"])
+        self.combo_goto.setFixedWidth(110)
+        self.combo_goto.currentTextChanged.connect(self.on_goto_changed)
+        grid_layout.addWidget(self.combo_goto, 4, 1, Qt.AlignmentFlag.AlignLeft)
+        
+        goto_step_label = BodyLabel("Step:")
         self.lbl_goto_step_label = goto_step_label
         self.lbl_goto_step_label.setVisible(False)
+        grid_layout.addWidget(goto_step_label, 4, 2, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         
-        # spin_goto_step : Step number cho Chuyển Đến
-        self.spin_goto_step = QSpinBox()
-        self.spin_goto_step.setRange(1, 999)
-        self.spin_goto_step.setValue(1)
-        self.spin_goto_step.setMinimumWidth(80)
-        self.spin_goto_step.setVisible(False)
-        grid_layout.addWidget(self.spin_goto_step, 3, 3)
+        # Use LineEdit instead of SpinBox
+        self.input_goto_step = LineEdit()
+        self.input_goto_step.setValidator(QIntValidator(1, 999, self))
+        self.input_goto_step.setText("1")
+        self.input_goto_step.setFixedWidth(80)
+        self.input_goto_step.setVisible(False)
+        grid_layout.addWidget(self.input_goto_step, 4, 3, Qt.AlignmentFlag.AlignLeft)
         
-        grid_layout.setColumnStretch(4, 1)
-        options_container.addLayout(grid_layout)
+        right_panel.addLayout(grid_layout)
         
-        # Advanced options
-        adv_layout = QHBoxLayout()
-        adv_layout.setSpacing(12)
-        # cb_grayscale : Checkbox chế độ grayscale
-        self.cb_grayscale = StyledCheckBox("Grayscale")
-        # cb_multiscale : Checkbox chế độ multi-scale
-        self.cb_multiscale = StyledCheckBox("Multi-scale")
-        adv_layout.addWidget(self.cb_grayscale)
-        adv_layout.addWidget(self.cb_multiscale)
-        adv_layout.addStretch()
-        options_container.addLayout(adv_layout)
+        right_panel.addStretch()
+        main_layout.addLayout(right_panel)
         
-        # Test result label
-        # lbl_test_result : Label hiển thị kết quả test
-        self.lbl_test_result = QLabel("")
-        self.lbl_test_result.setStyleSheet("font-weight: bold; font-size: 11px;")
-        options_container.addWidget(self.lbl_test_result)
+        container_layout.addLayout(main_layout)
         
-        options_container.addStretch()
-        content_layout.addLayout(options_container, 1)
+        # Test result label (Bottom of card)
+        self.lbl_test_result = BodyLabel("")
+        self.lbl_test_result.setStyleSheet("color: #0078D4; font-weight: bold;")
+        container_layout.addWidget(self.lbl_test_result)
         
-        container_layout.addLayout(content_layout)
         layout.addWidget(container)
         
         self.is_snipping = False
+    
+    def show_placeholder(self):
+        """Show placeholder when no image loaded"""
+        self.image_preview.setText("No Image")
+        self.image_preview.setStyleSheet("""
+            QLabel {
+                border: 2px solid #E0E0E0;
+                border-radius: 6px;
+                background-color: #FAFAFA;
+                color: #999;
+            }
+        """)
     
     def on_search_area_changed(self, text):
         """Show/hide Define button"""
@@ -262,10 +268,10 @@ class ImageDetectItem(QWidget):
         """Show/hide goto step number input"""
         if text == "Chuyển Đến":
             self.lbl_goto_step_label.setVisible(True)
-            self.spin_goto_step.setVisible(True)
+            self.input_goto_step.setVisible(True)
         else:
             self.lbl_goto_step_label.setVisible(False)
-            self.spin_goto_step.setVisible(False)
+            self.input_goto_step.setVisible(False)
     
     def load_from_file(self):
         """Load image from file"""
@@ -274,7 +280,9 @@ class ImageDetectItem(QWidget):
         if dialog.exec():
             f = dialog.selectedFiles()[0]
             self.image_path = f
-            self.image_preview.set_image(QPixmap(f))
+            pixmap = QPixmap(f)
+            scaled_pixmap = pixmap.scaled(120, 120, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self.image_preview.setPixmap(scaled_pixmap)
     
     def capture_from_screen(self):
         """Capture image from screen using Snipping Tool"""
@@ -325,7 +333,9 @@ class ImageDetectItem(QWidget):
     def on_snipper_success(self, path):
         """Handle successful snippet"""
         self.image_path = path
-        self.image_preview.set_image(QPixmap(path))
+        pixmap = QPixmap(path)
+        scaled_pixmap = pixmap.scaled(120, 120, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self.image_preview.setPixmap(scaled_pixmap)
         self.restore_ui()
     
     def define_search_area(self):
@@ -377,7 +387,12 @@ class ImageDetectItem(QWidget):
             self.lbl_test_result.setStyleSheet("color: red; font-weight: bold; font-size: 11px;")
             return
         
-        tolerance = self.spin_tolerance.value()
+        tolerance = 0
+        try:
+            tolerance = int(self.input_tolerance.text())
+        except ValueError:
+            tolerance = 0
+            
         confidence = 1.0 - ((tolerance + 1) / 400.0)
         if confidence < 0.1: confidence = 0.1
         
@@ -409,6 +424,16 @@ class ImageDetectItem(QWidget):
         else:
             self.lbl_test_result.setText("❌ Không tìm thấy!")
             self.lbl_test_result.setStyleSheet("color: red; font-weight: bold; font-size: 11px;")
+            
+    def confirm_remove(self):
+        """Ask for confirmation before removing"""
+        w = MessageBox(
+            "Xác nhận xóa",
+            f"Bạn có chắc chắn muốn xóa Ảnh #{self.item_index + 1} không?",
+            self.window()
+        )
+        if w.exec():
+            self.remove_requested.emit(self)
     
     def get_data(self):
         """Get configuration data for this image item"""
@@ -432,19 +457,25 @@ class ImageDetectItem(QWidget):
             'Tiếp theo': 'Next',
             'Bắt đầu': 'Start',
             'Kết thúc': 'End',
-            'Chuyển Đến': f"Step {self.spin_goto_step.value()}"
+            'Chuyển Đến': f"Step {self.input_goto_step.text()}"
         }
         
         goto_text = self.combo_goto.currentText()
         goto_value = goto_map.get(goto_text, 'none')
         if goto_text == 'Chuyển Đến':
-            goto_value = f"Step {self.spin_goto_step.value()}"
+            goto_value = f"Step {self.input_goto_step.text()}"
         
+        tolerance = 0
+        try:
+            tolerance = int(self.input_tolerance.text())
+        except ValueError:
+            tolerance = 0
+            
         return {
             'image_path': self.image_path,
             'search_area': search_area_map.get(self.combo_window.currentText(), 'entire screen'),
             'custom_region': self.custom_region,
-            'tolerance': self.spin_tolerance.value(),
+            'tolerance': tolerance,
             'grayscale': self.cb_grayscale.isChecked(),
             'multi_scale': self.cb_multiscale.isChecked(),
             'action': action_map.get(self.combo_action.currentText(), 'none'),
@@ -460,7 +491,9 @@ class ImageDetectItem(QWidget):
         if 'image_path' in data and data['image_path']:
             self.image_path = data['image_path']
             if os.path.exists(self.image_path):
-                self.image_preview.set_image(QPixmap(self.image_path))
+                pixmap = QPixmap(self.image_path)
+                scaled_pixmap = pixmap.scaled(120, 120, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                self.image_preview.setPixmap(scaled_pixmap)
         
         search_area_map = {
             'focused window': 'cửa sổ đang focus',
@@ -474,7 +507,7 @@ class ImageDetectItem(QWidget):
             self.custom_region = data['custom_region']
         
         if 'tolerance' in data:
-            self.spin_tolerance.setValue(data['tolerance'])
+            self.input_tolerance.setText(str(data['tolerance']))
         
         if 'grayscale' in data:
             self.cb_grayscale.setChecked(data['grayscale'])
@@ -510,8 +543,8 @@ class ImageDetectItem(QWidget):
             elif goto_str.startswith('Step '):
                 self.combo_goto.setCurrentText('Chuyển Đến')
                 try:
-                    step_num = int(goto_str.replace('Step ', ''))
-                    self.spin_goto_step.setValue(step_num)
+                    step_num = goto_str.replace('Step ', '')
+                    self.input_goto_step.setText(step_num)
                 except:
                     pass
 
@@ -534,190 +567,149 @@ class AutoDetectDialog(QDialog):
     
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(10)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
         
-        # Tab Widget (đưa lên đầu tiên)
-        # tab_widget : Tab widget chứa tab Hình Ảnh và Text
-        self.tab_widget = QTabWidget()
-        self.tab_widget.setStyleSheet("""
-            QTabWidget::pane {
-                border: 1px solid #E0E0E0;
-                border-radius: 4px;
-                background: white;
-            }
-            QTabBar::tab {
-                background: #F5F5F5;
-                color: #333333;
-                padding: 8px 20px;
-                margin-right: 2px;
-                border: 1px solid #E0E0E0;
-                border-bottom: none;
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-            }
-            QTabBar::tab:selected {
-                background: white;
-                color: #0078D4;
-                font-weight: bold;
-                border-bottom: 2px solid #0078D4;
-            }
-            QTabBar::tab:hover {
-                background: #E8E8E8;
-            }
-        """)
+        # Top Bar: Tabs (SegmentedWidget) + Global Add Button
+        top_layout = QHBoxLayout()
+        
+        # PIVOT (Tab)
+        self.pivot = SegmentedWidget(self)
+        self.pivot.addItem(routeKey='image', text='Hình Ảnh', onClick=lambda: self.stackedWidget.setCurrentIndex(0))
+        self.pivot.addItem(routeKey='text', text='Text', onClick=lambda: self.stackedWidget.setCurrentIndex(1))
+        top_layout.addWidget(self.pivot)
+        
+        top_layout.addStretch()
+        
+        # btn_add_global : Nút thêm item (cho tab hiện tại)
+        self.btn_add_global = PrimaryPushButton("+ Thêm", self)
+        self.btn_add_global.setFixedSize(80, 32)
+        self.btn_add_global.clicked.connect(self.on_add_clicked)
+        top_layout.addWidget(self.btn_add_global)
+        
+        layout.addLayout(top_layout)
+        
+        # Stacked widget cho các tab
+        from PySide6.QtWidgets import QStackedWidget
+        self.stackedWidget = QStackedWidget(self)
         
         # Tab 1: Image Detection
-        # tab_image_detect : Tab Hình Ảnh
         self.tab_image = QWidget()
         self.setup_image_tab()
-        self.tab_widget.addTab(self.tab_image, "Hình Ảnh")
+        self.stackedWidget.addWidget(self.tab_image)
         
-        # Tab 2: Text Detection
-        # tab_text_detect : Tab Text
+        # Tab 2: Text Detection (placeholder)
         self.tab_text = QWidget()
         self.setup_text_tab()
-        self.tab_widget.addTab(self.tab_text, "Text")
+        self.stackedWidget.addWidget(self.tab_text)
         
-        layout.addWidget(self.tab_widget)
+        layout.addWidget(self.stackedWidget)
         
-        # Global settings group - GỘP THÀNH 1 HÀNG
-        global_group = QGroupBox("Cài đặt chung:")
-        global_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                border: 1px solid #E0E0E0;
-                border-radius: 4px;
-                margin-top: 10px;
-                padding-top: 12px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 4px;
-            }
-        """)
-        global_layout = QHBoxLayout()
-        global_layout.setSpacing(15)
+        # Global settings - GỘP THÀNH 1 HÀNG (dùng CardWidget)
+        global_card = CardWidget(self)
+        global_layout = QHBoxLayout(global_card)
+        global_layout.setContentsMargins(16, 12, 16, 12)
+        global_layout.setSpacing(20)
         
-        # Scan interval
-        global_layout.addWidget(QLabel("Quét lại mỗi:"))
-        # spin_scan_interval : Khoảng thời gian quét lại (ms)
-        self.spin_scan_interval = QSpinBox()
-        self.spin_scan_interval.setRange(50, 10000)
-        self.spin_scan_interval.setValue(200)
-        self.spin_scan_interval.setSuffix(" ms")
-        self.spin_scan_interval.setMaximumWidth(120)
-        global_layout.addWidget(self.spin_scan_interval)
+        global_layout.addWidget(BodyLabel("Quét lại mỗi:"))
+        # Use LineEdit + Label for Scan Interval
+        interval_layout = QHBoxLayout()
+        interval_layout.setSpacing(4)
         
-        # Max duration
-        global_layout.addWidget(QLabel("Thời gian chờ tối đa:"))
-        # spin_max_duration : Thời gian chờ tối đa (s)
-        self.spin_max_duration = QSpinBox()
-        self.spin_max_duration.setRange(1, 999999)
-        self.spin_max_duration.setValue(65535)
-        self.spin_max_duration.setSuffix(" giây")
-        self.spin_max_duration.setMaximumWidth(120)
-        global_layout.addWidget(self.spin_max_duration)
+        self.input_scan_interval = LineEdit()
+        self.input_scan_interval.setValidator(QIntValidator(50, 10000, self))
+        self.input_scan_interval.setText("200")
+        self.input_scan_interval.setFixedWidth(60)
+        interval_layout.addWidget(self.input_scan_interval)
+        interval_layout.addWidget(BodyLabel("ms"))
         
-        # Goto on timeout
-        global_layout.addWidget(QLabel("Nếu hết thời gian chờ:"))
+        global_layout.addLayout(interval_layout)
+        
+        global_layout.addWidget(BodyLabel("Thời gian chờ tối đa:"))
+        # Use LineEdit + Label for Max Duration
+        duration_layout = QHBoxLayout()
+        duration_layout.setSpacing(4)
+        
+        self.input_max_duration = LineEdit()
+        self.input_max_duration.setValidator(QIntValidator(1, 999999, self))
+        self.input_max_duration.setText("65535")
+        self.input_max_duration.setFixedWidth(80)
+        duration_layout.addWidget(self.input_max_duration)
+        duration_layout.addWidget(BodyLabel("s"))
+        
+        global_layout.addLayout(duration_layout)
+        
+        global_layout.addWidget(BodyLabel("Nếu hết thời gian:"))
         # combo_goto_timeout : Hành động khi hết thời gian chờ
-        self.combo_goto_timeout = StyledComboBox()
+        self.combo_goto_timeout = ComboBox()
         self.combo_goto_timeout.addItems(["Tiếp theo", "Bắt đầu", "Kết thúc"])
-        self.combo_goto_timeout.setMinimumWidth(120)
+        self.combo_goto_timeout.setFixedWidth(120)
         global_layout.addWidget(self.combo_goto_timeout)
         
         global_layout.addStretch()
-        
-        global_group.setLayout(global_layout)
-        layout.addWidget(global_group)
+        layout.addWidget(global_card)
         
         # Buttons
         button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)
         button_layout.addStretch()
-        # btn_ok : Nút OK
-        self.btn_ok = QPushButton("OK")
-        self.btn_ok.setDefault(True)
-        self.btn_ok.setMinimumWidth(80)
-        self.btn_ok.setMinimumHeight(28)
-        self.btn_ok.clicked.connect(self.accept)
         # btn_cancel : Nút Hủy
-        self.btn_cancel = QPushButton("Hủy")
-        self.btn_cancel.setMinimumWidth(80)
-        self.btn_cancel.setMinimumHeight(28)
+        self.btn_cancel = PushButton("Hủy")
+        self.btn_cancel.setFixedSize(100, 36)
         self.btn_cancel.clicked.connect(self.reject)
-        button_layout.addWidget(self.btn_ok)
+        # btn_ok : Nút OK
+        self.btn_ok = PrimaryPushButton("OK")
+        self.btn_ok.setFixedSize(100, 36)
+        self.btn_ok.clicked.connect(self.accept)
         button_layout.addWidget(self.btn_cancel)
+        button_layout.addWidget(self.btn_ok)
         layout.addLayout(button_layout)
     
+    def on_add_clicked(self):
+        """Handle global add button click"""
+        current_index = self.stackedWidget.currentIndex()
+        if current_index == 0: # Image Tab
+            self.add_image_item()
+        elif current_index == 1: # Text Tab
+            # Placeholder for text item addition
+            pass
+
     def setup_image_tab(self):
         """Setup Image Detection tab"""
         layout = QVBoxLayout(self.tab_image)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(0, 10, 0, 10)
+        layout.setSpacing(12)
         
-        # Instruction label
-        instruction = QLabel("Thêm nhiều ảnh để quét. Khi tìm thấy ảnh nào, hệ thống sẽ thực hiện hành động tương ứng.")
-        instruction.setWordWrap(True)
-        instruction.setStyleSheet("color: #666666; font-size: 12px;")
-        layout.addWidget(instruction)
-        
-        # Add image button
-        # btn_add_image : Nút thêm ảnh mới
-        self.btn_add_image = QPushButton("+ Thêm Ảnh")
-        self.btn_add_image.setMinimumHeight(32)
-        self.btn_add_image.setStyleSheet("""
-            QPushButton {
-                background-color: #0078D4;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                font-weight: bold;
-                font-size: 13px;
-            }
-            QPushButton:hover {
-                background-color: #005A9E;
-            }
-        """)
-        self.btn_add_image.clicked.connect(self.add_image_item)
-        layout.addWidget(self.btn_add_image)
-        
-        # Scroll area for image items
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("""
-            QScrollArea {
-                border: none;
-                background: transparent;
-            }
-        """)
+        # ScrollArea với Fluent Widgets style
+        self.scroll_area = ScrollArea(self.tab_image)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         
         # Container for image items
         # container_image_items : Container chứa các ImageDetectItem
         self.image_items_container = QWidget()
         self.image_items_layout = QVBoxLayout(self.image_items_container)
-        self.image_items_layout.setContentsMargins(0, 0, 0, 0)
-        self.image_items_layout.setSpacing(10)
+        self.image_items_layout.setContentsMargins(0, 0, 8, 0)
+        self.image_items_layout.setSpacing(12)
         self.image_items_layout.addStretch()
         
-        scroll.setWidget(self.image_items_container)
-        layout.addWidget(scroll)
+        self.scroll_area.setWidget(self.image_items_container)
+        layout.addWidget(self.scroll_area)
         
         # Add first item by default
         self.add_image_item()
     
     def setup_text_tab(self):
-        """Setup Text Detection tab"""
+        """Setup Text Detection tab (placeholder)"""
         layout = QVBoxLayout(self.tab_text)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(10)
         
-        # Placeholder for future text detection implementation
-        placeholder = QLabel("Text Detection sẽ được phát triển trong phiên bản sau.\n\nChức năng này cho phép quét text trên màn hình bằng OCR và thực hiện hành động tương ứng.")
+        # Placeholder với Fluent style
+        placeholder = BodyLabel("Text Detection sẽ được phát triển trong phiên bản sau.\n\nChức năng này cho phép quét text trên màn hình bằng OCR và thực hiện hành động tương ứng.")
         placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        placeholder.setStyleSheet("color: #999999; font-size: 13px; padding: 40px;")
+        placeholder.setWordWrap(True)
+        placeholder.setStyleSheet("color: #999; padding: 40px;")
         layout.addWidget(placeholder)
     
     def add_image_item(self):
@@ -725,6 +717,7 @@ class AutoDetectDialog(QDialog):
         item_index = len(self.image_items)
         item = ImageDetectItem(self, item_index)
         item.remove_requested.connect(self.remove_image_item)
+        item.add_requested.connect(self.add_image_item)
         
         self.image_items.append(item)
         # Insert before stretch
@@ -751,7 +744,7 @@ class AutoDetectDialog(QDialog):
         """Update index labels for all image items"""
         for idx, item in enumerate(self.image_items):
             item.item_index = idx
-            item.lbl_index.setText(f"Ảnh #{idx + 1}")
+            item.lbl_index.setText(f"Ảnh {idx + 1}") # Bỏ dấu #
     
     def load_event_data(self):
         """Load event data into dialog"""
@@ -760,10 +753,10 @@ class AutoDetectDialog(QDialog):
         
         # Load global settings
         if 'scan_interval' in self.event:
-            self.spin_scan_interval.setValue(self.event['scan_interval'])
+            self.input_scan_interval.setText(str(self.event['scan_interval']))
         
         if 'max_duration' in self.event:
-            self.spin_max_duration.setValue(self.event['max_duration'])
+            self.input_max_duration.setText(str(self.event['max_duration']))
         
         goto_map = {'Next': 'Tiếp theo', 'Start': 'Bắt đầu', 'End': 'Kết thúc'}
         if 'goto_timeout' in self.event:
@@ -795,11 +788,23 @@ class AutoDetectDialog(QDialog):
         image_detects = []
         for item in self.image_items:
             image_detects.append(item.get_data())
+            
+        scan_interval = 200
+        try:
+            scan_interval = int(self.input_scan_interval.text())
+        except ValueError:
+            pass
+            
+        max_duration = 65535
+        try:
+            max_duration = int(self.input_max_duration.text())
+        except ValueError:
+            pass
         
         return {
             'type': 'auto_detect',
-            'scan_interval': self.spin_scan_interval.value(),
-            'max_duration': self.spin_max_duration.value(),
+            'scan_interval': scan_interval,
+            'max_duration': max_duration,
             'goto_timeout': goto_map.get(self.combo_goto_timeout.currentText(), 'Next'),
             'image_detects': image_detects,
             'time': self.event.get('time', 0.5)
