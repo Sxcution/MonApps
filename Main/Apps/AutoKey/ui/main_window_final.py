@@ -6,7 +6,7 @@
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTableView, QHeaderView, 
                               QFileDialog, QInputDialog, QAbstractItemView, QMessageBox, QMenu)
-from PySide6.QtCore import QSettings, QSize, QPoint, Qt, Slot, QTimer
+from PySide6.QtCore import QSettings, QSize, QPoint, Qt, Slot, QTimer, Signal
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QIcon, QPixmap
 from qfluentwidgets import FluentWindow, NavigationItemPosition, FluentIcon as FIF, InfoBar
 
@@ -39,6 +39,9 @@ class MainWindow(FluentWindow):
     -Global hotkey support
     - Image and text search capabilities
     """
+    
+    # Signal to request parent Main window visibility control
+    request_main_visibility = Signal(bool)  # True=show, False=hide
     
     def __init__(self, is_embedded=False):
         super().__init__()
@@ -215,7 +218,11 @@ class MainWindow(FluentWindow):
                 self.steps_interface.set_play_state(False)
                 return
             
-            # Hide main window and show overlay
+            # Request Main window to hide if embedded
+            if self.is_embedded:
+                self.request_main_visibility.emit(False)
+            
+            # Hide AutoKey window and show overlay
             self.hide()
             self.overlay.show()
             self.overlay.position_overlay()
@@ -247,12 +254,20 @@ class MainWindow(FluentWindow):
             self.overlay_timer.stop()
             self.overlay.hide()
             self.show()
+            
+            # Request Main window to show if embedded
+            if self.is_embedded:
+                self.request_main_visibility.emit(True)
     
     def stop_playback_from_overlay(self):
         """Stop playback when stop button is clicked in overlay"""
         self.overlay.hide()
         self.show()
         self.steps_interface.set_play_state(False)
+        
+        # Request Main window to show if embedded
+        if self.is_embedded:
+            self.request_main_visibility.emit(True)
     
     def pause_playback(self, paused):
         """Pause/resume playback - keeps overlay visible"""
@@ -277,6 +292,11 @@ class MainWindow(FluentWindow):
         self.overlay.hide()
         self.show()
         self.steps_interface.set_play_state(False)
+        
+        # Request Main window to show if embedded
+        if self.is_embedded:
+            self.request_main_visibility.emit(True)
+        
         InfoBar.success("Hoàn thành", "Đã phát xong macro", parent=self)
 
     # ===========================================================================

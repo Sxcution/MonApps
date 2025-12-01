@@ -39,7 +39,13 @@ class LogManager(QObject):
 
     @property
     def buffer(self):
-        return self.original_stdout.buffer
+        """Return buffer attribute for compatibility with TextIOWrapper"""
+        if self.original_stdout and hasattr(self.original_stdout, 'buffer'):
+            return self.original_stdout.buffer
+        # Fallback: return sys.__stdout__.buffer if available
+        if hasattr(sys.__stdout__, 'buffer'):
+            return sys.__stdout__.buffer
+        return None
 
     @classmethod
     def get_instance(cls):

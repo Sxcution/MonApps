@@ -3,6 +3,7 @@ import pyautogui
 import random
 import ctypes
 import os
+import threading
 from PySide6.QtCore import QSettings, QThread, Signal
 from pynput.keyboard import Controller as KeyboardController
 from pynput.mouse import Controller as MouseController, Button

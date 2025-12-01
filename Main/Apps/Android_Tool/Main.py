@@ -15,9 +15,16 @@ from datetime import datetime
 from pathlib import Path
 
 # Fix Unicode encoding for Windows console
+# When running as .pyw (no console), sys.stdout/stderr might be None or without buffer
 if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    try:
+        if hasattr(sys.stdout, 'buffer') and sys.stdout.buffer is not None:
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        if hasattr(sys.stderr, 'buffer') and sys.stderr.buffer is not None:
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    except (AttributeError, OSError):
+        # If stdout/stderr are redirected or unavailable, skip encoding fix
+        pass
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QWidget, 

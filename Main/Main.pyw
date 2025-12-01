@@ -47,7 +47,46 @@ except Exception as e:
         log_file.write(traceback.format_exc())
     print(f"[Main] ERROR: {e}")
 
-from PySide6.QtWidgets import QApplication
+# Global Exception Handler - prevents crashes from unhandled exceptions
+def global_exception_handler(exc_type, exc_value, exc_traceback):
+    """Catch unhandled exceptions and display error dialog instead of crashing"""
+    import traceback
+    from datetime import datetime
+    
+    # Format exception
+    error_msg = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+    
+    # Log to file
+    if log_file:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_file.write(f"\n[{timestamp}] UNHANDLED EXCEPTION:\n{error_msg}\n")
+        log_file.flush()
+    
+    # Print to console
+    print(f"\n{'='*50}")
+    print("UNHANDLED EXCEPTION - App will continue running")
+    print(f"{'='*50}")
+    print(error_msg)
+    
+    # Show error dialog to user (if QApplication exists)
+    try:
+        from PySide6.QtWidgets import QApplication, QMessageBox
+        if QApplication.instance():
+            QMessageBox.critical(
+                None,
+                "Lỗi Không Xử Lý Được",
+                f"Đã xảy ra lỗi:\n\n{exc_type.__name__}: {exc_value}\n\n"
+                f"Chi tiết đã được ghi vào file log.\n\n"
+                f"Ứng dụng sẽ tiếp tục chạy."
+            )
+    except:
+        pass  # If Qt isn't available, just log
+
+# Install global exception handler
+sys.excepthook = global_exception_handler
+
+
+from PySide6.QtWidgets import QApplication, QMessageBox
 from core.config_manager import ConfigManager
 from launcher_ui.home_interface import HomeInterface
 from launcher_ui.settings_interface import SettingsInterface

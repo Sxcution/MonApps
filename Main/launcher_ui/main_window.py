@@ -10,6 +10,7 @@ from launcher_ui.app_settings_interface import AppSettingsInterface
 from launcher_ui.log_interface import LogInterface
 from launcher_ui.widget_samples_interface import WidgetSamplesInterface
 from launcher_ui.notes_interface import NotesInterface
+from launcher_ui.chat_interface import ChatBubble
 import os
 import sys
 
@@ -101,6 +102,27 @@ class MainWindow(FluentWindow):
         self.embedded_android = None
         self.embedded_notes = None
 
+        # Chat Bubble (Floating)
+        self.chat_bubble = ChatBubble(self)
+        self.chat_bubble.show()
+        # Initial position will be set in resizeEvent or we can set it here if we want
+        # But resizeEvent is safer as it runs on show
+
+    
+    def handle_child_visibility_request(self, show: bool):
+        """Handle visibility request from embedded AutoKey
+        
+        Args:
+            show (bool): True to show Main window, False to hide
+        """
+        if show:
+            print("📺 AutoKey requested Main window SHOW")
+            self.show()
+            self.activateWindow()
+        else:
+            print("🔒 AutoKey requested Main window HIDE")
+            self.hide()
+
     def on_interface_changed(self, index):
         widget = self.stackedWidget.widget(index)
         print(f"\n🔄 Tab changed to: {widget.objectName()}")
@@ -158,6 +180,21 @@ class MainWindow(FluentWindow):
             self.embedded_android.resize(new_size)
             print(f"🔧 Android resized: {old_size} → {new_size}")
 
+        # Chat Bubble positioning
+        if hasattr(self, 'chat_bubble'):
+            self.chat_bubble.raise_()
+            if not self.chat_bubble._userMoved:
+                # Snap to bottom-right with margin
+                margin = 24
+                x = self.width() - self.chat_bubble.width() - margin
+                y = self.height() - self.chat_bubble.height() - margin
+                print(f"📏 Resize Snap: Window={self.width()}x{self.height()}, Bubble={self.chat_bubble.width()}x{self.chat_bubble.height()} -> Move to ({x}, {y})")
+                self.chat_bubble.move(x, y)
+            else:
+                # Ensure it stays within bounds if window shrinks
+                print(f"📏 Resize Check Bounds: User moved bubble")
+                self.chat_bubble._ensure_within_bounds()
+
     def embed_autokey(self):
         # Ensure container layout exists
         if self.autokey_interface.layout() is None:
@@ -207,6 +244,15 @@ class MainWindow(FluentWindow):
                 except:
                     pass
                 self.embedded_autokey.toolbar.close_requested.connect(self.close_autokey)
+            
+            # Connect visibility request signal
+            if hasattr(self.embedded_autokey, 'request_main_visibility'):
+                try:
+                    self.embedded_autokey.request_main_visibility.disconnect()
+                except:
+                    pass
+                self.embedded_autokey.request_main_visibility.connect(self.handle_child_visibility_request)
+                print("✓ Connected AutoKey visibility signal to Main window handler")
 
     def embed_android(self):
         # Ensure container layout exists
