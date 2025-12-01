@@ -1,6 +1,6 @@
 from PySide6.QtCore import Qt, QPoint, Signal, QSize
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget, 
-                               QListWidgetItem, QLabel, QDialog, QFrame, QScrollArea)
+                               QListWidgetItem, QLabel, QDialog, QFrame, QScrollArea, QSizeGrip)
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QBrush, QPen, QMouseEvent
 
 from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton, LineEdit, 
@@ -85,6 +85,11 @@ class ChatSettingsDialog(QDialog):
              
         layout.addWidget(self.keys_list)
         
+        # Active Key Selection (Initialize BEFORE adding keys)
+        layout.addWidget(BodyLabel("Key đang dùng:", self))
+        self.combo_active = ComboBox(self)
+        layout.addWidget(self.combo_active)
+
         # Add existing keys
         for item in self.settings.api_keys:
             self.add_key_row(item["name"], item["key"])
@@ -95,13 +100,9 @@ class ChatSettingsDialog(QDialog):
         self.btn_add_key.clicked.connect(lambda: self.add_key_row("", ""))
         layout.addWidget(self.btn_add_key)
         
-        # Active Key Selection
-        layout.addWidget(BodyLabel("Key đang dùng:", self))
-        self.combo_active = ComboBox(self)
-        self.update_combo_items()
+        # Set initial selection
         if 0 <= self.settings.active_key_index < self.combo_active.count():
             self.combo_active.setCurrentIndex(self.settings.active_key_index)
-        layout.addWidget(self.combo_active)
         
         # System Rule
         layout.addWidget(BodyLabel("Luật hệ thống:", self))
@@ -197,7 +198,15 @@ class ChatBubble(QWidget):
         
         # 1. Chat Card (Expanded State) - Initially Hidden
         self.chat_card = CardWidget(self)
-        self.chat_card.setFixedSize(350, 500)
+        self.chat_card.setMinimumSize(300, 400)
+        self.chat_card.resize(350, 500) # Initial size
+        # Set gray background to match Main window
+        self.chat_card.setStyleSheet("""
+            CardWidget {
+                background-color: #2b2b2b;
+                border-radius: 10px;
+            }
+        """)
         self.chat_card.hide()
         
         self._setup_chat_card()
@@ -207,19 +216,23 @@ class ChatBubble(QWidget):
         self.bubble_btn = PrimaryPushButton(self)
         self.bubble_btn.setIcon(FIF.CHAT)
         self.bubble_btn.setFixedSize(60, 60)
-        self.bubble_btn.setIconSize(QSize(24, 24))
+        self.bubble_btn.setIconSize(QSize(28, 28))
         
-        # Make it circular and add shadow
+        # Make it circular with centered icon
         self.bubble_btn.setStyleSheet("""
             PrimaryPushButton {
                 border-radius: 30px;
                 border: none;
+                background-color: #2986ff;
                 padding: 0px;
                 margin: 0px;
+                text-align: center;
+                qproperty-iconSize: 28px 28px;
+            }
+            PrimaryPushButton:hover {
+                background-color: #1a73e8;
             }
         """)
-        # Force mask for perfect circle if stylesheet fails
-        # self.bubble_btn.setMask(QRegion(self.bubble_btn.rect(), QRegion.Ellipse))
         
         # Connect click to toggle
         self.bubble_btn.clicked.connect(self.toggle_chat)
@@ -229,7 +242,7 @@ class ChatBubble(QWidget):
         bubble_layout = QHBoxLayout(bubble_container)
         bubble_layout.setContentsMargins(0, 0, 0, 0)
         bubble_layout.addStretch()
-        bubble_layout.addWidget(self.bubble_btn)
+        bubble_layout.addWidget(self.bubble_btn, 0, Qt.AlignCenter)
         
         self.layout.addWidget(bubble_container)
         
@@ -266,12 +279,13 @@ class ChatBubble(QWidget):
         self.chat_list = QListWidget(self.chat_card)
         self.chat_list.setFrameShape(QFrame.NoFrame)
         self.chat_list.setVerticalScrollMode(QListWidget.ScrollPerPixel)
-        self.chat_list.setStyleSheet("QListWidget { background: transparent; }")
-        layout.addWidget(self.chat_list)
+        # White background for chat area
+        self.chat_list.setStyleSheet("QListWidget { background: white; border-radius: 5px; }")
+        layout.addWidget(self.chat_list, 1)  # Give it stretch factor to fill space
         
-        # --- Input Area ---
+        # --- Input Area (moved to bottom) ---
         input_layout = QHBoxLayout()
-        input_layout.setContentsMargins(0, 5, 0, 5)
+        input_layout.setContentsMargins(0, 5, 0, 0)
         
         self.input_box = LineEdit(self.chat_card)
         self.input_box.setPlaceholderText("Nhập tin nhắn...")
@@ -280,11 +294,42 @@ class ChatBubble(QWidget):
         
         self.btn_send = PrimaryPushButton(self.chat_card)
         self.btn_send.setIcon(FIF.SEND)
-        self.btn_send.setFixedSize(40, 40) # Square and larger
+        self.btn_send.setFixedSize(36, 36) # Slightly smaller, standard icon size
+        self.btn_send.setStyleSheet("""
+            PrimaryPushButton {
+                border-radius: 4px;
+                padding: 4px;
+                margin: 0px;
+            }
+        """)
         self.btn_send.clicked.connect(self.send_message)
         input_layout.addWidget(self.btn_send, 0)
         
-        layout.addLayout(input_layout)
+        layout.addLayout(input_layout, 0)  # No stretch, stays at bottom
+        
+        # --- Resize Grip ---
+        # Add a size grip to the bottom-right corner
+        self.size_grip = QSizeGrip(self.chat_card)
+        self.size_grip.setFixedSize(20, 20)
+        # Position it in the bottom-right corner
+        self.size_grip.setStyleSheet("background: transparent;")
+        # We need to manually position it or add it to layout?
+        # QSizeGrip usually works best when added to a layout or manually positioned in resizeEvent
+        # But CardWidget has a layout. Let's add it to the main layout but aligned bottom-right.
+        
+        # Actually, QSizeGrip resizes its parent window. 
+        # Since ChatCard is a child widget, QSizeGrip might not work out of the box for resizing the widget itself 
+        # unless it's a top-level window.
+        # But ChatBubble adjusts size to content.
+        # Let's try adding a custom resize handle logic or just QSizeGrip and see if it works for a widget.
+        # If not, we might need to implement mouse events on the edge.
+        
+        # Alternative: Add it to the layout
+        grip_layout = QHBoxLayout()
+        grip_layout.setContentsMargins(0, 0, 0, 0)
+        grip_layout.addStretch()
+        grip_layout.addWidget(self.size_grip)
+        layout.addLayout(grip_layout)
 
     def toggle_chat(self):
         """Toggle between expanded and collapsed states."""
