@@ -169,38 +169,79 @@ class SettingsDialog(QDialog):
         layout.addLayout(form_layout)
         layout.addStretch()
         
-        # Apply Styles
+        
+        # ✅ Apply Dark Theme Styles
         self.setStyleSheet("""
-            QDialog { background-color: #ffffff; color: #333333; }
-            QLabel { color: #333333; font-weight: bold; }
+            QDialog { 
+                background-color: #2b2b2b; 
+                color: #ffffff; 
+            }
+            QTabWidget::pane {
+                background-color: #2b2b2b;
+                border: 1px solid #454545;
+                border-radius: 4px;
+            }
+            QTabBar::tab {
+                background-color: #1e1e1e;
+                color: #ffffff;
+                padding: 8px 16px;
+                border: 1px solid #454545;
+                border-bottom: none;
+                margin-right: 2px;
+            }
+            QTabBar::tab:selected {
+                background-color: #2b2b2b;
+                border-bottom: 2px solid #0078d4;
+            }
+            QLabel { 
+                color: #ffffff; 
+                font-weight: bold; 
+            }
             QKeySequenceEdit { 
                 padding: 5px; 
-                border: 1px solid #cccccc; 
+                border: 1px solid #454545; 
                 border-radius: 3px;
-                color: #333333;
-                background-color: #ffffff;
+                color: #ffffff;
+                background-color: #1e1e1e;
                 selection-background-color: #0078d4;
             }
             QKeySequenceEdit:focus {
                 border: 2px solid #0078d4;
-                background-color: #ffffff;
+                background-color: #2b2b2b;
             }
             QLineEdit {
                 padding: 5px; 
-                border: 1px solid #cccccc; 
+                border: 1px solid #454545; 
                 border-radius: 4px;
-                color: #333333;
-                background-color: #f9f9f9;
+                color: #ffffff;
+                background-color: #1e1e1e;
             }
-            QSpinBox, QDoubleSpinBox {
+            QSpinBox, QDoubleSpinBox, QComboBox {
                 padding: 5px;
-                border: 1px solid #cccccc;
+                border: 1px solid #454545;
                 border-radius: 4px;
-                color: #333333;
-                background-color: #ffffff;
+                color: #ffffff;
+                background-color: #1e1e1e;
             }
-            QSpinBox:focus, QDoubleSpinBox:focus {
+            QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {
                 border: 2px solid #0078d4;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 20px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 6px solid #ffffff;
+                margin-right: 5px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #2b2b2b;
+                color: #ffffff;
+                selection-background-color: #0078d4;
+                border: 1px solid #454545;
             }
             QPushButton {
                 padding: 6px 12px;
@@ -209,8 +250,13 @@ class SettingsDialog(QDialog):
                 border: none;
                 border-radius: 4px;
             }
-            QPushButton:hover { background-color: #106ebe; }
-            QPushButton:disabled { background-color: #cccccc; }
+            QPushButton:hover { 
+                background-color: #1084d9; 
+            }
+            QPushButton:disabled { 
+                background-color: #454545;
+                color: #808080;
+            }
         """)
     
     def _clamp_speed(self):

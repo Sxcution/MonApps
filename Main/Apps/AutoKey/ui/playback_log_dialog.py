@@ -98,16 +98,18 @@ class PlaybackLogDialog(QDialog):
         
         layout.addLayout(btn_layout)
         
-        # Style
+        # ✅ Apply Dark Theme Styles
         self.setStyleSheet("""
             QDialog {
-                background-color: #ffffff;
+                background-color: #2b2b2b;
+                color: #ffffff;
             }
             QTableWidget {
-                background-color: #ffffff;
-                border: 1px solid #cccccc;
+                background-color: #1e1e1e;
+                border: 1px solid #454545;
                 border-radius: 4px;
-                gridline-color: #e0e0e0;
+                gridline-color: #3d3d3d;
+                color: #ffffff;
             }
             QTableWidget::item {
                 padding: 5px;
@@ -117,12 +119,26 @@ class PlaybackLogDialog(QDialog):
                 color: white;
             }
             QHeaderView::section {
-                background-color: #f0f0f0;
+                background-color: #2b2b2b;
+                color: #ffffff;
                 border: none;
-                border-right: 1px solid #cccccc;
-                border-bottom: 1px solid #cccccc;
+                border-right: 1px solid #454545;
+                border-bottom: 1px solid #454545;
                 padding: 8px;
                 font-weight: bold;
+            }
+            QListWidget {
+                background-color: #1e1e1e;
+                border: 1px solid #454545;
+                border-radius: 4px;
+                color: #ffffff;
+            }
+            QListWidget::item:selected {
+                background-color: #0078d4;
+                color: white;
+            }
+            QLabel {
+                color: #ffffff;
             }
             QPushButton {
                 padding: 8px 16px;
@@ -133,10 +149,13 @@ class PlaybackLogDialog(QDialog):
                 font-size: 11pt;
             }
             QPushButton:hover {
-                background-color: #106ebe;
+                background-color: #1084d9;
             }
             QPushButton:pressed {
                 background-color: #005a9e;
+            }
+            QSplitter::handle {
+                background-color: #454545;
             }
         """)
     
@@ -197,7 +216,7 @@ class PlaybackLogDialog(QDialog):
         
         # Thời gian
         time_item = QTableWidgetItem(timestamp)
-        time_item.setForeground(QColor("#666666"))
+        time_item.setForeground(QColor("#cccccc")) # Light gray for dark theme
         self.log_table.setItem(row_position, 0, time_item)
         
         # Step
@@ -240,8 +259,8 @@ class PlaybackLogDialog(QDialog):
         # Merge all columns for loop marker
         loop_text = f"═══════ Loop {loop_num} ═══════"
         item = QTableWidgetItem(loop_text)
-        item.setBackground(QColor("#e3f2fd"))
-        item.setForeground(QColor("#0078d4"))
+        item.setBackground(QColor("#004578")) # Dark blue background
+        item.setForeground(QColor("#ffffff")) # White text
         item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         
         # Set span to merge columns
@@ -258,7 +277,7 @@ class PlaybackLogDialog(QDialog):
                 'loop_num': loop_num
             })
     
-    def add_status_message(self, message, color="#666666"):
+    def add_status_message(self, message, color="#cccccc"):
         """Add a status message (non-step log)"""
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         

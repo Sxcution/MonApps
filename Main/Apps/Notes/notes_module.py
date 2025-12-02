@@ -638,6 +638,11 @@ class AutoSaveTextEdit(QTextEdit):
             color_action = QAction("🎨 Đổi màu chữ", self)
             color_action.triggered.connect(self.change_text_color)
             menu.addAction(color_action)
+            
+            # ✅ Bold text option
+            bold_action = QAction("📝 In đậm", self)
+            bold_action.triggered.connect(self.toggle_bold)
+            menu.addAction(bold_action)
             menu.addSeparator()
         
         # Text size submenu (always show)
@@ -805,6 +810,23 @@ class AutoSaveTextEdit(QTextEdit):
                 fmt = QTextCharFormat()
                 fmt.setForeground(color)
                 cursor.mergeCharFormat(fmt)
+    
+    def toggle_bold(self):
+        """Toggle bold formatting for selected text."""
+        cursor = self.textCursor()
+        if cursor.hasSelection():
+            fmt = QTextCharFormat()
+            # Get current font weight
+            current_fmt = cursor.charFormat()
+            is_bold = current_fmt.fontWeight() == QFont.Weight.Bold
+            
+            # Toggle bold
+            if is_bold:
+                fmt.setFontWeight(QFont.Weight.Normal)
+            else:
+                fmt.setFontWeight(QFont.Weight.Bold)
+            
+            cursor.mergeCharFormat(fmt)
     
     def change_text_size(self, size):
         """Change font size of selected text or set for new text."""

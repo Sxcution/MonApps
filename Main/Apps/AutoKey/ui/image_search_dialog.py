@@ -61,27 +61,29 @@ class StyledComboBox(QComboBox):
             popup.setMinimumWidth(max_width)
             popup.setStyleSheet("""
                 QAbstractItemView {
-                    background-color: #FFFFFF;
-                    border: 2px solid #000000;
+                    background-color: #2b2b2b;
+                    border: 1px solid #454545;
                     border-radius: 4px;
-                    selection-background-color: #E5F3FF;
-                    selection-color: #000000;
+                    selection-background-color: #0078d4;
+                    selection-color: #ffffff;
                     outline: none;
                     padding: 0px;
+                    color: #ffffff;
                 }
                 QAbstractItemView::item {
                     padding: 4px 8px;
                     border: none;
                     background-color: transparent;
+                    color: #ffffff;
                 }
                 QAbstractItemView::item:hover {
-                    background-color: #E5F3FF;
+                    background-color: #3d3d3d;
                     border: none;
                 }
                 QAbstractItemView::item:selected {
-                    background-color: #0078D4;
-                    color: #FFFFFF;
-                    border: 1px solid #000000;
+                    background-color: #0078d4;
+                    color: #ffffff;
+                    border: none;
                 }
             """)
 
@@ -93,31 +95,31 @@ class StyledCheckBox(QCheckBox):
         self.setStyleSheet("""
             QCheckBox {
                 spacing: 8px;
-                color: #1A1A1A;
+                color: #ffffff;
                 font-size: 13px;
             }
             QCheckBox::indicator {
                 width: 20px;
                 height: 20px;
                 border-radius: 4px;
-                border: 2px solid #0078D4;
-                background-color: #FFFFFF;
+                border: 2px solid #0078d4;
+                background-color: #1e1e1e;
             }
             QCheckBox::indicator:checked {
-                background-color: #FFFFFF;
-                border: 2px solid #0078D4;
+                background-color: #0078d4;
+                border: 2px solid #0078d4;
             }
             QCheckBox::indicator:unchecked {
-                background-color: #FFFFFF;
-                border: 2px solid #CCCCCC;
+                background-color: #1e1e1e;
+                border: 2px solid #454545;
             }
             QCheckBox::indicator:unchecked:hover {
-                border: 2px solid #0078D4;
-                background-color: #F5F5F5;
+                border: 2px solid #0078d4;
+                background-color: #2b2b2b;
             }
             QCheckBox::indicator:checked:hover {
-                background-color: #F5F5F5;
-                border: 2px solid #005A9E;
+                background-color: #1084d9;
+                border: 2px solid #1084d9;
             }
         """)
     
@@ -141,8 +143,8 @@ class StyledCheckBox(QCheckBox):
             )
             
             if not indicator_rect.isEmpty():
-                # Draw black checkmark
-                painter.setPen(QPen(QColor(0, 0, 0), 2.5, 
+                # Draw white checkmark
+                painter.setPen(QPen(QColor(255, 255, 255), 2.5, 
                                   Qt.PenStyle.SolidLine, 
                                   Qt.PenCapStyle.RoundCap, 
                                   Qt.PenJoinStyle.RoundJoin))
@@ -171,8 +173,8 @@ class ImagePreviewLabel(QLabel):
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setStyleSheet("""
             QLabel { 
-                border: 1px solid #CCCCCC; 
-                background: #FFFFFF;
+                border: 1px solid #454545; 
+                background: #1e1e1e;
                 border-radius: 4px;
             }
         """)
@@ -181,14 +183,14 @@ class ImagePreviewLabel(QLabel):
         
     def show_placeholder(self):
         placeholder = QPixmap(200, 200)
-        placeholder.fill(Qt.GlobalColor.white)
+        placeholder.fill(QColor("#1e1e1e"))
         painter = QPainter(placeholder)
-        painter.setPen(QColor(200, 200, 200))
-        painter.setBrush(QColor(245, 245, 245))
+        painter.setPen(QColor("#454545"))
+        painter.setBrush(QColor("#2b2b2b"))
         # Draw frame
         painter.drawRect(50, 50, 100, 100)
         # Draw question mark
-        painter.setPen(QColor(180, 180, 180))
+        painter.setPen(QColor("#808080"))
         painter.setFont(painter.font())
         painter.drawText(75, 75, 50, 50, Qt.AlignmentFlag.AlignCenter, "?")
         painter.end()
@@ -226,28 +228,77 @@ class ImageSearchDialog(QDialog):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(10)
         
-        # Description
-        desc_label = QLabel("Tìm vị trí của ảnh đã định nghĩa trong vùng màn hình đã chọn.")
-        desc_label.setWordWrap(True)
-        desc_label.setStyleSheet("QLabel { color: #333333; margin-bottom: 8px; }")
-        layout.addWidget(desc_label)
-        
-        # Image specifications group
-        img_group = QGroupBox("Thông số ảnh:")
-        img_group.setStyleSheet("""
+        # ✅ Apply Dark Theme Styles
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #2b2b2b;
+                color: #ffffff;
+            }
+            QLabel {
+                color: #ffffff;
+            }
             QGroupBox {
                 font-weight: bold;
-                border: 1px solid #E0E0E0;
+                border: 1px solid #454545;
                 border-radius: 4px;
                 margin-top: 10px;
                 padding-top: 12px;
+                color: #ffffff;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
                 left: 8px;
                 padding: 0 4px;
+                color: #ffffff;
+            }
+            QPushButton {
+                padding: 5px 10px;
+                background-color: #0078d4;
+                color: white;
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #1084d9;
+            }
+            QPushButton:pressed {
+                background-color: #005a9e;
+            }
+            QSpinBox {
+                background-color: #1e1e1e;
+                color: #ffffff;
+                border: 1px solid #454545;
+                border-radius: 4px;
+                padding: 4px;
+            }
+            QComboBox {
+                background-color: #1e1e1e;
+                color: #ffffff;
+                border: 1px solid #454545;
+                border-radius: 4px;
+                padding: 4px;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 6px solid #ffffff;
+                margin-right: 5px;
             }
         """)
+        
+        # Description
+        desc_label = QLabel("Tìm vị trí của ảnh đã định nghĩa trong vùng màn hình đã chọn.")
+        desc_label.setWordWrap(True)
+        desc_label.setStyleSheet("QLabel { color: #cccccc; margin-bottom: 8px; }")
+        layout.addWidget(desc_label)
+        
+        # Image specifications group
+        img_group = QGroupBox("Thông số ảnh:")
+        # Style is handled by global stylesheet now
         img_layout = QHBoxLayout()
         img_layout.setSpacing(15)
         
@@ -352,20 +403,7 @@ class ImageSearchDialog(QDialog):
         
         # If image is found section
         found_group = QGroupBox("Nếu tìm thấy ảnh:")
-        found_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                border: 1px solid #E0E0E0;
-                border-radius: 4px;
-                margin-top: 10px;
-                padding-top: 12px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 4px;
-            }
-        """)
+        # Style is handled by global stylesheet now
         found_layout = QVBoxLayout()
         found_layout.setSpacing(10)
         
@@ -446,20 +484,7 @@ class ImageSearchDialog(QDialog):
         
         # If image is not found section
         not_found_group = QGroupBox("Nếu không tìm thấy ảnh")
-        not_found_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                border: 1px solid #E0E0E0;
-                border-radius: 4px;
-                margin-top: 10px;
-                padding-top: 12px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 4px;
-            }
-        """)
+        # Style is handled by global stylesheet now
         not_found_layout = QVBoxLayout()
         not_found_layout.setSpacing(10)
         

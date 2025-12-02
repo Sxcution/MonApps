@@ -82,9 +82,9 @@ class ImageDetectItem(QWidget):
         self.image_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_preview.setStyleSheet("""
             QLabel {
-                border: 2px solid #E0E0E0;
+                border: 2px solid #454545;
                 border-radius: 6px;
-                background-color: #FFFFFF;
+                background-color: #1e1e1e;
             }
         """)
         self.show_placeholder()
@@ -262,10 +262,10 @@ class ImageDetectItem(QWidget):
         self.image_preview.setText("No Image")
         self.image_preview.setStyleSheet("""
             QLabel {
-                border: 2px solid #E0E0E0;
+                border: 2px solid #454545;
                 border-radius: 6px;
-                background-color: #FAFAFA;
-                color: #999;
+                background-color: #1e1e1e;
+                color: #808080;
             }
         """)
     

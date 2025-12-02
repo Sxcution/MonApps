@@ -48,6 +48,22 @@ class ApiKeyRow(QWidget):
         layout.addWidget(self.key_input)
         layout.addWidget(self.btn_remove)
 
+class ResizableCardWidget(CardWidget):
+    """CardWidget with a built-in resize grip that overlays the content."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.size_grip = QSizeGrip(self)
+        self.size_grip.setFixedSize(20, 20)
+        self.size_grip.setStyleSheet("background: transparent;")
+        
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        rect = self.rect()
+        # Position in bottom-right corner
+        self.size_grip.move(rect.right() - self.size_grip.width(), rect.bottom() - self.size_grip.height())
+        self.size_grip.raise_()
+
+
 class ChatSettingsDialog(QDialog):
     """Dialog to configure chatbot settings."""
     def __init__(self, settings: ChatSettings, parent=None):
@@ -197,7 +213,7 @@ class ChatBubble(QWidget):
         self.layout.setAlignment(Qt.AlignBottom | Qt.AlignRight)
         
         # 1. Chat Card (Expanded State) - Initially Hidden
-        self.chat_card = CardWidget(self)
+        self.chat_card = ResizableCardWidget(self)
         self.chat_card.setMinimumSize(300, 400)
         self.chat_card.resize(350, 500) # Initial size
         # Set gray background to match Main window
@@ -261,7 +277,7 @@ class ChatBubble(QWidget):
     def _setup_chat_card(self):
         """Build the internal layout of the chat card."""
         layout = QVBoxLayout(self.chat_card)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(10, 10, 10, 5)
         layout.setSpacing(5)
         
         # --- Header ---
@@ -341,29 +357,7 @@ class ChatBubble(QWidget):
         
         layout.addLayout(input_layout, 0)  # No stretch, stays at bottom
         
-        # --- Resize Grip ---
-        # Add a size grip to the bottom-right corner
-        self.size_grip = QSizeGrip(self.chat_card)
-        self.size_grip.setFixedSize(20, 20)
-        # Position it in the bottom-right corner
-        self.size_grip.setStyleSheet("background: transparent;")
-        # We need to manually position it or add it to layout?
-        # QSizeGrip usually works best when added to a layout or manually positioned in resizeEvent
-        # But CardWidget has a layout. Let's add it to the main layout but aligned bottom-right.
-        
-        # Actually, QSizeGrip resizes its parent window. 
-        # Since ChatCard is a child widget, QSizeGrip might not work out of the box for resizing the widget itself 
-        # unless it's a top-level window.
-        # But ChatBubble adjusts size to content.
-        # Let's try adding a custom resize handle logic or just QSizeGrip and see if it works for a widget.
-        # If not, we might need to implement mouse events on the edge.
-        
-        # Alternative: Add it to the layout
-        grip_layout = QHBoxLayout()
-        grip_layout.setContentsMargins(0, 0, 0, 0)
-        grip_layout.addStretch()
-        grip_layout.addWidget(self.size_grip)
-        layout.addLayout(grip_layout)
+
 
     def toggle_chat(self):
         """Toggle between expanded and collapsed states."""
