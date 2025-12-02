@@ -88,3 +88,13 @@
     - **Enforce App Theme:** Explicitly set the theme (e.g., `setTheme(Theme.LIGHT)`) in the main window's `__init__` method to ensure consistent rendering regardless of system settings.
     - **Button & Panel Sync:** Ensure that buttons, panels, and tables share the same theme (Light/Dark) to avoid visual discrepancies (e.g., black buttons on white panels).
     - **Avoid Custom Cards:** Do NOT manually create `CardWidget` with custom layouts for standard settings unless absolutely necessary for a unique feature not covered by standard components.
+
+## IX. GEMINI & SYSTEM CONTROL PROTOCOL
+15. **AI Integration (Gemini):**
+    - **Model Standard:** Use `gemini-2.5-flash` as the default model for consistency with Dashboard.
+    - **Handler:** All AI interactions MUST go through `core.ai_handler.AIHandler`.
+    - **Persistence:** API Keys and settings MUST be saved to `chat_settings.json` using absolute paths.
+
+16. **System Control:**
+    - **Centralized Controller:** All OS-level commands (Shutdown, Volume, App Launch) MUST be implemented in `core.system_controller.SystemController`.
+    - **Media Control:** Use `ctypes` for media/volume control to ensure compatibility.

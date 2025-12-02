@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt, Signal, Slot, QSize, QMimeData, QModelIndex, QPoi
 from PySide6.QtGui import (QStandardItemModel, QStandardItem, QColor, QIcon, QPixmap, 
                           QDragEnterEvent, QDropEvent, QDragMoveEvent, QPolygon)
 from qfluentwidgets import (PushButton, ToolButton, FluentIcon as FIF, 
-                            InfoBar, CardWidget, SubtitleLabel)
+                            InfoBar, CardWidget, SubtitleLabel, MessageDialog)
 import uuid
 import os
 import glob
@@ -317,6 +317,66 @@ class SavedMacrosTableView(QTableView):
         super().dropEvent(event)
         
         print(f"🔍 DEBUG: After drop - total rows: {model.rowCount()}")
+
+    def contextMenuEvent(self, event):
+        """Show context menu for saved macros"""
+        index = self.indexAt(event.pos())
+        if not index.isValid():
+            return
+            
+        menu = QMenu(self)
+        
+        # Action: Mở thư mục
+        # Note: FIF.FOLDER returns FluentIcon, need .icon() for QMenu
+        open_folder_action = menu.addAction(FIF.FOLDER.icon(), "Mở Thư Mục")
+        open_folder_action.triggered.connect(lambda: self._open_macro_folder(index))
+        
+        # Action: Xóa
+        delete_action = menu.addAction(FIF.DELETE.icon(), "Xóa")
+        delete_action.triggered.connect(lambda: self._delete_macro_file(index))
+        
+        menu.exec(event.globalPos())
+
+    def _open_macro_folder(self, index):
+        """Open the folder containing the macro file"""
+        item = self.model().itemFromIndex(index)
+        if item:
+            filepath = item.data(Qt.ItemDataRole.UserRole)
+            if filepath:
+                folder_path = os.path.dirname(filepath)
+                if os.path.exists(folder_path):
+                    os.startfile(folder_path)
+                else:
+                    InfoBar.error("Lỗi", "Thư mục không tồn tại!", parent=self.window())
+
+    def _delete_macro_file(self, index):
+        """Delete the selected macro file"""
+        item = self.model().itemFromIndex(index)
+        if not item:
+            return
+            
+        filepath = item.data(Qt.ItemDataRole.UserRole)
+        filename = item.text()
+        
+        # Show confirmation dialog
+        dialog = MessageDialog("Xóa Macro", f"Bạn có chắc chắn muốn xóa macro '{filename}' không?", self.window())
+        if dialog.exec():
+            try:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                    InfoBar.success("Thành công", f"Đã xóa macro '{filename}'", parent=self.window())
+                    
+                    # Refresh list via parent (StepsInterface)
+                    if hasattr(self.parent(), 'refresh_saved_macros'):
+                        self.parent().refresh_saved_macros()
+                else:
+                    # If file doesn't exist but is in list, just refresh
+                    InfoBar.warning("Cảnh báo", "File không tồn tại, đang làm mới danh sách...", parent=self.window())
+                    if hasattr(self.parent(), 'refresh_saved_macros'):
+                        self.parent().refresh_saved_macros()
+                        
+            except Exception as e:
+                InfoBar.error("Lỗi", f"Không thể xóa file: {e}", parent=self.window())
 
 
 class StepsInterface(QWidget):

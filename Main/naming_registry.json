@@ -22,7 +22,12 @@
         "lbl_loop_count": "loop_label",
         "lbl_elapsed_time": "time_label",
         "btn_pause": "pause_btn",
-        "btn_stop": "stop_btn"
+        "btn_stop": "stop_btn",
+        "chat_interface": "chatInterface",
+        "chat_bubble_btn": "bubble_btn",
+        "chat_window": "chat_window",
+        "chat_input": "chat_input",
+        "chat_send_btn": "send_btn"
     },
     "config_keys": {
         "dark_mode": "dark_mode",

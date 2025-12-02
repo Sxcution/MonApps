@@ -25,9 +25,12 @@ This directory contains the central launcher and the sub-projects `AutoKey` and 
 - `core/`: Core functionality
     - `config_manager.py`: Handles loading/saving config.json
     - `log_manager.py`: Singleton for capturing stdout/stderr to log interface
+    - `ai_handler.py`: Handles Gemini API communication and function calling
+    - `system_controller.py`: Executes system-level commands (Shutdown, Volume, etc.)
 - `launcher_ui/`: UI components for the launcher
     - `main_window.py`: Main FluentWindow with independent app navigation buttons, close handlers
     - `home_interface.py`: Home page with app launch buttons
+    - `chat_interface.py`: Detached Chat Bubble window with AI integration
     - `notes_interface.py`: Notes interface embedding the Notes module
     - `settings_interface.py`: General settings page with widget samples button
     - `tools_interface.py`: Empty placeholder interface (no content)

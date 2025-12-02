@@ -1,17 +1,18 @@
-from PySide6.QtCore import Qt, QPoint, Signal, QSize
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget, 
-                               QListWidgetItem, QLabel, QDialog, QFrame, QScrollArea, QSizeGrip, QPushButton)
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QBrush, QPen, QMouseEvent
+                               QListWidgetItem, QLabel, QDialog, QFrame, QScrollArea, QSizeGrip, QPushButton, QApplication)
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QBrush, QPen, QMouseEvent, QPixmap, QClipboard, QKeySequence, QShortcut
+from PySide6.QtCore import Qt, QPoint, Signal, QSize, QRect, QBuffer, QByteArray, QEvent
 
 from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton, LineEdit, 
                             FluentIcon as FIF, TextEdit, InfoBar, StrongBodyLabel,
                             BodyLabel, Theme, isDarkTheme, TransparentToolButton,
-                            BodyLabel, Theme, isDarkTheme, TransparentToolButton,
-                            ComboBox)
+                            ComboBox, ToolButton)
 from core.ai_handler import AIHandler
 
 import json
 import os
+
+
 
 class ChatSettings:
     """Data class to hold chatbot settings with persistence."""
@@ -115,6 +116,82 @@ class DraggableHeader(QWidget):
     def mouseReleaseEvent(self, event: QMouseEvent):
         self._dragging = False
         super().mouseReleaseEvent(event)
+
+class SnippingOverlay(QWidget):
+    """Fullscreen overlay for capturing a screenshot area."""
+    captured = Signal(QPixmap)
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setWindowState(Qt.WindowFullScreen)
+        self.setCursor(Qt.CrossCursor)
+        
+        self.start_pos = None
+        self.end_pos = None
+        self.is_drawing = False
+        
+        # Capture full screen
+        screen = QApplication.primaryScreen()
+        self.original_pixmap = screen.grabWindow(0)
+        
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        # 1. Draw the original screenshot (background)
+        painter.drawPixmap(0, 0, self.original_pixmap)
+        
+        # 2. Draw the dimming layer (semi-transparent black)
+        painter.setBrush(QColor(0, 0, 0, 100))
+        painter.setPen(Qt.NoPen)
+        
+        if self.start_pos and self.end_pos:
+            # Draw 4 rectangles around the selection to create the "hole"
+            # This avoids CompositionMode issues and ensures the selection is clear
+            rect = QRect(self.start_pos, self.end_pos).normalized()
+            
+            # Top
+            painter.drawRect(0, 0, self.width(), rect.top())
+            # Bottom
+            painter.drawRect(0, rect.bottom() + 1, self.width(), self.height() - rect.bottom() - 1)
+            # Left
+            painter.drawRect(0, rect.top(), rect.left(), rect.height())
+            # Right
+            painter.drawRect(rect.right() + 1, rect.top(), self.width() - rect.right() - 1, rect.height())
+            
+            # Draw border around selection
+            painter.setPen(QPen(QColor("#0078d4"), 2))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRect(rect)
+        else:
+            # No selection, dim everything
+            painter.drawRect(self.rect())
+            
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.start_pos = event.pos()
+            self.end_pos = event.pos()
+            self.is_drawing = True
+            self.update()
+            
+    def mouseMoveEvent(self, event):
+        if self.is_drawing:
+            self.end_pos = event.pos()
+            self.update()
+            
+    def mouseReleaseEvent(self, event):
+        if self.is_drawing:
+            self.is_drawing = False
+            self.close()
+            
+            # Capture the selected area
+            rect = QRect(self.start_pos, self.end_pos).normalized()
+            if rect.width() > 10 and rect.height() > 10:
+                captured_pixmap = self.original_pixmap.copy(rect)
+                self.captured.emit(captured_pixmap)
+                
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.close()
 
 class ResizeGrip(QWidget):
     """Custom grip to resize the top-level window."""
@@ -467,14 +544,46 @@ class ChatBubble(QWidget):
         self.chat_list.setStyleSheet("QListWidget { background: #2b2b2b; border-radius: 5px; }")
         layout.addWidget(self.chat_list, 1)  # Give it stretch factor to fill space
         
+        # --- Image Preview Area ---
+        self.image_preview_container = QWidget(self.chat_card)
+        self.image_preview_container.hide()
+        preview_layout = QHBoxLayout(self.image_preview_container)
+        preview_layout.setContentsMargins(10, 5, 10, 5)
+        
+        self.image_preview_label = QLabel(self.image_preview_container)
+        self.image_preview_label.setFixedSize(100, 100)
+        self.image_preview_label.setScaledContents(True)
+        self.image_preview_label.setStyleSheet("border: 1px solid #555; border-radius: 5px;")
+        
+        self.btn_clear_image = TransparentToolButton(FIF.CLOSE, self.image_preview_container)
+        self.btn_clear_image.setFixedSize(24, 24)
+        self.btn_clear_image.clicked.connect(self.clear_image_preview)
+        
+        preview_layout.addWidget(self.image_preview_label)
+        preview_layout.addWidget(self.btn_clear_image, 0, Qt.AlignTop)
+        preview_layout.addStretch()
+        
+        layout.addWidget(self.image_preview_container)
+        
         # --- Input Area (moved to bottom) ---
         input_layout = QHBoxLayout()
         input_layout.setContentsMargins(0, 5, 0, 0)
         
+        # Camera Button (Snipping Tool)
+        self.btn_camera = TransparentToolButton(FIF.CAMERA, self.chat_card)
+        self.btn_camera.setFixedSize(36, 36)
+        self.btn_camera.setIconSize(QSize(18, 18))
+        self.btn_camera.setToolTip("Chụp màn hình")
+        self.btn_camera.clicked.connect(self.start_snipping)
+        input_layout.addWidget(self.btn_camera)
+        
         self.input_box = LineEdit(self.chat_card)
-        self.input_box.setPlaceholderText("Nhập tin nhắn...")
+        self.input_box.setPlaceholderText("Nhập tin nhắn... (Ctrl+V để dán ảnh)")
         self.input_box.setFixedHeight(40)  # Fixed height for better appearance
         self.input_box.returnPressed.connect(self.send_message)
+        
+        # Install event filter for Ctrl+V
+        self.input_box.installEventFilter(self)
         
         # ✅ Rounded input field styling
         self.input_box.setStyleSheet("""
@@ -483,10 +592,13 @@ class ChatBubble(QWidget):
                 padding-left: 15px;
                 padding-right: 15px;
                 border: 1px solid #454545;
+                border-bottom: 1px solid #454545;
                 background-color: #1e1e1e;
             }
             LineEdit:focus {
                 border: 1px solid #0078d4;
+                border-bottom: 1px solid #0078d4;
+                background-color: #1e1e1e;
             }
         """)
         input_layout.addWidget(self.input_box, 1)
@@ -517,9 +629,50 @@ class ChatBubble(QWidget):
         
         layout.addLayout(input_layout, 0)  # No stretch, stays at bottom
         
+        self.current_image = None # Store current image data
+
+    def eventFilter(self, obj, event):
+        if obj == self.input_box and event.type() == QEvent.KeyPress:
+            if event.matches(QKeySequence.Paste):
+                clipboard = QApplication.clipboard()
+                mime_data = clipboard.mimeData()
+                if mime_data.hasImage():
+                    self.set_image_preview(clipboard.pixmap())
+                    return True
+        return super().eventFilter(obj, event)
+
+    def start_snipping(self):
+        """Start the snipping tool overlay."""
+        self.hide() # Hide chat window
+        self.snipper = SnippingOverlay()
+        self.snipper.captured.connect(self.on_snip_captured)
+        self.snipper.show()
+        
+    def on_snip_captured(self, pixmap):
+        """Handle captured screenshot."""
+        self.show() # Show chat window again
+        self.set_image_preview(pixmap)
+        
+    def set_image_preview(self, pixmap):
+        """Show image in preview area."""
+        self.current_image = pixmap
+        self.image_preview_label.setPixmap(pixmap)
+        self.image_preview_container.show()
+        self.input_box.setFocus()
+        
+    def clear_image_preview(self):
+        """Clear the current image."""
+        self.current_image = None
+        self.image_preview_container.hide()
+
     def toggle_chat(self):
         """Toggle between expanded and collapsed states."""
         print(f"🔄 Toggle Chat: Currently Expanded={self._isExpanded}")
+        
+        # Capture current bottom-right position BEFORE resizing
+        current_geo = self.geometry()
+        bottom_right = current_geo.bottomRight()
+        
         if self.chat_card.isVisible():
             self.chat_card.hide()
             self.bubble_btn.show() # Show bubble when collapsed
@@ -533,6 +686,12 @@ class ChatBubble(QWidget):
             print("  → Showing chat card")
         
         self.adjustSize()
+        
+        # Restore position based on bottom-right anchor
+        new_geo = self.geometry()
+        new_top_left = QPoint(bottom_right.x() - new_geo.width() + 1, bottom_right.y() - new_geo.height() + 1)
+        self.move(new_top_left)
+        
         self._ensure_within_bounds()
 
     def _ensure_within_bounds(self):
@@ -583,17 +742,24 @@ class ChatBubble(QWidget):
 
     def send_message(self):
         text = self.input_box.text().strip()
-        if not text:
+        image = self.current_image
+        
+        if not text and not image:
             return
             
-        self.appendUserMessage(text)
+        # Clear input immediately
         self.input_box.clear()
+        if image:
+            self.clear_image_preview()
+            
+        # Display user message
+        self.appendUserMessage(text, image)
         self.messageSent.emit(text)
         
         # Process reply
-        self.request_ai_reply(text)
+        self.request_ai_reply(text, image)
 
-    def appendUserMessage(self, text: str):
+    def appendUserMessage(self, text: str, image: QPixmap = None):
         item = QListWidgetItem()
         item.setTextAlignment(Qt.AlignRight)
         
@@ -603,19 +769,35 @@ class ChatBubble(QWidget):
         layout.setContentsMargins(0, 5, 0, 5)
         layout.addStretch()
         
-        label = BodyLabel(text, widget)
-        label.setStyleSheet("""
-            QLabel {
-                background-color: #2986ff;
-                color: white;
-                border-radius: 10px;
-                padding: 8px 12px;
-            }
-        """)
-        label.setWordWrap(True)
-        label.setMaximumWidth(250)
+        content_layout = QVBoxLayout()
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(5)
         
-        layout.addWidget(label)
+        # Add Image if present
+        if image:
+            img_label = QLabel()
+            # Scale image for chat display
+            scaled_pixmap = image.scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            img_label.setPixmap(scaled_pixmap)
+            img_label.setStyleSheet("border-radius: 10px;")
+            content_layout.addWidget(img_label, 0, Qt.AlignRight)
+        
+        # Add Text if present
+        if text:
+            label = BodyLabel(text, widget)
+            label.setStyleSheet("""
+                QLabel {
+                    background-color: #2986ff;
+                    color: white;
+                    border-radius: 10px;
+                    padding: 8px 12px;
+                }
+            """)
+            label.setWordWrap(True)
+            label.setMaximumWidth(250)
+            content_layout.addWidget(label, 0, Qt.AlignRight)
+            
+        layout.addLayout(content_layout)
         
         item.setSizeHint(widget.sizeHint())
         self.chat_list.addItem(item)
@@ -658,33 +840,23 @@ class ChatBubble(QWidget):
     def clearChat(self):
         self.chat_list.clear()
 
-    def process_command(self, text: str) -> str:
-        """
-        Basic mock logic.
-        Later this will be replaced or extended to call Gemini API.
-        """
-        text_lower = text.lower()
-        
-        if text_lower.startswith("/note"):
-            return "Note saved (mock)."
-        elif "autokey" in text_lower:
-            return "Opening AutoKey... (mock)"
-        else:
-            return f"This is a mock reply from {self.settings.bot_name}.\nYou said: {text}"
-
-    def request_ai_reply(self, user_text: str):
+    def request_ai_reply(self, user_text: str, image: QPixmap = None):
         """
         Call Gemini API via AIHandler.
         """
-        # Use QTimer to prevent UI freeze (basic async simulation)
-        # In a real app, use QThread. For now, this is "good enough" for quick interactions
-        # or we accept a slight freeze.
-        # Let's do a simple processEvents call or just run it.
-        
         from PySide6.QtWidgets import QApplication
         QApplication.processEvents() # Keep UI responsive
         
-        reply = self.ai_handler.process_message(user_text)
+        # Convert QPixmap to bytes if present
+        image_data = None
+        if image:
+            byte_array = QByteArray()
+            buffer = QBuffer(byte_array)
+            buffer.open(QBuffer.WriteOnly)
+            image.save(buffer, "PNG")
+            image_data = byte_array.data()
+        
+        reply = self.ai_handler.process_message(user_text, image_data)
         self.appendBotMessage(reply)
 
     # --- Edge Resizing Logic ---

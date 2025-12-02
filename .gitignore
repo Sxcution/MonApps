@@ -80,6 +80,11 @@ Main/Apps/Android_Tool/modules/ModAndroid/data/
 Main/Apps/Android_Tool/bootlog.txt
 Main/Apps/AutoKey/Autokey/
 
+# Sensitive Configuration Files
+chat_settings.json
+**/chat_settings.json
+Main/launcher_ui/chat_settings.json
+
 # Temporary files
 Project_Context.txt
 Mon_Lite/

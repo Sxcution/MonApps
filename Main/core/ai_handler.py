@@ -106,6 +106,24 @@ class AIHandler:
                                 },
                                 "required": ["content"]
                             }
+                        },
+                        {
+                            "name": "control_media",
+                            "description": "Control system volume and media playback (Volume Up/Down, Mute, Play/Pause).",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "command": {
+                                        "type": "string",
+                                        "description": "The command to execute: 'volume_up', 'volume_down', 'mute', 'play_pause', 'next', 'prev'."
+                                    },
+                                    "times": {
+                                        "type": "integer",
+                                        "description": "Number of times to execute the command (e.g., 5 for 10% volume change). Default is 1."
+                                    }
+                                },
+                                "required": ["command"]
+                            }
                         }
                     ]
                 }
@@ -127,18 +145,34 @@ class AIHandler:
         self.api_key = api_key
         self._configure_genai()
 
-    def process_message(self, user_text: str) -> str:
+    def process_message(self, user_text: str, image_data: bytes = None) -> str:
         """
         Send message to Gemini, handle function calls automatically, and return response.
+        Supports optional image data (bytes).
         """
         if not self.api_key or not self.chat_session:
             return "⚠️ Please configure your Gemini API Key in Settings first."
 
         try:
-            print(f"📤 AIHandler: Sending to Gemini: '{user_text}'")
+            print(f"📤 AIHandler: Sending to Gemini: '{user_text}' (Image: {bool(image_data)})")
             
+            content = []
+            if user_text:
+                content.append(user_text)
+                
+            if image_data:
+                # Add image blob
+                import PIL.Image
+                import io
+                image = PIL.Image.open(io.BytesIO(image_data))
+                content.append(image)
+                
+                # Add system rule for images if not already present
+                if "translate" not in user_text.lower() and "dịch" not in user_text.lower():
+                     content.append("Nếu hình ảnh là đoạn chat (Zalo, WeChat...), hãy dịch sang tiếng Việt và giải thích nội dung.")
+
             # Send message
-            response = self.chat_session.send_message(user_text)
+            response = self.chat_session.send_message(content)
             
             # Check for function calls (Manual handling if auto-calling isn't fully supported by lib version)
             # Note: enable_automatic_function_calling=True in start_chat usually handles this,
@@ -232,6 +266,8 @@ class AIHandler:
                 return SystemController.open_url(**args)
             elif name == "create_note":
                 return SystemController.create_note(**args)
+            elif name == "control_media":
+                return SystemController.control_media(**args)
             else:
                 return f"Error: Function {name} not found."
         except Exception as e:

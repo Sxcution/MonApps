@@ -1,6 +1,8 @@
 import os
 import subprocess
 import webbrowser
+import ctypes
+import time
 from datetime import datetime
 
 class SystemController:
@@ -91,3 +93,41 @@ class SystemController:
             return f"Note saved to Desktop: {filename}"
         except Exception as e:
             return f"Failed to save note: {str(e)}"
+
+    @staticmethod
+    def control_media(command: str, times: int = 1):
+        """
+        Control media/volume using Windows API key events.
+        Commands: volume_up, volume_down, mute, play_pause, next, prev
+        """
+        print(f"🔊 SystemController: Media Command '{command}' x{times}...")
+        
+        VK_VOLUME_MUTE = 0xAD
+        VK_VOLUME_DOWN = 0xAE
+        VK_VOLUME_UP = 0xAF
+        VK_MEDIA_NEXT_TRACK = 0xB0
+        VK_MEDIA_PREV_TRACK = 0xB1
+        VK_MEDIA_PLAY_PAUSE = 0xB3
+        
+        key_map = {
+            "volume_up": VK_VOLUME_UP,
+            "volume_down": VK_VOLUME_DOWN,
+            "mute": VK_VOLUME_MUTE,
+            "next": VK_MEDIA_NEXT_TRACK,
+            "prev": VK_MEDIA_PREV_TRACK,
+            "play_pause": VK_MEDIA_PLAY_PAUSE
+        }
+        
+        vk_code = key_map.get(command.lower())
+        if not vk_code:
+            return f"Unknown media command: {command}"
+            
+        try:
+            for _ in range(times):
+                ctypes.windll.user32.keybd_event(vk_code, 0, 0, 0) # Key down
+                ctypes.windll.user32.keybd_event(vk_code, 0, 2, 0) # Key up
+                time.sleep(0.05) # Small delay
+                
+            return f"Executed {command} {times} times."
+        except Exception as e:
+            return f"Error executing media command: {str(e)}"
