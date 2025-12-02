@@ -20,11 +20,14 @@ class ChatSettings:
     SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chat_settings.json")
 
     def __init__(self, api_keys: list = None, active_key_index: int = 0, bot_name: str = "Mon Assistant", system_rule: str = ""):
-        self.api_keys = api_keys or [{"name": "Default", "key": ""}]
+        self.api_keys = api_keys
         self.active_key_index = active_key_index
         self.bot_name = bot_name
         self.system_rule = system_rule
-        self.load() # Load saved settings on init
+        
+        if self.api_keys is None:
+            self.api_keys = [{"name": "Default", "key": ""}]
+            self.load() # Only load if no keys provided (default init)
 
     @property
     def current_key(self):
@@ -120,12 +123,14 @@ class DraggableHeader(QWidget):
 class SnippingOverlay(QWidget):
     """Fullscreen overlay for capturing a screenshot area."""
     captured = Signal(QPixmap)
+    closed = Signal() # Signal emitted when overlay is closed
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.setWindowState(Qt.WindowFullScreen)
         self.setCursor(Qt.CrossCursor)
+        self.setAttribute(Qt.WA_TranslucentBackground)
         
         self.start_pos = None
         self.end_pos = None
@@ -166,12 +171,22 @@ class SnippingOverlay(QWidget):
             # No selection, dim everything
             painter.drawRect(self.rect())
             
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.activateWindow()
+        self.setFocus()
+        self.grabKeyboard() # Ensure we catch Esc key
+
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.start_pos = event.pos()
             self.end_pos = event.pos()
             self.is_drawing = True
             self.update()
+        elif event.button() == Qt.RightButton:
+            # Right click to cancel immediately
+            self.close()
+            self.closed.emit()
             
     def mouseMoveEvent(self, event):
         if self.is_drawing:
@@ -188,10 +203,13 @@ class SnippingOverlay(QWidget):
             if rect.width() > 10 and rect.height() > 10:
                 captured_pixmap = self.original_pixmap.copy(rect)
                 self.captured.emit(captured_pixmap)
+            else:
+                self.closed.emit() # Emit closed if no valid capture
                 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
             self.close()
+            self.closed.emit()
 
 class ResizeGrip(QWidget):
     """Custom grip to resize the top-level window."""
@@ -646,6 +664,7 @@ class ChatBubble(QWidget):
         self.hide() # Hide chat window
         self.snipper = SnippingOverlay()
         self.snipper.captured.connect(self.on_snip_captured)
+        self.snipper.closed.connect(self.show) # Show chat window if cancelled
         self.snipper.show()
         
     def on_snip_captured(self, pixmap):

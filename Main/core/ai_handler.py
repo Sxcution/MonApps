@@ -169,7 +169,7 @@ class AIHandler:
                 
                 # Add system rule for images if not already present
                 if "translate" not in user_text.lower() and "dịch" not in user_text.lower():
-                     content.append("Nếu hình ảnh là đoạn chat (Zalo, WeChat...), hãy dịch sang tiếng Việt và giải thích nội dung.")
+                     content.append("Nếu hình ảnh là đoạn chat (Zalo, WeChat...), hãy dịch sát nghĩa sang tiếng Việt. Tuyệt đối KHÔNG giải thích, chỉ dịch nội dung ngắn gọn như Google Dịch.")
 
             # Send message
             response = self.chat_session.send_message(content)
