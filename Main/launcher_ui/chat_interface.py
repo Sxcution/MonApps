@@ -671,6 +671,7 @@ class ChatBubble(QWidget):
         """Handle captured screenshot."""
         self.show() # Show chat window again
         self.set_image_preview(pixmap)
+        self.send_message() # Auto-send immediately
         
     def set_image_preview(self, pixmap):
         """Show image in preview area."""

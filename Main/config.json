@@ -2,5 +2,6 @@
     "dark_mode": true,
     "startup": true,
     "external_autokey": false,
-    "external_android": false
+    "external_android": false,
+    "run_in_background": true
 }

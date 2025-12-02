@@ -53,6 +53,18 @@ class SettingsInterface(QWidget):
         self.startup_card.setChecked(self.config.get("startup", False))
         self.startup_card.checkedChanged.connect(self.on_startup_changed)
         layout.addWidget(self.startup_card)
+        
+        # Run in Background Card
+        self.background_card = SwitchSettingCard(
+            FIF.REMOVE,
+            "Chạy ngầm hệ thống",
+            "Khi đóng cửa sổ, ứng dụng sẽ chạy ngầm dưới khay hệ thống",
+            configItem=None,
+            parent=self
+        )
+        self.background_card.setChecked(self.config.get("run_in_background", False))
+        self.background_card.checkedChanged.connect(self.on_run_in_background_changed)
+        layout.addWidget(self.background_card)
 
         # App Settings Link
         self.app_settings_card = PrimaryPushSettingCard(
@@ -137,6 +149,11 @@ class SettingsInterface(QWidget):
             if os.path.exists(shortcut_path):
                 os.remove(shortcut_path)
                 InfoBar.success("Thành công", "Đã gỡ khỏi khởi động cùng Windows", parent=self.window())
+
+    def on_run_in_background_changed(self, checked):
+        self.config["run_in_background"] = checked
+        ConfigManager.save(self.config)
+        InfoBar.success("Đã lưu", "Cài đặt chạy ngầm đã được cập nhật", parent=self.window())
 
     def on_external_changed(self, key, checked):
         self.config[key] = checked

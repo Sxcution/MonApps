@@ -7,6 +7,8 @@ This directory contains the central launcher and the sub-projects `AutoKey` and 
 - `config.json`: Stores user configuration (Dark Mode, Startup, External Mode).
 - `naming_registry.json`: Central registry for UI element IDs and config keys.
 - `check_icons.py`: Utility script to list available Fluent Icons.
+- `resources/`: Application resources (icons, images).
+    - `app_icon.png`: Main application icon.
 
 ## Sub-directories
     - `Apps/`: Contains embedded applications
@@ -31,6 +33,7 @@ This directory contains the central launcher and the sub-projects `AutoKey` and 
     - `main_window.py`: Main FluentWindow with independent app navigation buttons, close handlers
     - `home_interface.py`: Home page with app launch buttons
     - `chat_interface.py`: Detached Chat Bubble window with AI integration
+    - `chat_settings.json`: Stores API keys and chat settings (Not tracked by Git).
     - `notes_interface.py`: Notes interface embedding the Notes module
     - `settings_interface.py`: General settings page with widget samples button
     - `tools_interface.py`: Empty placeholder interface (no content)

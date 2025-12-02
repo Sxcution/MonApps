@@ -389,10 +389,87 @@ class MainWindow(FluentWindow):
         except Exception as e:
             print(f"⚠️ Could not highlight {app_name}: {e}")
 
-    def closeEvent(self, event):
-        """Handle window close event"""
+    def init_system_tray(self):
+        """Initialize system tray icon"""
+        from PySide6.QtWidgets import QSystemTrayIcon, QMenu
+        from PySide6.QtGui import QAction, QIcon
+        
+        # Prevent app from closing when window is closed
+        QApplication.setQuitOnLastWindowClosed(False)
+        
+        self.tray_icon = QSystemTrayIcon(self)
+        
+        # Use the specific icon provided by user
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources", "app_icon.png")
+        if os.path.exists(icon_path):
+            icon = QIcon(icon_path)
+            self.setWindowIcon(icon) # Update window icon too
+        else:
+            icon = self.windowIcon()
+        
+        self.tray_icon.setIcon(icon)
+        self.tray_icon.setToolTip("Mon Tool Hub")
+        
+        # Context Menu
+        menu = QMenu()
+        
+        open_action = QAction("Mở", self)
+        open_action.triggered.connect(self.show_window)
+        menu.addAction(open_action)
+        
+        quit_action = QAction("Thoát", self)
+        quit_action.triggered.connect(self.quit_app)
+        menu.addAction(quit_action)
+        
+        self.tray_icon.setContextMenu(menu)
+        
+        # Click handler
+        self.tray_icon.activated.connect(self.on_tray_icon_activated)
+        
+        self.tray_icon.show()
+        
+    def on_tray_icon_activated(self, reason):
+        from PySide6.QtWidgets import QSystemTrayIcon
+        if reason == QSystemTrayIcon.Trigger:
+            if self.isVisible():
+                if self.isMinimized():
+                    self.showNormal()
+                    self.activateWindow()
+                else:
+                    self.hide()
+            else:
+                self.show_window()
+
+    def show_window(self):
+        self.show()
+        self.setWindowState(Qt.WindowActive)
+        self.activateWindow()
+        
+    def quit_app(self):
+        """Fully exit the application"""
         # Close detached chat bubble if it exists
         if hasattr(self, 'chat_bubble') and self.chat_bubble:
             self.chat_bubble.close()
             
-        super().closeEvent(event)
+        QApplication.quit()
+
+    def closeEvent(self, event):
+        """Handle window close event"""
+        run_in_background = self.config.get("run_in_background", False)
+        
+        if run_in_background:
+            event.ignore()
+            self.hide()
+            
+            # Initialize tray if not already done
+            if not hasattr(self, 'tray_icon'):
+                self.init_system_tray()
+            
+            # Show notification only once per session or just rely on tray tooltip
+            # self.tray_icon.showMessage("Mon Tool Hub", "Ứng dụng đang chạy ngầm", QSystemTrayIcon.Information, 2000)
+        else:
+            # Close detached chat bubble if it exists
+            if hasattr(self, 'chat_bubble') and self.chat_bubble:
+                self.chat_bubble.close()
+                
+            super().closeEvent(event)
