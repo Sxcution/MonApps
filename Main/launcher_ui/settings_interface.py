@@ -121,6 +121,7 @@ class SettingsInterface(QWidget):
         main_window = self.window()
         if hasattr(main_window, 'widget_samples_interface'):
             main_window.switchTo(main_window.widget_samples_interface)
+    
 
     def on_dark_mode_changed(self, checked):
         self.config["dark_mode"] = checked

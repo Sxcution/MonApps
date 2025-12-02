@@ -1029,6 +1029,33 @@ class NotesWidget(QWidget):
         except:
             return ""
     
+    def showEvent(self, event):
+        """Re-apply stylesheet when widget is shown to prevent theme override."""
+        super().showEvent(event)
+        if hasattr(self, 'notes_table'):
+            self.notes_table.setStyleSheet("""
+                QTableWidget {
+                    background-color: #2b2b2b;
+                    color: #ffffff;
+                    border: none;
+                }
+                QTableWidget::item:selected {
+                    background-color: #0078d4;
+                    color: #ffffff;
+                }
+                QTableWidget::item:focus {
+                    outline: none;
+                }
+                QHeaderView::section {
+                    background-color: #1e1e1e;
+                    color: #ffffff;
+                    border: none;
+                    border-bottom: 1px solid #454545;
+                    padding: 4px;
+                }
+            """)
+    
+    
     def init_ui(self):
         """Initialize UI with Fluent widgets."""
         layout = QVBoxLayout(self)

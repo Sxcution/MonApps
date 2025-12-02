@@ -421,16 +421,38 @@ class DraggableButton(QPushButton):
                 self._chat_bubble = self._find_chat_bubble()
             
             if self._chat_bubble:
-                self._widget_start_pos = self._chat_bubble.pos()
+                # Store widget position (global for overlay, local for embedded)
+                if self._chat_bubble._isOverlay:
+                    self._widget_start_pos = self._chat_bubble.pos()  # Global position
+                else:
+                    # For embedded, store global position
+                    if self._chat_bubble.main_window:
+                        local_pos = self._chat_bubble.pos()
+                        parent_global = self._chat_bubble.main_window.mapToGlobal(QPoint(0, 0))
+                        self._widget_start_pos = parent_global + local_pos  # Convert to global
+                    else:
+                        self._widget_start_pos = self._chat_bubble.pos()
                 self._dragging = True
             
             super().mousePressEvent(event)
             
     def mouseMoveEvent(self, event: QMouseEvent):
         if event.buttons() == Qt.LeftButton and self._dragging and self._chat_bubble:
-            delta = event.globalPosition().toPoint() - self._drag_start_pos
-            if delta.manhattanLength() > 5: # Threshold to distinguish click vs drag
-                self._chat_bubble.move(self._widget_start_pos + delta)
+            current_global = event.globalPosition().toPoint()
+            delta_global = current_global - self._drag_start_pos
+            if delta_global.manhattanLength() > 5: # Threshold to distinguish click vs drag
+                if self._chat_bubble._isOverlay:
+                    # Overlay mode: move in global coordinates
+                    self._chat_bubble.move(self._widget_start_pos + delta_global)
+                else:
+                    # Embedded mode: convert global delta to parent-relative coordinates
+                    if self._chat_bubble.main_window:
+                        # Get parent's global position
+                        parent_global = self._chat_bubble.main_window.mapToGlobal(QPoint(0, 0))
+                        # Calculate new position relative to parent
+                        new_global = self._widget_start_pos + delta_global
+                        new_local = new_global - parent_global
+                        self._chat_bubble.move(new_local)
                 self._chat_bubble._userMoved = True
         super().mouseMoveEvent(event)
         
@@ -446,15 +468,13 @@ class ChatBubble(QWidget):
     messageSent = Signal(str)
 
     def __init__(self, parent=None):
-        # Pass None to super() to make it a top-level window, 
-        # but keep 'parent' reference for logical connection if needed
-        super().__init__(None) 
+        # Initially, embed as child widget in main window (not overlay)
+        super().__init__(parent) 
         self.main_window = parent # Store reference to main window
         self.settings = ChatSettings()
         self._userMoved = False
         self._isExpanded = False
-        self._userMoved = False
-        self._isExpanded = False
+        self._isOverlay = False  # Track if bubble is in overlay mode
         self._dragPos = QPoint()
         
         # Resize state
@@ -467,11 +487,10 @@ class ChatBubble(QWidget):
         # Initialize AI Handler
         self.ai_handler = AIHandler(self.settings.current_key)
         
-        # Setup UI
-        # Qt.Tool makes it float nicely without a taskbar entry (optional)
-        # Qt.WindowStaysOnTopHint keeps it above other windows
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
-        self.setAttribute(Qt.WA_TranslucentBackground)
+        # Setup UI - Initially as embedded widget (no overlay flags)
+        # Will switch to overlay mode after first chat interaction
+        self.setWindowFlags(Qt.Widget)  # Embedded widget, not overlay
+        # No translucent background when embedded
         
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
@@ -702,13 +721,45 @@ class ChatBubble(QWidget):
         self.current_image = None
         self.image_preview_container.hide()
 
+    def _switch_to_overlay_mode(self):
+        """Switch from embedded widget to overlay window mode."""
+        if self._isOverlay:
+            return  # Already in overlay mode
+        
+        print("🔄 Switching chat bubble to overlay mode")
+        
+        # Store current position relative to main window
+        if self.main_window:
+            global_pos = self.mapToGlobal(QPoint(0, 0))
+        else:
+            global_pos = self.pos()
+        
+        # Change to top-level overlay window
+        self.setParent(None)  # Remove parent to make it top-level
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self._isOverlay = True
+        
+        # Restore position in global coordinates
+        self.move(global_pos)
+        self.show()
+        self.raise_()
+        
     def toggle_chat(self):
         """Toggle between expanded and collapsed states."""
-        print(f"🔄 Toggle Chat: Currently Expanded={self._isExpanded}")
+        print(f"🔄 Toggle Chat: Currently Expanded={self._isExpanded}, Overlay={self._isOverlay}")
         
-        # Capture current bottom-right position BEFORE resizing
+        # Capture current position BEFORE resizing
         current_geo = self.geometry()
-        bottom_right = current_geo.bottomRight()
+        if self._isOverlay:
+            bottom_right = current_geo.bottomRight()
+        else:
+            # If embedded, get position relative to parent
+            if self.main_window:
+                global_pos = self.mapToGlobal(QPoint(0, 0))
+                bottom_right = QPoint(global_pos.x() + current_geo.width(), global_pos.y() + current_geo.height())
+            else:
+                bottom_right = current_geo.bottomRight()
         
         if self.chat_card.isVisible():
             self.chat_card.hide()
@@ -716,6 +767,10 @@ class ChatBubble(QWidget):
             self._isExpanded = False
             print("  → Hiding chat card")
         else:
+            # Switch to overlay mode when opening chatbot (if not already overlay)
+            if not self._isOverlay:
+                self._switch_to_overlay_mode()
+            
             self.chat_card.show()
             self.bubble_btn.hide() # Hide bubble when expanded
             self._isExpanded = True
@@ -726,13 +781,26 @@ class ChatBubble(QWidget):
         
         # Restore position based on bottom-right anchor
         new_geo = self.geometry()
-        new_top_left = QPoint(bottom_right.x() - new_geo.width() + 1, bottom_right.y() - new_geo.height() + 1)
-        self.move(new_top_left)
+        if self._isOverlay:
+            new_top_left = QPoint(bottom_right.x() - new_geo.width() + 1, bottom_right.y() - new_geo.height() + 1)
+            self.move(new_top_left)
+        else:
+            # If still embedded, position relative to parent
+            if self.main_window:
+                # Position at bottom-right of main window
+                margin = 24
+                x = self.main_window.width() - new_geo.width() - margin
+                y = self.main_window.height() - new_geo.height() - margin
+                self.move(x, y)
         
-        self._ensure_within_bounds()
+        if self._isOverlay:
+            self._ensure_within_bounds()
 
     def _ensure_within_bounds(self):
-        """Ensure the bubble stays within the screen bounds."""
+        """Ensure the bubble stays within the screen bounds (only in overlay mode)."""
+        if not self._isOverlay:
+            return  # Only check bounds when in overlay mode
+        
         # Use screen geometry since we are now a top-level window
         screen = self.screen()
         if not screen:

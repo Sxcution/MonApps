@@ -52,6 +52,35 @@ PgUp::
     RunAsUser("C:\Users\Mon\AppData\Local\Programs\Python\Python311\pythonw.exe", "c:\Users\Mon\Desktop\Mon\Main\Main.pyw", "c:\Users\Mon\Desktop\Mon\Main")
 return
 
+PgDn::
+    ; Kill only Main.pyw process (not all Python processes)
+    KillMainPyw()
+    ; Wait a bit for process to terminate
+    Sleep, 500
+    ; Restart Main.pyw
+    RunAsUser("C:\Users\Mon\AppData\Local\Programs\Python\Python311\pythonw.exe", "c:\Users\Mon\Desktop\Mon\Main\Main.pyw", "c:\Users\Mon\Desktop\Mon\Main")
+return
+
+KillMainPyw() {
+    ; Use WMI to find and kill only processes running Main.pyw
+    try {
+        wmi := ComObjGet("winmgmts:")
+        query := "SELECT ProcessId, CommandLine FROM Win32_Process WHERE (Name = 'pythonw.exe' OR Name = 'python.exe') AND CommandLine LIKE '%Main.pyw%'"
+        processes := wmi.ExecQuery(query)
+        
+        for process in processes {
+            pid := process.ProcessId
+            Process, Close, %pid%
+            DebugLog("Killed Main.pyw process with PID: " . pid)
+        }
+    } catch e {
+        ; Fallback: Try to close window by title if WMI fails
+        WinClose, ahk_exe pythonw.exe
+        WinClose, ahk_exe python.exe
+        DebugLog("WMI failed, used WinClose fallback")
+    }
+}
+
 RunAsUser(Target, Args := "", WorkingDir := "") {
     ; Get the ShellWindows collection
     shellWindows := ComObjCreate("Shell.Application").Windows

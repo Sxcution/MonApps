@@ -10,7 +10,7 @@ from PySide6.QtGui import QPixmap, QPainter, QColor, QBrush, QPen, QPalette, QIn
 from qfluentwidgets import (PushButton, PrimaryPushButton, ComboBox, SpinBox, 
                            CheckBox, LineEdit, CardWidget, BodyLabel, 
                            StrongBodyLabel, Pivot, qrouter, ScrollArea, SegmentedWidget,
-                           MessageBox, FluentIcon, ToolButton)
+                           MessageBox, FluentIcon, ToolButton, MessageBoxBase, SubtitleLabel)
 import os
 import time
 from utils.image_finder import find_image_on_screen
@@ -69,7 +69,7 @@ class ImageDetectItem(QWidget):
         
         # MAIN LAYOUT: Horizontal (Left: Image, Right: Controls)
         main_layout = QHBoxLayout()
-        main_layout.setSpacing(0)  # Yêu cầu: không khoảng cách giữa ảnh và controls
+        main_layout.setSpacing(0)  # No spacing between image and controls - stick together
         
         # --- LEFT PANEL: Image Preview + Import/Cut Buttons ---
         left_panel = QVBoxLayout()
@@ -135,7 +135,7 @@ class ImageDetectItem(QWidget):
         # --- RIGHT PANEL: Header + Inputs ---
         right_panel = QVBoxLayout()
         right_panel.setSpacing(8)
-        right_panel.setContentsMargins(0, 0, 0, 0) # Sát lề theo yêu cầu "không khoảng cách"
+        right_panel.setContentsMargins(0, 0, 0, 0) # No margin - stick to image
         
         # ROW 1: Header - Label | Grayscale | Multi-scale (No Buttons here)
         header_row = QHBoxLayout()
@@ -159,12 +159,12 @@ class ImageDetectItem(QWidget):
         # GRID: Vùng, Độ lệch, Hành động
         grid_layout = QGridLayout()
         grid_layout.setSpacing(10)
-        # Adjust column stretch to pack items to the left
-        grid_layout.setColumnStretch(4, 1) 
+        grid_layout.setContentsMargins(0, 0, 0, 0)
+        # No column stretch - let widgets pack naturally to the left 
         
         # Row 0: Vùng
         search_area_label = BodyLabel("Vùng:")
-        grid_layout.addWidget(search_area_label, 0, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        grid_layout.addWidget(search_area_label, 0, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         
         self.combo_window = ComboBox()
         self.combo_window.addItems(["toàn màn hình", "cửa sổ đang focus", "vùng tùy chỉnh"])
@@ -182,7 +182,7 @@ class ImageDetectItem(QWidget):
         # Row 1: Độ lệch (Dung sai) + Test
         # "Dung sai" -> "Độ lệch"
         tolerance_label = BodyLabel("Độ lệch:")
-        grid_layout.addWidget(tolerance_label, 1, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        grid_layout.addWidget(tolerance_label, 1, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         
         # Use LineEdit instead of SpinBox to completely remove buttons
         self.input_tolerance = LineEdit()
@@ -198,7 +198,7 @@ class ImageDetectItem(QWidget):
         
         # Row 2: Hành động
         action_label = BodyLabel("Hành động:")
-        grid_layout.addWidget(action_label, 2, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        grid_layout.addWidget(action_label, 2, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         
         self.combo_action = ComboBox()
         self.combo_action.addItems(["Không làm gì", "Press Key", "Key Down", "Click chuột trái", "Click chuột phải", "Hold chuột trái"])
@@ -210,7 +210,7 @@ class ImageDetectItem(QWidget):
         param_label = BodyLabel("Tham số:")
         self.lbl_param_label = param_label
         self.lbl_param_label.setVisible(False)
-        grid_layout.addWidget(param_label, 3, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        grid_layout.addWidget(param_label, 3, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         
         self.input_action_param = LineEdit()
         self.input_action_param.setPlaceholderText("A, D, F...")
@@ -220,7 +220,7 @@ class ImageDetectItem(QWidget):
         
         # Row 4: Sau đó (Moved from Row 2)
         goto_label = BodyLabel("Sau đó:")
-        grid_layout.addWidget(goto_label, 4, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        grid_layout.addWidget(goto_label, 4, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         
         self.combo_goto = ComboBox()
         self.combo_goto.addItems(["Không làm gì", "Tiếp theo", "Bắt đầu", "Kết thúc", "Chuyển Đến"])
@@ -231,7 +231,7 @@ class ImageDetectItem(QWidget):
         goto_step_label = BodyLabel("Step:")
         self.lbl_goto_step_label = goto_step_label
         self.lbl_goto_step_label.setVisible(False)
-        grid_layout.addWidget(goto_step_label, 4, 2, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        grid_layout.addWidget(goto_step_label, 4, 2, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         
         # Use LineEdit instead of SpinBox
         self.input_goto_step = LineEdit()
@@ -586,6 +586,63 @@ class ImageDetectItem(QWidget):
                     pass
 
 
+class TimeScanDialog(MessageBoxBase):
+    """Dialog for configuring time scan settings"""
+    def __init__(self, parent=None, scan_interval=200, max_duration=65535, goto_timeout="Tiếp theo"):
+        super().__init__(parent)
+        self.titleLabel = SubtitleLabel("⏱️ Time Scan Settings", self)
+        
+        # Quét lại mỗi
+        self.viewLayout.addWidget(BodyLabel("Quét lại mỗi:", self))
+        interval_layout = QHBoxLayout()
+        interval_layout.setSpacing(4)
+        
+        self.input_scan_interval = LineEdit(self)
+        self.input_scan_interval.setValidator(QIntValidator(50, 10000, self))
+        self.input_scan_interval.setText(str(scan_interval))
+        self.input_scan_interval.setFixedWidth(80)
+        interval_layout.addWidget(self.input_scan_interval)
+        interval_layout.addWidget(BodyLabel("ms", self))
+        interval_layout.addStretch()
+        self.viewLayout.addLayout(interval_layout)
+        
+        # Thời gian chờ tối đa
+        self.viewLayout.addWidget(BodyLabel("Thời gian chờ tối đa:", self))
+        duration_layout = QHBoxLayout()
+        duration_layout.setSpacing(4)
+        
+        self.input_max_duration = LineEdit(self)
+        self.input_max_duration.setValidator(QIntValidator(1, 999999, self))
+        self.input_max_duration.setText(str(max_duration))
+        self.input_max_duration.setFixedWidth(100)
+        duration_layout.addWidget(self.input_max_duration)
+        duration_layout.addWidget(BodyLabel("s", self))
+        duration_layout.addStretch()
+        self.viewLayout.addLayout(duration_layout)
+        
+        # Nếu hết thời gian
+        self.viewLayout.addWidget(BodyLabel("Nếu hết thời gian:", self))
+        self.combo_goto_timeout = ComboBox(self)
+        self.combo_goto_timeout.addItems(["Tiếp theo", "Bắt đầu", "Kết thúc"])
+        self.combo_goto_timeout.setCurrentText(goto_timeout)
+        self.combo_goto_timeout.setFixedWidth(150)
+        self.viewLayout.addWidget(self.combo_goto_timeout)
+        
+        # Update button text
+        self.yesButton.setText("OK")
+        self.cancelButton.setText("Hủy")
+        
+        self.widget.setMinimumWidth(350)
+    
+    def get_data(self):
+        """Get time scan settings"""
+        return {
+            'scan_interval': int(self.input_scan_interval.text()),
+            'max_duration': int(self.input_max_duration.text()),
+            'goto_timeout': self.combo_goto_timeout.currentText()
+        }
+
+
 class AutoDetectDialog(QDialog):
     """
     Dialog for Auto Detect - complex conditional detection with multiple images/text
@@ -618,6 +675,12 @@ class AutoDetectDialog(QDialog):
         
         top_layout.addStretch()
         
+        # Time Scan button (bên phải, kế bên + Thêm)
+        self.btn_time_scan = PushButton("⏱️ Time Scan", self)
+        self.btn_time_scan.setFixedSize(120, 32)
+        self.btn_time_scan.clicked.connect(self.open_time_scan_dialog)
+        top_layout.addWidget(self.btn_time_scan)
+        
         # btn_add_global : Nút thêm item (cho tab hiện tại)
         self.btn_add_global = PrimaryPushButton("+ Thêm", self)
         self.btn_add_global.setFixedSize(80, 32)
@@ -642,49 +705,10 @@ class AutoDetectDialog(QDialog):
         
         layout.addWidget(self.stackedWidget)
         
-        # Global settings - GỘP THÀNH 1 HÀNG (dùng CardWidget)
-        global_card = CardWidget(self)
-        global_layout = QHBoxLayout(global_card)
-        global_layout.setContentsMargins(16, 12, 16, 12)
-        global_layout.setSpacing(20)
-        
-        global_layout.addWidget(BodyLabel("Quét lại mỗi:"))
-        # Use LineEdit + Label for Scan Interval
-        interval_layout = QHBoxLayout()
-        interval_layout.setSpacing(4)
-        
-        self.input_scan_interval = LineEdit()
-        self.input_scan_interval.setValidator(QIntValidator(50, 10000, self))
-        self.input_scan_interval.setText("200")
-        self.input_scan_interval.setFixedWidth(60)
-        interval_layout.addWidget(self.input_scan_interval)
-        interval_layout.addWidget(BodyLabel("ms"))
-        
-        global_layout.addLayout(interval_layout)
-        
-        global_layout.addWidget(BodyLabel("Thời gian chờ tối đa:"))
-        # Use LineEdit + Label for Max Duration
-        duration_layout = QHBoxLayout()
-        duration_layout.setSpacing(4)
-        
-        self.input_max_duration = LineEdit()
-        self.input_max_duration.setValidator(QIntValidator(1, 999999, self))
-        self.input_max_duration.setText("65535")
-        self.input_max_duration.setFixedWidth(80)
-        duration_layout.addWidget(self.input_max_duration)
-        duration_layout.addWidget(BodyLabel("s"))
-        
-        global_layout.addLayout(duration_layout)
-        
-        global_layout.addWidget(BodyLabel("Nếu hết thời gian:"))
-        # combo_goto_timeout : Hành động khi hết thời gian chờ
-        self.combo_goto_timeout = ComboBox()
-        self.combo_goto_timeout.addItems(["Tiếp theo", "Bắt đầu", "Kết thúc"])
-        self.combo_goto_timeout.setFixedWidth(120)
-        global_layout.addWidget(self.combo_goto_timeout)
-        
-        global_layout.addStretch()
-        layout.addWidget(global_card)
+        # Initialize time scan settings (stored internally)
+        self.scan_interval = 200
+        self.max_duration = 65535
+        self.goto_timeout = "Tiếp theo"
         
         # Buttons
         button_layout = QHBoxLayout()
@@ -701,6 +725,20 @@ class AutoDetectDialog(QDialog):
         button_layout.addWidget(self.btn_cancel)
         button_layout.addWidget(self.btn_ok)
         layout.addLayout(button_layout)
+    
+    def open_time_scan_dialog(self):
+        """Open Time Scan settings dialog"""
+        dialog = TimeScanDialog(
+            self,
+            scan_interval=self.scan_interval,
+            max_duration=self.max_duration,
+            goto_timeout=self.goto_timeout
+        )
+        if dialog.exec():
+            data = dialog.get_data()
+            self.scan_interval = data['scan_interval']
+            self.max_duration = data['max_duration']
+            self.goto_timeout = data['goto_timeout']
     
     def on_add_clicked(self):
         """Handle global add button click"""
@@ -790,14 +828,14 @@ class AutoDetectDialog(QDialog):
         
         # Load global settings
         if 'scan_interval' in self.event:
-            self.input_scan_interval.setText(str(self.event['scan_interval']))
+            self.scan_interval = self.event['scan_interval']
         
         if 'max_duration' in self.event:
-            self.input_max_duration.setText(str(self.event['max_duration']))
+            self.max_duration = self.event['max_duration']
         
         goto_map = {'Next': 'Tiếp theo', 'Start': 'Bắt đầu', 'End': 'Kết thúc'}
         if 'goto_timeout' in self.event:
-            self.combo_goto_timeout.setCurrentText(goto_map.get(self.event['goto_timeout'], 'Tiếp theo'))
+            self.goto_timeout = goto_map.get(self.event['goto_timeout'], 'Tiếp theo')
         
         # Load image items
         if 'image_detects' in self.event and self.event['image_detects']:
@@ -825,24 +863,12 @@ class AutoDetectDialog(QDialog):
         image_detects = []
         for item in self.image_items:
             image_detects.append(item.get_data())
-            
-        scan_interval = 200
-        try:
-            scan_interval = int(self.input_scan_interval.text())
-        except ValueError:
-            pass
-            
-        max_duration = 65535
-        try:
-            max_duration = int(self.input_max_duration.text())
-        except ValueError:
-            pass
         
         return {
             'type': 'auto_detect',
-            'scan_interval': scan_interval,
-            'max_duration': max_duration,
-            'goto_timeout': goto_map.get(self.combo_goto_timeout.currentText(), 'Next'),
+            'scan_interval': self.scan_interval,
+            'max_duration': self.max_duration,
+            'goto_timeout': goto_map.get(self.goto_timeout, 'Next'),
             'image_detects': image_detects,
             'time': self.event.get('time', 0.5)
         }

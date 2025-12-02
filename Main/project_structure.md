@@ -39,7 +39,7 @@ This directory contains the central launcher and the sub-projects `AutoKey` and 
     - `tools_interface.py`: Empty placeholder interface (no content)
     - `app_settings_interface.py`: App-specific settings (placeholder)
     - `log_interface.py`: Log display with copy functionality
-    - `widget_samples_interface.py`: Widget showcase with copyable code samples
+    - `widget_samples_interface.py`: UI Components Gallery showcasing all Fluent Design buttons and widgets
 
 ## Dependencies
 - `PySide6`
@@ -61,40 +61,34 @@ The application uses a **dual-stylesheet approach** with separate `LIGHT_STYLESH
 ### Theme Propagation Rules
 
 1. **Main App Theme:**
-   - Stored in: `launcher_ui/main_window.py` → `self.current_theme` (Theme.LIGHT or Theme.DARK)
-   - Loaded from: `config.json` → `dark_mode` key
-   - Applied via: `setTheme(self.current_theme)` in main window `__init__()`
+   - **Default:** `Theme.DARK` (Hardcoded preference for modern aesthetics)
+   - Stored in: `launcher_ui/main_window.py` → `self.current_theme`
+   - Applied via: `setTheme(Theme.DARK)` in main window `__init__()`
 
 2. **Embedded App Theme:**
    - **MUST** receive `parent_theme` from Main app
-   - Example: `AutoKeywindow(is_embedded=True, parent_theme=self.main_window.current_theme)`
+   - Example: `AutoKeyWindow(is_embedded=True, parent_theme=self.main_window.current_theme)`
    - Embedded app stores in `self.current_theme` and applies via `apply_stylesheet()`
 
 3. **Standalone App Theme:**
-   - Defaults to `Theme.LIGHT`
-   - Example: `AutoKeyWindow(is_embedded=False)` → uses Light theme
+   - Defaults to `Theme.DARK` (Consistent with Main App)
+   - Example: `AutoKeyWindow(is_embedded=False)` → uses Dark theme
 
 ### Styling Principles
 
-#### 1. NEVER Hardcode Colors
-❌ **BAD:**
-```python
-self.table.setStyleSheet("QTableView { background-color: white; }")
-```
-
-✅ **GOOD:**
-```python
-# Let global stylesheet handle it
-# No local setStyleSheet() call
-```
+#### 1. Use Default Fluent Styles
+- Avoid hardcoding colors (e.g., `background-color: white` or `black`).
+- Rely on `qfluentwidgets` default styles which handle Light/Dark modes automatically.
+- Only use `styles.py` for specific overrides or non-Fluent widgets (like standard QDialogs).
 
 #### 2. Apply Stylesheet to QApplication (CRITICAL)
 **Native Qt widgets** (QInputDialog, QMessageBox, QMenu) require stylesheet on `QApplication`:
 
 ```python
 def apply_stylesheet(self):
-    from ui.styles import LIGHT_STYLESHEET, DARK_STYLESHEET
-    stylesheet = DARK_STYLESHEET if self.current_theme == Theme.DARK else LIGHT_STYLESHEET
+    from ui.styles import DARK_STYLESHEET
+    # Default to Dark
+    stylesheet = DARK_STYLESHEET
     
     # Apply to window
     self.setStyleSheet(stylesheet)
@@ -105,45 +99,30 @@ def apply_stylesheet(self):
         app.setStyleSheet(stylesheet)
 ```
 
-#### 3. Dual Stylesheet Structure
-Both `LIGHT_STYLESHEET` and `DARK_STYLESHEET` MUST style:
-- QTableView (background, alternating rows, selection, gridlines)
-- QHeaderView::section (headers)
-- QInputDialog, QMessageBox, QMenu (native widgets)
-- QListWidget (custom lists)
-- QPushButton, QLineEdit, QComboBox, QSpinBox
-- QLabel, QToolTip
+#### 3. Dual Stylesheet Structure (Legacy Support)
+- `LIGHT_STYLESHEET` and `DARK_STYLESHEET` are kept in `Apps/AutoKey/ui/styles.py` for reference.
+- **Primary:** `DARK_STYLESHEET` is the active default.
+- Styles should focus on layout and spacing, leaving colors to the Theme engine where possible.
 
 ### Key Files
 
 - **Stylesheets:** `Apps/AutoKey/ui/styles.py`
-  - `LIGHT_STYLESHEET`: White backgrounds (#FFFFFF), dark text (#1A1A1A)
-  - `DARK_STYLESHEET`: Dark backgrounds (#1E1E1E), light text (#E0E0E0)
-  - `MAIN_STYLESHEET = LIGHT_STYLESHEET` (backward compatibility)
+  - `DARK_STYLESHEET`: Active default. Dark backgrounds (#1E1E1E), light text (#E0E0E0).
+  - `MAIN_STYLESHEET = DARK_STYLESHEET`
 
 - **Theme Storage:**
   - Main: `launcher_ui/main_window.py` → `current_theme`
   - AutoKey: `Apps/AutoKey/ui/main_window.py` → `current_theme`
-  - Config: `config.json` → `dark_mode` (bool)
-
-- **Theme Toggle:** `launcher_ui/settings_interface.py`
-  - Updates `config.json`
-  - Updates `main_window.current_theme`
-  - Calls `qfluentwidgets.setTheme()`
 
 ### Common Pitfalls
 
 1. **Title Bar Dark Issue:**
    - Cause: Missing `QInputDialog QWidget` styling
-   - Fix: Add to both LIGHT/DARK stylesheets
+   - Fix: Ensure `DARK_STYLESHEET` covers native widget backgrounds.
 
-2 **Table/Panel White in Dark Mode:**
-   - Cause: Hardcoded `background-color: white` in component
-   - Fix: Remove local `setStyleSheet()`, rely on global
-
-3. **Theme Not Updating:**
-   - Cause: Not calling `apply_stylesheet()` after theme change
-   - Fix: Call `apply_stylesheet()` or reload app
+2. **Hardcoded Colors:**
+   - Cause: `background-color: white` left over from old code.
+   - Fix: Remove local `setStyleSheet()` and let global Dark theme take over.
 
 ### Save Path Standard
 - AutoKey macros: `Apps/AutoKey/Save/`

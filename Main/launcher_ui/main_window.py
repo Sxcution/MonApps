@@ -74,6 +74,7 @@ class MainWindow(FluentWindow):
         # Add Widget Samples (Hidden from Nav, accessed via Settings)
         self.stackedWidget.addWidget(self.widget_samples_interface)
 
+
         # Connect navigation changes
         self.stackedWidget.currentChanged.connect(self.on_interface_changed)
         
@@ -116,10 +117,14 @@ class MainWindow(FluentWindow):
     def init_chat_bubble(self):
         """Show and position chat bubble after main window is ready"""
         if hasattr(self, 'chat_bubble'):
+            # Position at bottom-right when embedded
+            margin = 24
+            x = self.width() - self.chat_bubble.width() - margin
+            y = self.height() - self.chat_bubble.height() - margin
+            self.chat_bubble.move(x, y)
             self.chat_bubble.show()
             self.chat_bubble.raise_()
-            # Trigger resize event logic to position it
-            self.resizeEvent(None)
+            print(f"📌 Chat bubble initialized at bottom-right: ({x}, {y})")
 
     
     def handle_child_visibility_request(self, show: bool):
@@ -194,20 +199,33 @@ class MainWindow(FluentWindow):
             self.embedded_android.resize(new_size)
             print(f"🔧 Android resized: {old_size} → {new_size}")
 
-        # Chat Bubble positioning
-        if hasattr(self, 'chat_bubble'):
+        # Chat Bubble positioning (only when embedded, not in overlay mode)
+        if hasattr(self, 'chat_bubble') and not self.chat_bubble._isOverlay:
             self.chat_bubble.raise_()
             if not self.chat_bubble._userMoved:
-                # Snap to bottom-right with margin
+                # Snap to bottom-right with margin (when embedded)
                 margin = 24
                 x = self.width() - self.chat_bubble.width() - margin
                 y = self.height() - self.chat_bubble.height() - margin
-                print(f"📏 Resize Snap: Window={self.width()}x{self.height()}, Bubble={self.chat_bubble.width()}x{self.chat_bubble.height()} -> Move to ({x}, {y})")
+                print(f"📏 Resize Snap (Embedded): Window={self.width()}x{self.height()}, Bubble={self.chat_bubble.width()}x{self.chat_bubble.height()} -> Move to ({x}, {y})")
                 self.chat_bubble.move(x, y)
             else:
-                # Ensure it stays within bounds if window shrinks
-                print(f"📏 Resize Check Bounds: User moved bubble")
-                self.chat_bubble._ensure_within_bounds()
+                # Keep within window bounds if user moved it
+                bubble_rect = self.chat_bubble.geometry()
+                new_x = bubble_rect.x()
+                new_y = bubble_rect.y()
+                
+                # Clamp to window bounds
+                if new_x < 0: new_x = 0
+                if new_y < 0: new_y = 0
+                if new_x + bubble_rect.width() > self.width():
+                    new_x = self.width() - bubble_rect.width()
+                if new_y + bubble_rect.height() > self.height():
+                    new_y = self.height() - bubble_rect.height()
+                
+                if new_x != bubble_rect.x() or new_y != bubble_rect.y():
+                    self.chat_bubble.move(new_x, new_y)
+                    print(f"📏 Resize Clamp (Embedded): Adjusted to ({new_x}, {new_y})")
 
     def embed_autokey(self):
         # Ensure container layout exists
