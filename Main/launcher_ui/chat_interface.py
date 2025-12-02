@@ -1,26 +1,66 @@
 from PySide6.QtCore import Qt, QPoint, Signal, QSize
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget, 
-                               QListWidgetItem, QLabel, QDialog, QFrame, QScrollArea, QSizeGrip)
+                               QListWidgetItem, QLabel, QDialog, QFrame, QScrollArea, QSizeGrip, QPushButton)
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QBrush, QPen, QMouseEvent
 
 from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton, LineEdit, 
                             FluentIcon as FIF, TextEdit, InfoBar, StrongBodyLabel,
                             BodyLabel, Theme, isDarkTheme, TransparentToolButton,
+                            BodyLabel, Theme, isDarkTheme, TransparentToolButton,
                             ComboBox)
+from core.ai_handler import AIHandler
+
+import json
+import os
 
 class ChatSettings:
-    """Data class to hold chatbot settings."""
+    """Data class to hold chatbot settings with persistence."""
+    # Use absolute path relative to this file to ensure persistence works
+    SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chat_settings.json")
+
     def __init__(self, api_keys: list = None, active_key_index: int = 0, bot_name: str = "Mon Assistant", system_rule: str = ""):
-        self.api_keys = api_keys or [{"name": "Default", "key": ""}]  # List of dicts: {"name": "...", "key": "..."}
+        self.api_keys = api_keys or [{"name": "Default", "key": ""}]
         self.active_key_index = active_key_index
         self.bot_name = bot_name
         self.system_rule = system_rule
+        self.load() # Load saved settings on init
 
     @property
     def current_key(self):
         if 0 <= self.active_key_index < len(self.api_keys):
             return self.api_keys[self.active_key_index]["key"]
         return ""
+
+    def save(self):
+        """Save settings to JSON file."""
+        data = {
+            "api_keys": self.api_keys,
+            "active_key_index": self.active_key_index,
+            "bot_name": self.bot_name,
+            "system_rule": self.system_rule
+        }
+        try:
+            with open(self.SETTINGS_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=4, ensure_ascii=False)
+            print("✅ ChatSettings saved.")
+        except Exception as e:
+            print(f"❌ Error saving ChatSettings: {e}")
+
+    def load(self):
+        """Load settings from JSON file."""
+        if not os.path.exists(self.SETTINGS_FILE):
+            return
+        
+        try:
+            with open(self.SETTINGS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                self.api_keys = data.get("api_keys", [{"name": "Default", "key": ""}])
+                self.active_key_index = data.get("active_key_index", 0)
+                self.bot_name = data.get("bot_name", "Mon Assistant")
+                self.system_rule = data.get("system_rule", "")
+            print("✅ ChatSettings loaded.")
+        except Exception as e:
+            print(f"❌ Error loading ChatSettings: {e}")
 
 class ApiKeyRow(QWidget):
     """Row widget for a single API key entry."""
@@ -48,13 +88,66 @@ class ApiKeyRow(QWidget):
         layout.addWidget(self.key_input)
         layout.addWidget(self.btn_remove)
 
-class ResizableCardWidget(CardWidget):
-    """CardWidget with a built-in resize grip that overlays the content."""
+class DraggableHeader(QWidget):
+    """Header widget that allows dragging the parent window."""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.size_grip = QSizeGrip(self)
-        self.size_grip.setFixedSize(20, 20)
-        self.size_grip.setStyleSheet("background: transparent;")
+        self._dragging = False
+        self._drag_start_pos = QPoint()
+        self._window_start_pos = QPoint()
+
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() == Qt.LeftButton:
+            self._dragging = True
+            self._drag_start_pos = event.globalPosition().toPoint()
+            self._window_start_pos = self.window().pos()
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if self._dragging:
+            delta = event.globalPosition().toPoint() - self._drag_start_pos
+            self.window().move(self._window_start_pos + delta)
+            # Update _userMoved flag in ChatBubble if it exists
+            if hasattr(self.window(), '_userMoved'):
+                self.window()._userMoved = True
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        self._dragging = False
+        super().mouseReleaseEvent(event)
+
+class ResizeGrip(QWidget):
+    """Custom grip to resize the top-level window."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(20, 20)
+        self.setCursor(Qt.SizeFDiagCursor)
+        self.setStyleSheet("background: transparent;")
+        self._dragging = False
+        self._drag_start_pos = QPoint()
+        self._window_start_size = QSize()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._dragging = True
+            self._drag_start_pos = event.globalPosition().toPoint()
+            self._window_start_size = self.window().size()
+
+    def mouseMoveEvent(self, event):
+        if self._dragging:
+            delta = event.globalPosition().toPoint() - self._drag_start_pos
+            new_width = max(300, self._window_start_size.width() + delta.x())
+            new_height = max(400, self._window_start_size.height() + delta.y())
+            self.window().resize(new_width, new_height)
+            
+    def mouseReleaseEvent(self, event):
+        self._dragging = False
+
+class ResizableCardWidget(CardWidget):
+    """CardWidget with a built-in resize grip that resizes the top-level window."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.size_grip = ResizeGrip(self)
         
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -189,6 +282,50 @@ class ChatSettingsDialog(QDialog):
             system_rule=self.rule_input.toPlainText().strip()
         )
 
+class DraggableButton(QPushButton):
+    """A PushButton that can be dragged to move its parent ChatBubble."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._dragging = False
+        self._drag_start_pos = QPoint()
+        self._widget_start_pos = QPoint()
+        self._chat_bubble = None
+        
+    def _find_chat_bubble(self):
+        """Find the ChatBubble parent widget."""
+        parent = self.parent()
+        while parent:
+            if isinstance(parent, ChatBubble):
+                return parent
+            parent = parent.parent()
+        return None
+        
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() == Qt.LeftButton:
+            self._drag_start_pos = event.globalPosition().toPoint()
+            
+            # Find ChatBubble widget to move
+            if not self._chat_bubble:
+                self._chat_bubble = self._find_chat_bubble()
+            
+            if self._chat_bubble:
+                self._widget_start_pos = self._chat_bubble.pos()
+                self._dragging = True
+            
+            super().mousePressEvent(event)
+            
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if event.buttons() == Qt.LeftButton and self._dragging and self._chat_bubble:
+            delta = event.globalPosition().toPoint() - self._drag_start_pos
+            if delta.manhattanLength() > 5: # Threshold to distinguish click vs drag
+                self._chat_bubble.move(self._widget_start_pos + delta)
+                self._chat_bubble._userMoved = True
+        super().mouseMoveEvent(event)
+        
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        self._dragging = False
+        super().mouseReleaseEvent(event)
+
 class ChatBubble(QWidget):
     """
     Modern floating chat bubble (Circular, Elevated, Beautiful)
@@ -197,14 +334,31 @@ class ChatBubble(QWidget):
     messageSent = Signal(str)
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        # Pass None to super() to make it a top-level window, 
+        # but keep 'parent' reference for logical connection if needed
+        super().__init__(None) 
+        self.main_window = parent # Store reference to main window
         self.settings = ChatSettings()
+        self._userMoved = False
+        self._isExpanded = False
         self._userMoved = False
         self._isExpanded = False
         self._dragPos = QPoint()
         
+        # Resize state
+        self._resizing = False
+        self._resize_edge = None
+        self._resize_start_pos = QPoint()
+        self._resize_start_geo = None
+        self.setMouseTracking(True) # Enable mouse tracking for cursor update
+        
+        # Initialize AI Handler
+        self.ai_handler = AIHandler(self.settings.current_key)
+        
         # Setup UI
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.SubWindow)
+        # Qt.Tool makes it float nicely without a taskbar entry (optional)
+        # Qt.WindowStaysOnTopHint keeps it above other windows
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.setAttribute(Qt.WA_TranslucentBackground)
         
         self.layout = QVBoxLayout(self)
@@ -229,33 +383,35 @@ class ChatBubble(QWidget):
         self.layout.addWidget(self.chat_card)
         
         # 2. Bubble Button (Collapsed State) - Modern Circular Design
-        self.bubble_btn = PushButton(self)
-        self.bubble_btn.setIcon(FIF.CHAT)
-        self.bubble_btn.setIconSize(QSize(24, 24))
-        self.bubble_btn.setFixedSize(60, 60)
+        self.bubble_btn = DraggableButton(self)
+        self.bubble_btn.setObjectName("ChatBubbleBtn") # ID for specific styling
+        self.bubble_btn.setIcon(FIF.CHAT.icon())
+        self.bubble_btn.setIconSize(QSize(20, 20)) # Reduced icon size
+        self.bubble_btn.setFixedSize(42, 42) # Reduced size by ~30% (60 -> 42)
         
-        # ✅ Modern circular style with border and hover effects
+        # ✅ Modern circular style with gradient and glow
+        # Using ID selector #ChatBubbleBtn to prevent theme overrides
         self.bubble_btn.setStyleSheet("""
-            PushButton {
-                background-color: #0078d4;
-                border: 2px solid #ffffff;
-                border-radius: 30px;
+            #ChatBubbleBtn {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #0078d4, stop:1 #00bcf2);
+                border: 2px solid rgba(255, 255, 255, 0.8);
+                border-radius: 21px;
                 padding: 0px;
             }
-            PushButton:hover {
-                background-color: #1084d9;
-                border: 2px solid #e0e0e0;
+            #ChatBubbleBtn:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1084d9, stop:1 #2ce0f5);
+                border: 2px solid #ffffff;
             }
-            PushButton:pressed {
-                background-color: #005a9e;
+            #ChatBubbleBtn:pressed {
+                background: #005a9e;
             }
         """)
         
         # ✅ Add drop shadow for elevated/floating effect
         from PySide6.QtWidgets import QGraphicsDropShadowEffect
         shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
+        shadow.setBlurRadius(25)
+        shadow.setColor(QColor(0, 120, 212, 100)) # Blueish shadow
         shadow.setOffset(0, 4)
         self.bubble_btn.setGraphicsEffect(shadow)
         
@@ -281,24 +437,27 @@ class ChatBubble(QWidget):
         layout.setSpacing(5)
         
         # --- Header ---
-        header_layout = QHBoxLayout()
+        # --- Header ---
+        self.header = DraggableHeader(self.chat_card)
+        header_layout = QHBoxLayout(self.header)
+        header_layout.setContentsMargins(0, 0, 0, 0)
         
-        self.title_label = StrongBodyLabel(self.settings.bot_name, self.chat_card)
+        self.title_label = StrongBodyLabel(self.settings.bot_name, self.header)
         header_layout.addWidget(self.title_label)
         
         header_layout.addStretch()
         
-        self.btn_settings = TransparentToolButton(FIF.SETTING, self.chat_card)
+        self.btn_settings = TransparentToolButton(FIF.SETTING, self.header)
         self.btn_settings.setFixedSize(30, 30)
         self.btn_settings.clicked.connect(self.open_settings)
         header_layout.addWidget(self.btn_settings)
         
-        self.btn_close = TransparentToolButton(FIF.CLOSE, self.chat_card)
+        self.btn_close = TransparentToolButton(FIF.CLOSE, self.header)
         self.btn_close.setFixedSize(30, 30)
         self.btn_close.clicked.connect(self.toggle_chat)
         header_layout.addWidget(self.btn_close)
         
-        layout.addLayout(header_layout)
+        layout.addWidget(self.header)
         
         # --- Chat History ---
         self.chat_list = QListWidget(self.chat_card)
@@ -348,6 +507,7 @@ class ChatBubble(QWidget):
             }
             TransparentToolButton:hover {
                 background-color: #1084d9;
+                border: none;
             }
             TransparentToolButton:pressed {
                 background-color: #005a9e;
@@ -357,17 +517,17 @@ class ChatBubble(QWidget):
         
         layout.addLayout(input_layout, 0)  # No stretch, stays at bottom
         
-
-
     def toggle_chat(self):
         """Toggle between expanded and collapsed states."""
         print(f"🔄 Toggle Chat: Currently Expanded={self._isExpanded}")
         if self.chat_card.isVisible():
             self.chat_card.hide()
+            self.bubble_btn.show() # Show bubble when collapsed
             self._isExpanded = False
             print("  → Hiding chat card")
         else:
             self.chat_card.show()
+            self.bubble_btn.hide() # Hide bubble when expanded
             self._isExpanded = True
             self.input_box.setFocus()
             print("  → Showing chat card")
@@ -376,55 +536,44 @@ class ChatBubble(QWidget):
         self._ensure_within_bounds()
 
     def _ensure_within_bounds(self):
-        """Ensure the bubble stays within the parent window bounds."""
-        if not self.parent():
+        """Ensure the bubble stays within the screen bounds."""
+        # Use screen geometry since we are now a top-level window
+        screen = self.screen()
+        if not screen:
             return
             
-        parent_rect = self.parent().rect()
+        screen_rect = screen.availableGeometry()
         my_rect = self.geometry()
         
         new_x = my_rect.x()
         new_y = my_rect.y()
         
         # Debug current pos
-        print(f"📍 Checking bounds: Pos=({new_x}, {new_y}), Size={my_rect.width()}x{my_rect.height()}, Parent={parent_rect.width()}x{parent_rect.height()}")
+        print(f"📍 Checking bounds: Pos=({new_x}, {new_y}), Size={my_rect.width()}x{my_rect.height()}, Screen={screen_rect.width()}x{screen_rect.height()}")
         
         # Clamp X
-        if new_x < 0: new_x = 0
-        if new_x + my_rect.width() > parent_rect.width():
-            new_x = parent_rect.width() - my_rect.width()
+        if new_x < screen_rect.left(): new_x = screen_rect.left()
+        if new_x + my_rect.width() > screen_rect.right():
+            new_x = screen_rect.right() - my_rect.width()
             
         # Clamp Y
-        if new_y < 0: new_y = 0
-        if new_y + my_rect.height() > parent_rect.height():
-            new_y = parent_rect.height() - my_rect.height()
+        if new_y < screen_rect.top(): new_y = screen_rect.top()
+        if new_y + my_rect.height() > screen_rect.bottom():
+            new_y = screen_rect.bottom() - my_rect.height()
             
         if new_x != my_rect.x() or new_y != my_rect.y():
             print(f"  ⚠️ Clamping to: ({new_x}, {new_y})")
             self.move(new_x, new_y)
 
-    def mousePressEvent(self, event: QMouseEvent):
-        if event.button() == Qt.LeftButton:
-            # Store position relative to widget
-            self._dragPos = event.pos()
-            event.accept()
-
-    def mouseMoveEvent(self, event: QMouseEvent):
-        if event.buttons() == Qt.LeftButton:
-            # Calculate new position in parent coordinates
-            # mapToParent(event.pos()) gives the cursor position in parent coords
-            # Subtracting _dragPos (which is the offset of cursor within widget) gives the new widget top-left
-            new_pos = self.mapToParent(event.pos()) - self._dragPos
-            self.move(new_pos)
-            self._userMoved = True
-            event.accept()
-            
     def open_settings(self):
         try:
             dialog = ChatSettingsDialog(self.settings, self.window())
             if dialog.exec():
                 self.settings = dialog.get_settings()
+                self.settings.save() # ✅ Save to file
                 self.title_label.setText(self.settings.bot_name)
+                # Update API Key in AI Handler
+                self.ai_handler.update_api_key(self.settings.current_key)
                 InfoBar.success("Thành công", "Đã lưu cài đặt Chatbot", parent=self.window())
         except Exception as e:
             print(f"❌ Error opening settings: {e}")
@@ -525,16 +674,114 @@ class ChatBubble(QWidget):
 
     def request_ai_reply(self, user_text: str):
         """
-        Placeholder for future Gemini API integration.
-
-        In the future this method will:
-        - Use self.settings.current_key for authorization.
-        - Build a message history including:
-            - system: self.settings.system_rule
-            - user: user_text
-        - Call Gemini API and return the AI reply text.
-        For now, just delegate to process_command(user_text).
+        Call Gemini API via AIHandler.
         """
-        # Simulate delay or async call here if needed
-        reply = self.process_command(user_text)
+        # Use QTimer to prevent UI freeze (basic async simulation)
+        # In a real app, use QThread. For now, this is "good enough" for quick interactions
+        # or we accept a slight freeze.
+        # Let's do a simple processEvents call or just run it.
+        
+        from PySide6.QtWidgets import QApplication
+        QApplication.processEvents() # Keep UI responsive
+        
+        reply = self.ai_handler.process_message(user_text)
         self.appendBotMessage(reply)
+
+    # --- Edge Resizing Logic ---
+    def mousePressEvent(self, event: QMouseEvent):
+        if not self._isExpanded:
+            super().mousePressEvent(event)
+            return
+
+        edge = self._check_edge(event.pos())
+        if edge:
+            self._resizing = True
+            self._resize_edge = edge
+            self._resize_start_pos = event.globalPosition().toPoint()
+            self._resize_start_geo = self.geometry()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if not self._isExpanded:
+            super().mouseMoveEvent(event)
+            return
+
+        if self._resizing:
+            self._handle_resize(event.globalPosition().toPoint())
+            event.accept()
+        else:
+            # Update cursor shape
+            edge = self._check_edge(event.pos())
+            if edge:
+                if edge in ['left', 'right']:
+                    self.setCursor(Qt.SizeHorCursor)
+                elif edge in ['top', 'bottom']:
+                    self.setCursor(Qt.SizeVerCursor)
+                elif edge in ['top_left', 'bottom_right']:
+                    self.setCursor(Qt.SizeFDiagCursor)
+                elif edge in ['top_right', 'bottom_left']:
+                    self.setCursor(Qt.SizeBDiagCursor)
+            else:
+                self.setCursor(Qt.ArrowCursor)
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        if self._resizing:
+            self._resizing = False
+            self._resize_edge = None
+            self.setCursor(Qt.ArrowCursor)
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
+
+    def _check_edge(self, pos: QPoint):
+        """Check if cursor is near an edge."""
+        margin = 10
+        w, h = self.width(), self.height()
+        x, y = pos.x(), pos.y()
+        
+        edge = ""
+        if y < margin: edge += "top"
+        elif y > h - margin: edge += "bottom"
+        
+        if x < margin: 
+            edge += "_" if edge else ""
+            edge += "left"
+        elif x > w - margin:
+            edge += "_" if edge else ""
+            edge += "right"
+            
+        return edge if edge else None
+
+    def _handle_resize(self, global_pos: QPoint):
+        """Resize window based on drag."""
+        delta = global_pos - self._resize_start_pos
+        geo = self._resize_start_geo
+        new_geo = list(geo.getRect()) # x, y, w, h
+        
+        # Minimum size constraints
+        min_w, min_h = 300, 400
+        
+        if 'right' in self._resize_edge:
+            new_geo[2] = max(min_w, geo.width() + delta.x())
+            
+        if 'left' in self._resize_edge:
+            diff = delta.x()
+            if geo.width() - diff >= min_w:
+                new_geo[0] = geo.x() + diff
+                new_geo[2] = geo.width() - diff
+                
+        if 'bottom' in self._resize_edge:
+            new_geo[3] = max(min_h, geo.height() + delta.y())
+            
+        if 'top' in self._resize_edge:
+            diff = delta.y()
+            if geo.height() - diff >= min_h:
+                new_geo[1] = geo.y() + diff
+                new_geo[3] = geo.height() - diff
+                
+        self.setGeometry(*new_geo)
+        # Resize internal card to match
+        self.chat_card.resize(new_geo[2], new_geo[3])

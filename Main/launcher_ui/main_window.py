@@ -103,10 +103,20 @@ class MainWindow(FluentWindow):
         self.embedded_notes = None
 
         # Chat Bubble (Floating)
+        # Initialize but don't show immediately to avoid layout interference
         self.chat_bubble = ChatBubble(self)
-        self.chat_bubble.show()
-        # Initial position will be set in resizeEvent or we can set it here if we want
-        # But resizeEvent is safer as it runs on show
+        
+        # Use QTimer to show bubble after window is fully initialized
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(100, self.init_chat_bubble)
+
+    def init_chat_bubble(self):
+        """Show and position chat bubble after main window is ready"""
+        if hasattr(self, 'chat_bubble'):
+            self.chat_bubble.show()
+            self.chat_bubble.raise_()
+            # Trigger resize event logic to position it
+            self.resizeEvent(None)
 
     
     def handle_child_visibility_request(self, show: bool):
@@ -165,7 +175,8 @@ class MainWindow(FluentWindow):
             self.embed_notes()
 
     def resizeEvent(self, event):
-        super().resizeEvent(event)
+        if event is not None:
+            super().resizeEvent(event)
         
         # Debug resize events for embedded apps
         if self.embedded_autokey and self.autokey_interface.isVisible():
@@ -377,3 +388,11 @@ class MainWindow(FluentWindow):
             
         except Exception as e:
             print(f"⚠️ Could not highlight {app_name}: {e}")
+
+    def closeEvent(self, event):
+        """Handle window close event"""
+        # Close detached chat bubble if it exists
+        if hasattr(self, 'chat_bubble') and self.chat_bubble:
+            self.chat_bubble.close()
+            
+        super().closeEvent(event)

@@ -59,6 +59,8 @@ class FileWorker(QThread):
                 self.saved.emit(self.filepath, str(e))
 
 
+from ui.recording_overlay import RecordingOverlay
+
 class MainWindow(QMainWindow):
     """AutoKey Main Window - Fluent Design Version
     
@@ -102,7 +104,10 @@ class MainWindow(QMainWindow):
         
         # Setup Hotkeys
         self.setup_global_hotkeys()
-    
+        
+        # Recording Overlay
+        self.recording_overlay = RecordingOverlay(self)
+
     def apply_stylesheet(self):
         """Apply appropriate stylesheet based on current theme"""
         from ui.styles import LIGHT_STYLESHEET, DARK_STYLESHEET
@@ -240,10 +245,18 @@ class MainWindow(QMainWindow):
                 self.recorded_events = []
             
             self.recorder.start_recording()
+            
+            # Show Recording Overlay
+            self.recording_overlay.show()
+            self.recording_overlay.position_overlay()
+            
             InfoBar.info("Đang ghi", "Đang ghi macro...", parent=self)
         else:
             # Stop Recording
             new_events = self.recorder.stop_recording()
+            
+            # Hide Recording Overlay
+            self.recording_overlay.hide()
             
             # Get hotkeys for filtering
             start_rec_key = self.settings.value("hotkey_record", "F9")
