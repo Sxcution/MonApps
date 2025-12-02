@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget, 
                                QListWidgetItem, QLabel, QDialog, QFrame, QScrollArea, QSizeGrip, QPushButton, QApplication)
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QBrush, QPen, QMouseEvent, QPixmap, QClipboard, QKeySequence, QShortcut
-from PySide6.QtCore import Qt, QPoint, Signal, QSize, QRect, QBuffer, QByteArray, QEvent
+from PySide6.QtCore import Qt, QPoint, Signal, QSize, QRect, QBuffer, QByteArray, QEvent, QThread
 
 from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton, LineEdit, 
                             FluentIcon as FIF, TextEdit, InfoBar, StrongBodyLabel,
@@ -13,6 +13,23 @@ import json
 import os
 
 
+
+class AIWorker(QThread):
+    """Background worker for AI processing."""
+    finished = Signal(str)
+
+    def __init__(self, ai_handler, user_text, image_data=None):
+        super().__init__()
+        self.ai_handler = ai_handler
+        self.user_text = user_text
+        self.image_data = image_data
+
+    def run(self):
+        try:
+            reply = self.ai_handler.process_message(self.user_text, self.image_data)
+            self.finished.emit(reply)
+        except Exception as e:
+            self.finished.emit(f"❌ Error: {str(e)}")
 
 class ChatSettings:
     """Data class to hold chatbot settings with persistence."""
@@ -862,11 +879,8 @@ class ChatBubble(QWidget):
 
     def request_ai_reply(self, user_text: str, image: QPixmap = None):
         """
-        Call Gemini API via AIHandler.
+        Call Gemini API via AIHandler in background thread.
         """
-        from PySide6.QtWidgets import QApplication
-        QApplication.processEvents() # Keep UI responsive
-        
         # Convert QPixmap to bytes if present
         image_data = None
         if image:
@@ -875,9 +889,16 @@ class ChatBubble(QWidget):
             buffer.open(QBuffer.WriteOnly)
             image.save(buffer, "PNG")
             image_data = byte_array.data()
+            
+        # Create and start worker
+        self.worker = AIWorker(self.ai_handler, user_text, image_data)
+        self.worker.finished.connect(self.on_ai_reply_received)
+        self.worker.start()
         
-        reply = self.ai_handler.process_message(user_text, image_data)
+    def on_ai_reply_received(self, reply: str):
+        """Handle AI reply from background thread."""
         self.appendBotMessage(reply)
+        self.worker.deleteLater() # Cleanup worker
 
     # --- Edge Resizing Logic ---
     def mousePressEvent(self, event: QMouseEvent):

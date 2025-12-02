@@ -45,9 +45,9 @@ def qt_message_handler(mode, context, message):
 def main():
     # Request Admin Privileges
     if not is_admin():
-        print("⚠️ WARNING: Not running as Admin.")
-        print("   Hotkeys and Recording might not work correctly.")
-        print("   Please run your terminal/IDE as Administrator if you encounter issues.")
+        # Re-run the program with admin rights
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+        sys.exit()
     
     # ✅ Force Dark Theme Globally - Synchronize with Main Hub's dark theme
     from qfluentwidgets import Theme, setTheme

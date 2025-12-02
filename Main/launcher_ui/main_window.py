@@ -20,6 +20,9 @@ class MainWindow(FluentWindow):
         self.setWindowTitle("Mon Tool Hub")
         self.resize(1000, 700)
         
+        # Reduce Title Bar Height
+        self.titleBar.setFixedHeight(32)
+        
         # Set Theme Color (Blue #2986ff)
         setThemeColor('#2986ff')
         
