@@ -175,7 +175,7 @@ class ChatSettingsDialog(QDialog):
 
 class ChatBubble(QWidget):
     """
-    Floating chat bubble widget that sits on top of the MainWindow.
+    Modern floating chat bubble (Circular, Elevated, Beautiful)
     Has two states: Collapsed (Bubble) and Expanded (Chat Window).
     """
     messageSent = Signal(str)
@@ -212,27 +212,36 @@ class ChatBubble(QWidget):
         self._setup_chat_card()
         self.layout.addWidget(self.chat_card)
         
-        # 2. Bubble Button (Collapsed State)
-        self.bubble_btn = PrimaryPushButton(self)
+        # 2. Bubble Button (Collapsed State) - Modern Circular Design
+        self.bubble_btn = PushButton(self)
         self.bubble_btn.setIcon(FIF.CHAT)
+        self.bubble_btn.setIconSize(QSize(24, 24))
         self.bubble_btn.setFixedSize(60, 60)
-        self.bubble_btn.setIconSize(QSize(28, 28))
         
-        # Make it circular with centered icon
+        # ✅ Modern circular style with border and hover effects
         self.bubble_btn.setStyleSheet("""
-            PrimaryPushButton {
+            PushButton {
+                background-color: #0078d4;
+                border: 2px solid #ffffff;
                 border-radius: 30px;
-                border: none;
-                background-color: #2986ff;
                 padding: 0px;
-                margin: 0px;
-                text-align: center;
-                qproperty-iconSize: 28px 28px;
             }
-            PrimaryPushButton:hover {
-                background-color: #1a73e8;
+            PushButton:hover {
+                background-color: #1084d9;
+                border: 2px solid #e0e0e0;
+            }
+            PushButton:pressed {
+                background-color: #005a9e;
             }
         """)
+        
+        # ✅ Add drop shadow for elevated/floating effect
+        from PySide6.QtWidgets import QGraphicsDropShadowEffect
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(20)
+        shadow.setColor(QColor(0, 0, 0, 80))
+        shadow.setOffset(0, 4)
+        self.bubble_btn.setGraphicsEffect(shadow)
         
         # Connect click to toggle
         self.bubble_btn.clicked.connect(self.toggle_chat)
@@ -289,20 +298,45 @@ class ChatBubble(QWidget):
         
         self.input_box = LineEdit(self.chat_card)
         self.input_box.setPlaceholderText("Nhập tin nhắn...")
+        self.input_box.setFixedHeight(40)  # Fixed height for better appearance
         self.input_box.returnPressed.connect(self.send_message)
-        input_layout.addWidget(self.input_box, 1) # Give it stretch factor 1
         
-        self.btn_send = PrimaryPushButton(self.chat_card)
-        self.btn_send.setIcon(FIF.SEND)
-        self.btn_send.setFixedSize(36, 36) # Slightly smaller, standard icon size
-        self.btn_send.setStyleSheet("""
-            PrimaryPushButton {
-                border-radius: 4px;
-                padding: 4px;
-                margin: 0px;
+        # ✅ Rounded input field styling
+        self.input_box.setStyleSheet("""
+            LineEdit {
+                border-radius: 20px;
+                padding-left: 15px;
+                padding-right: 15px;
+                border: 1px solid #454545;
+                background-color: #1e1e1e;
+            }
+            LineEdit:focus {
+                border: 1px solid #0078d4;
             }
         """)
+        input_layout.addWidget(self.input_box, 1)
+        
+        # ✅ Modern Send Button (Circular, Icon-only)
+        self.btn_send = TransparentToolButton(FIF.SEND, self.chat_card)
+        self.btn_send.setFixedSize(40, 40)
+        self.btn_send.setIconSize(QSize(18, 18))
+        self.btn_send.setToolTip("Gửi")
         self.btn_send.clicked.connect(self.send_message)
+        
+        # Circular send button styling
+        self.btn_send.setStyleSheet("""
+            TransparentToolButton {
+                border-radius: 20px;
+                background-color: #0078d4;
+                border: none;
+            }
+            TransparentToolButton:hover {
+                background-color: #1084d9;
+            }
+            TransparentToolButton:pressed {
+                background-color: #005a9e;
+            }
+        """)
         input_layout.addWidget(self.btn_send, 0)
         
         layout.addLayout(input_layout, 0)  # No stretch, stays at bottom

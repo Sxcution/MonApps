@@ -17,6 +17,7 @@ class NotesInterface(QWidget):
         self.setObjectName("notesInterface")
         self.embedded_notes = None
         self.init_ui()
+        self.setup_styles()  # ✅ Apply dark theme styles
     
     def init_ui(self):
         """Initialize the interface."""
@@ -25,6 +26,53 @@ class NotesInterface(QWidget):
         
         # Notes widget will be embedded here when needed
         # This is handled by main_window.py's embed_notes() method
+    
+    def setup_styles(self):
+        """Thiết lập màu sắc chuẩn Dark Mode cho Notes"""
+        
+        # Style for text editor (if exists in embedded widget)
+        style_editor = """
+            QTextEdit, QPlainTextEdit {
+                background-color: #2b2b2b;
+                color: #ffffff;
+                border: 1px solid #454545;
+                border-radius: 8px;
+                padding: 12px;
+                font-family: 'Segoe UI', sans-serif;
+                font-size: 14px;
+                selection-background-color: #0078d4;
+                selection-color: #ffffff;
+            }
+            QTextEdit:focus, QPlainTextEdit:focus {
+                border: 1px solid #0078d4;
+            }
+        """
+        
+        # Style for context menus
+        style_menu = """
+            QMenu {
+                background-color: #2b2b2b;
+                border: 1px solid #3d3d3d;
+                border-radius: 8px;
+                padding: 4px;
+            }
+            QMenu::item {
+                background-color: transparent;
+                color: #ffffff;
+                padding: 6px 12px;
+                border-radius: 4px;
+            }
+            QMenu::item:selected {
+                background-color: #0078d4;
+                color: white;
+            }
+            QMenu::icon {
+                padding-left: 8px;
+            }
+        """
+        
+        # Apply combined styles to the interface
+        self.setStyleSheet(style_editor + style_menu)
     
     def embed_notes_widget(self):
         """Embed the Notes widget from Apps/Notes."""

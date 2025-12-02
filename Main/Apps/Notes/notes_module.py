@@ -1326,26 +1326,27 @@ class NotesWidget(QWidget):
         selected_note = next((n for n in notes if n['id'] == note_id), None)
         
         menu = QMenu(self)
-        # Apply Light Theme Styling to Context Menu (Same as Editor)
+        # ✅ Apply Dark Theme Styling to Context Menu
         menu.setStyleSheet("""
             QMenu {
-                background-color: #ffffff;
-                border: 1px solid #e0e0e0;
+                background-color: #2b2b2b;
+                border: 1px solid #3d3d3d;
                 border-radius: 8px;
                 padding: 4px 0;
             }
             QMenu::item {
-                color: #000000;
+                color: #ffffff;
                 padding: 6px 24px 6px 12px;
                 border-radius: 4px;
                 margin: 0 4px;
             }
             QMenu::item:selected {
-                background-color: #f0f0f0;
+                background-color: #0078d4;
+                color: #ffffff;
             }
             QMenu::separator {
                 height: 1px;
-                background-color: #e0e0e0;
+                background-color: #454545;
                 margin: 4px 0;
             }
         """)
