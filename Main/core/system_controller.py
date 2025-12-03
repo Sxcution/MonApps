@@ -39,7 +39,7 @@ class SystemController:
         """
         print(f"🚀 SystemController: Opening app '{app_name}'...")
         app_map = {
-            "zalo": "zalo",
+            "zalo": os.path.join(os.getenv('LOCALAPPDATA'), 'Programs', 'Zalo', 'Zalo.exe'),
             "chrome": "chrome",
             "notepad": "notepad",
             "calculator": "calc",
@@ -131,3 +131,66 @@ class SystemController:
             return f"Executed {command} {times} times."
         except Exception as e:
             return f"Error executing media command: {str(e)}"
+            return f"Executed {command} {times} times."
+        except Exception as e:
+            return f"Error executing media command: {str(e)}"
+
+    @staticmethod
+    def open_telegram_profiles(start: int, end: int, sample_path: str):
+        """
+        Open multiple Telegram instances based on a folder pattern.
+        Pattern: Telegram - Copy (N)
+        """
+        print(f"🚀 SystemController: Opening Telegram profiles {start} to {end}...")
+        
+        try:
+            # Clean up path (remove quotes if any)
+            sample_path = sample_path.strip('"').strip("'")
+            
+            # Extract base directory
+            # sample_path example: E:\Data Telegram\Telegram Desktop\M1\Telegram - Copy (2)\Telegram.exe
+            # We need: E:\Data Telegram\Telegram Desktop\M1
+            
+            # Strategy: Go up 2 levels from the executable
+            # Level 1: E:\Data Telegram\Telegram Desktop\M1\Telegram - Copy (2)
+            # Level 2: E:\Data Telegram\Telegram Desktop\M1
+            
+            executable_dir = os.path.dirname(sample_path)
+            base_dir = os.path.dirname(executable_dir)
+            
+            print(f"   → Base Directory: {base_dir}")
+            
+            success_count = 0
+            failed_count = 0
+            
+            for i in range(start, end + 1):
+                # Construct folder name
+                # If i=1, usually it's just "Telegram" or "Telegram - Copy" depending on user naming
+                # But based on user request "Telegram - Copy (N)", let's stick to that pattern for N >= 2
+                # For safety, we can check a few variations if file not found
+                
+                folder_name = f"Telegram - Copy ({i})"
+                exe_path = os.path.join(base_dir, folder_name, "Telegram.exe")
+                
+                if not os.path.exists(exe_path):
+                    # Try alternative: maybe just "Telegram" for i=1?
+                    if i == 1:
+                         exe_path = os.path.join(base_dir, "Telegram", "Telegram.exe")
+                
+                if os.path.exists(exe_path):
+                    print(f"   → Launching: {exe_path}")
+                    try:
+                        subprocess.Popen(exe_path, cwd=os.path.dirname(exe_path))
+                        success_count += 1
+                        time.sleep(1.5) # Delay to prevent CPU spike
+                    except Exception as e:
+                        print(f"   ❌ Failed to launch {i}: {e}")
+                        failed_count += 1
+                else:
+                    print(f"   ⚠️ Path not found: {exe_path}")
+                    failed_count += 1
+            
+            return f"Launched {success_count} Telegram instances. Failed: {failed_count}."
+            
+        except Exception as e:
+            return f"Error launching Telegram profiles: {str(e)}"

@@ -124,6 +124,28 @@ class AIHandler:
                                 },
                                 "required": ["command"]
                             }
+                        },
+                        {
+                            "name": "open_telegram_profiles",
+                            "description": "Open multiple Telegram instances based on a folder pattern (Telegram - Copy (N)).",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "start": {
+                                        "type": "integer",
+                                        "description": "Starting number of the profile range (e.g., 2)."
+                                    },
+                                    "end": {
+                                        "type": "integer",
+                                        "description": "Ending number of the profile range (e.g., 10)."
+                                    },
+                                    "sample_path": {
+                                        "type": "string",
+                                        "description": "A sample path to one of the Telegram executables (e.g., 'E:\\Data\\Telegram - Copy (2)\\Telegram.exe') to infer the base directory."
+                                    }
+                                },
+                                "required": ["start", "end", "sample_path"]
+                            }
                         }
                     ]
                 }
@@ -268,6 +290,8 @@ class AIHandler:
                 return SystemController.create_note(**args)
             elif name == "control_media":
                 return SystemController.control_media(**args)
+            elif name == "open_telegram_profiles":
+                return SystemController.open_telegram_profiles(**args)
             else:
                 return f"Error: Function {name} not found."
         except Exception as e:
