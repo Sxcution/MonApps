@@ -32,5 +32,9 @@
     "GlobalConfig": {
         "PrimaryColor": "#2986ff",
         "ThemeColorDescription": "Brand Color. Applies to Primary Buttons, Focus States, and Accents. Standard Buttons remain default."
+    },
+    "SingleInstance": {
+        "MutexName": "Global\\MonToolHubMainApp",
+        "WindowTitle": "Mon Tool Hub"
     }
 }

@@ -29,6 +29,7 @@ This directory contains the central launcher and the sub-projects `AutoKey` and 
     - `log_manager.py`: Singleton for capturing stdout/stderr to log interface
     - `ai_handler.py`: Handles Gemini API communication and function calling
     - `system_controller.py`: Executes system-level commands (Shutdown, Volume, etc.)
+    - `single_instance_manager.py`: Handles single instance logic using Windows Named Mutex and Messaging
 - `launcher_ui/`: UI components for the launcher
     - `main_window.py`: Main FluentWindow with independent app navigation buttons, close handlers
     - `home_interface.py`: Home page with app launch buttons

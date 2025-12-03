@@ -13,12 +13,23 @@ from launcher_ui.notes_interface import NotesInterface
 from launcher_ui.chat_interface import ChatBubble
 import os
 import sys
+import ctypes
+import ctypes.wintypes
 
 class MainWindow(FluentWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Mon Tool Hub")
         self.resize(1000, 700)
+        
+        # Set Window Icon
+        from PySide6.QtGui import QIcon
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources", "app_icon.png")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+            print(f"✓ Window icon set: {icon_path}")
+        else:
+            print(f"⚠️ Window icon not found: {icon_path}")
         
         # Reduce Title Bar Height
         self.titleBar.setFixedHeight(32)
@@ -113,6 +124,9 @@ class MainWindow(FluentWindow):
         # Use QTimer to show bubble after window is fully initialized
         from PySide6.QtCore import QTimer
         QTimer.singleShot(100, self.init_chat_bubble)
+        
+        # Initialize System Tray (always visible)
+        QTimer.singleShot(200, self.init_system_tray)
 
     def init_chat_bubble(self):
         """Show and position chat bubble after main window is ready"""
@@ -481,10 +495,7 @@ class MainWindow(FluentWindow):
         if run_in_background:
             event.ignore()
             self.hide()
-            
-            # Initialize tray if not already done
-            if not hasattr(self, 'tray_icon'):
-                self.init_system_tray()
+            # Tray icon is already initialized in __init__, no need to check
             
             # Show notification only once per session or just rely on tray tooltip
             # self.tray_icon.showMessage("Mon Tool Hub", "Ứng dụng đang chạy ngầm", QSystemTrayIcon.Information, 2000)
@@ -494,3 +505,29 @@ class MainWindow(FluentWindow):
                 self.chat_bubble.close()
                 
             super().closeEvent(event)
+
+    def nativeEvent(self, eventType, message):
+        """Handle native Windows messages"""
+        try:
+            # WM_USER + 1 = 0x0401 (1025)
+            WM_SHOW_APP = 1025
+            
+            if eventType == "windows_generic_MSG":
+                msg = ctypes.wintypes.MSG.from_address(message.__int__())
+                if msg.message == WM_SHOW_APP:
+                    print("📩 Received WM_SHOW_APP message. Restoring window...")
+                    
+                    # Restore window state safely on Qt thread
+                    if self.isMinimized():
+                        self.showNormal()
+                    
+                    self.show()
+                    self.raise_()
+                    self.activateWindow()
+                    
+                    return True, 0
+                    
+        except Exception as e:
+            print(f"❌ Error in nativeEvent: {e}")
+            
+        return super().nativeEvent(eventType, message)

@@ -1,6 +1,5 @@
 """
 Auto Detect Dialog - for configuring complex conditional detection with images and text
-<!-- auto_detect_dialog : Dialog cấu hình phát hiện tự động với nhiều điều kiện ảnh/text -->
 """
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                             QGroupBox, QFileDialog, QWidget, QApplication,
@@ -66,10 +65,12 @@ class ImageDetectItem(QWidget):
         container_layout = QVBoxLayout(container)
         container_layout.setContentsMargins(16, 16, 16, 16)
         container_layout.setSpacing(12)
+        container_layout.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)  # Force left alignment
         
         # MAIN LAYOUT: Horizontal (Left: Image, Right: Controls)
         main_layout = QHBoxLayout()
-        main_layout.setSpacing(0)  # No spacing between image and controls - stick together
+        main_layout.setSpacing(10)  # Add small spacing between Image and Controls
+        main_layout.setAlignment(Qt.AlignmentFlag.AlignLeft) # Force Main Layout to align Left
         
         # --- LEFT PANEL: Image Preview + Import/Cut Buttons ---
         left_panel = QVBoxLayout()
@@ -136,6 +137,7 @@ class ImageDetectItem(QWidget):
         right_panel = QVBoxLayout()
         right_panel.setSpacing(8)
         right_panel.setContentsMargins(0, 0, 0, 0) # No margin - stick to image
+        right_panel.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft) # Align Panel to Top Left
         
         # ROW 1: Header - Label | Grayscale | Multi-scale (No Buttons here)
         header_row = QHBoxLayout()
@@ -243,8 +245,10 @@ class ImageDetectItem(QWidget):
         
         right_panel.addLayout(grid_layout)
         
-        right_panel.addStretch()
         main_layout.addLayout(right_panel)
+        
+        # QUAN TRỌNG: Thêm stretch ở cuối main_layout để ép mọi thứ sang trái
+        main_layout.addStretch()
         
         container_layout.addLayout(main_layout)
         
@@ -646,7 +650,6 @@ class TimeScanDialog(MessageBoxBase):
 class AutoDetectDialog(QDialog):
     """
     Dialog for Auto Detect - complex conditional detection with multiple images/text
-    <!-- dialog_auto_detect : Dialog cấu hình Auto Detect -->
     """
     def __init__(self, parent=None, event=None):
         super().__init__(parent)
@@ -872,4 +875,3 @@ class AutoDetectDialog(QDialog):
             'image_detects': image_detects,
             'time': self.event.get('time', 0.5)
         }
-

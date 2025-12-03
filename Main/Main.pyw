@@ -113,7 +113,41 @@ if __name__ == '__main__':
     # Initialize Logger
     LogManager.get_instance()
     
+    # ✅ SINGLE INSTANCE CHECK
+    # Must be done before creating QApplication to avoid overhead
+    from core.single_instance_manager import SingleInstanceManager
+    instance_manager = SingleInstanceManager()
+    if instance_manager.check_existing_instance():
+        print("⚠️ Another instance is running. Activating it...")
+        if instance_manager.activate_existing_instance():
+            sys.exit(0)
+        else:
+            print("⚠️ Could not activate existing instance. Exiting anyway.")
+            sys.exit(0)
+            
+    # Keep reference to prevent GC
+    # instance_manager.mutex is held open as long as this object exists
+    
+    # CRITICAL: Set Windows AppUserModelID BEFORE creating QApplication
+    # This ensures the taskbar icon displays correctly instead of showing Python icon
+    try:
+        import ctypes
+        myappid = 'mon.toolhub.main.1.0'  # Arbitrary string
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+        print(f"✓ Windows AppUserModelID set: {myappid}")
+    except Exception as e:
+        print(f"⚠️ Could not set AppUserModelID: {e}")
+    
     app = QApplication(sys.argv)
+    
+    # ✅ Set Application Icon (for all windows)
+    from PySide6.QtGui import QIcon
+    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "resources", "app_icon.png")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
+        print(f"✓ Application icon set: {icon_path}")
+    else:
+        print(f"⚠️ Application icon not found: {icon_path}")
     
     # ✅ STEP 1: Set Fluent Dark Theme
     from qfluentwidgets import setTheme, Theme
