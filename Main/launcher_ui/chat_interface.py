@@ -1,12 +1,12 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget, 
-                               QListWidgetItem, QLabel, QDialog, QFrame, QScrollArea, QSizeGrip, QPushButton, QApplication)
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QBrush, QPen, QMouseEvent, QPixmap, QClipboard, QKeySequence, QShortcut
+                               QListWidgetItem, QLabel, QDialog, QFrame, QScrollArea, QSizeGrip, QPushButton, QApplication, QSizePolicy)
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QBrush, QPen, QMouseEvent, QPixmap, QClipboard, QKeySequence, QShortcut, QFontMetrics
 from PySide6.QtCore import Qt, QPoint, Signal, QSize, QRect, QBuffer, QByteArray, QEvent, QThread
 
 from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton, LineEdit, 
                             FluentIcon as FIF, TextEdit, InfoBar, StrongBodyLabel,
                             BodyLabel, Theme, isDarkTheme, TransparentToolButton,
-                            ComboBox, ToolButton)
+                            ComboBox, ToolButton, IndeterminateProgressRing)
 from core.ai_handler import AIHandler
 
 import json
@@ -402,6 +402,7 @@ class DraggableButton(QPushButton):
         self._drag_start_pos = QPoint()
         self._widget_start_pos = QPoint()
         self._chat_bubble = None
+        self._is_drag_action = False # Track if a drag actually happened
         
     def _find_chat_bubble(self):
         """Find the ChatBubble parent widget."""
@@ -415,6 +416,7 @@ class DraggableButton(QPushButton):
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.LeftButton:
             self._drag_start_pos = event.globalPosition().toPoint()
+            self._is_drag_action = False # Reset drag flag
             
             # Find ChatBubble widget to move
             if not self._chat_bubble:
@@ -441,6 +443,7 @@ class DraggableButton(QPushButton):
             current_global = event.globalPosition().toPoint()
             delta_global = current_global - self._drag_start_pos
             if delta_global.manhattanLength() > 5: # Threshold to distinguish click vs drag
+                self._is_drag_action = True # Mark as drag action
                 if self._chat_bubble._isOverlay:
                     # Overlay mode: move in global coordinates
                     self._chat_bubble.move(self._widget_start_pos + delta_global)
@@ -458,6 +461,12 @@ class DraggableButton(QPushButton):
         
     def mouseReleaseEvent(self, event: QMouseEvent):
         self._dragging = False
+        if self._is_drag_action:
+            # If it was a drag, suppress the click event
+            self.setDown(False)
+            self._is_drag_action = False
+            return
+            
         super().mouseReleaseEvent(event)
 
 class ChatBubble(QWidget):
@@ -592,10 +601,37 @@ class ChatBubble(QWidget):
         
         # --- Chat History ---
         self.chat_list = QListWidget(self.chat_card)
+        self.chat_list.setObjectName("chatHistoryList") # Unique ID for styling isolation
         self.chat_list.setFrameShape(QFrame.NoFrame)
         self.chat_list.setVerticalScrollMode(QListWidget.ScrollPerPixel)
-        # ✅ Dark theme background for chat area
-        self.chat_list.setStyleSheet("QListWidget { background: #2b2b2b; border-radius: 5px; }")
+        
+        # ✅ CRITICAL: Force dynamic item sizing (Qt-specific)
+        # This tells Qt to respect setSizeHint() for each item individually
+        self.chat_list.setUniformItemSizes(False)  # Allow different heights per item
+        self.chat_list.setResizeMode(QListWidget.Adjust)  # Adjust on content change
+        
+        # ✅ Use Qt-compatible stylesheet (NO !important - not supported in QSS)
+        # ID selector #chatHistoryList provides high specificity
+        # Use explicit rgb() colors to prevent inheritance from AutoKey
+        self.chat_list.setStyleSheet("""
+            QListWidget#chatHistoryList { 
+                background-color: rgb(43, 43, 43);
+                border: none;
+                border-radius: 0px;
+            }
+            QListWidget#chatHistoryList::item {
+                background-color: transparent;
+                border: none;
+                padding: 8px 20px 8px 8px;
+                /* NO height specification - let Qt use setSizeHint() */
+            }
+            QListWidget#chatHistoryList::item:selected {
+                background-color: transparent;
+            }
+            QListWidget#chatHistoryList::item:hover {
+                background-color: transparent;
+            }
+        """)
         layout.addWidget(self.chat_list, 1)  # Give it stretch factor to fill space
         
         # --- Image Preview Area ---
@@ -684,6 +720,7 @@ class ChatBubble(QWidget):
         layout.addLayout(input_layout, 0)  # No stretch, stays at bottom
         
         self.current_image = None # Store current image data
+        self.typing_item = None # Track the typing indicator item
 
     def eventFilter(self, obj, event):
         if obj == self.input_box and event.type() == QEvent.KeyPress:
@@ -862,7 +899,77 @@ class ChatBubble(QWidget):
         self.messageSent.emit(text)
         
         # Process reply
+        self.show_typing_indicator()
         self.request_ai_reply(text, image)
+
+    def show_typing_indicator(self):
+        """Show a temporary 'Thinking...' bubble in the chat list."""
+        if self.typing_item:
+            return # Already showing
+            
+        item = QListWidgetItem()
+        item.setTextAlignment(Qt.AlignLeft)
+        
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(0, 5, 0, 5)
+        layout.setSpacing(10)
+        
+        # Progress Ring with EXTRA protection against distortion
+        ring = IndeterminateProgressRing()
+        ring.setFixedSize(20, 20)
+        ring.setMinimumSize(20, 20)  # Enforce minimum
+        ring.setMaximumSize(20, 20)  # Enforce maximum
+        # Prevent ring from being stretched by layout
+        ring.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        ring.start()
+        
+        # Label
+        label = BodyLabel("Đang suy nghĩ...", widget)
+        
+        # Theme-aware styling
+        bg_color = "#3e3e3e" if isDarkTheme() else "#f0f0f0"
+        text_color = "white" if isDarkTheme() else "black"
+        
+        container_style = f"""
+            QWidget#TypingContainer {{
+                background-color: {bg_color};
+                border-radius: 10px;
+            }}
+        """
+        
+        container = QWidget()
+        container.setObjectName("TypingContainer")
+        container.setStyleSheet(container_style)
+        container.setFixedHeight(36)  # Fixed height for container
+        container_layout = QHBoxLayout(container)
+        container_layout.setContentsMargins(12, 8, 12, 8)
+        container_layout.setSpacing(8)
+        container_layout.addWidget(ring, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        container_layout.addWidget(label, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        container_layout.addStretch()  # Push content to left, let container stay compact
+        
+        # Set container to not expand
+        container.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        container.adjustSize()  # Shrink to content
+        
+        layout.addWidget(container, 0, Qt.AlignLeft)  # No stretch, align left
+        layout.addStretch()  # Push everything to the left
+        
+        item.setSizeHint(widget.sizeHint())
+        self.chat_list.addItem(item)
+        self.chat_list.setItemWidget(item, widget)
+        # ✅ Scroll to bottom to show typing indicator
+        self.chat_list.scrollToBottom()
+        
+        self.typing_item = item
+
+    def hide_typing_indicator(self):
+        """Remove the temporary typing indicator."""
+        if self.typing_item:
+            row = self.chat_list.row(self.typing_item)
+            self.chat_list.takeItem(row)
+            self.typing_item = None
 
     def appendUserMessage(self, text: str, image: QPixmap = None):
         item = QListWidgetItem()
@@ -890,23 +997,55 @@ class ChatBubble(QWidget):
         # Add Text if present
         if text:
             label = BodyLabel(text, widget)
-            label.setStyleSheet("""
-                QLabel {
-                    background-color: #2986ff;
-                    color: white;
+            
+            # Theme-aware styling for USER (Gray)
+            bg_color = "#3e3e3e" if isDarkTheme() else "#f0f0f0"
+            text_color = "white" if isDarkTheme() else "black"
+            
+            label.setStyleSheet(f"""
+                QLabel {{
+                    background-color: {bg_color};
+                    color: {text_color};
                     border-radius: 10px;
                     padding: 8px 12px;
-                }
+                }}
             """)
             label.setWordWrap(True)
-            label.setMaximumWidth(250)
+            # ✅ RESPONSIVE: Use 70% of chat list width, not fixed 450px
+            max_width = int(self.chat_list.width() * 0.7)
+            label.setMaximumWidth(max(max_width, 250))  # At least 250px
             content_layout.addWidget(label, 0, Qt.AlignRight)
             
         layout.addLayout(content_layout)
         
-        item.setSizeHint(widget.sizeHint())
+        # Calculate accurate height using QFontMetrics
+        size = widget.sizeHint()
+        if text:
+            fm = QFontMetrics(label.font())
+            # ✅ Use actual label width for calculation, not fixed 426
+            label_width = label.maximumWidth() - 24  # Subtract padding
+            rect = fm.boundingRect(0, 0, label_width, 0, Qt.TextWordWrap, text)
+            # Text height + Label Padding (16) + Layout Margins (10) + Buffer (34)
+            required_height = rect.height() + 80
+            # Add height for image if present (approx 200px + margins)
+            if image:
+                required_height += 210
+            
+            size.setHeight(max(size.height(), required_height))
+        else:
+             # Image only
+             if image:
+                 size.setHeight(220)
+
+        item.setSizeHint(size)
         self.chat_list.addItem(item)
         self.chat_list.setItemWidget(item, widget)
+        
+        # ✅ FORCE Qt to re-calculate item geometry after AutoKey pollution
+        item.setSizeHint(size)  # Re-apply to ensure it sticks
+        self.chat_list.updateGeometry()
+        self.chat_list.update()
+        
         self.chat_list.scrollToBottom()
 
     def appendBotMessage(self, text: str):
@@ -919,28 +1058,49 @@ class ChatBubble(QWidget):
         
         label = BodyLabel(text, widget)
         
-        # Theme-aware styling
-        bg_color = "#3e3e3e" if isDarkTheme() else "#f0f0f0"
+        # Theme-aware styling for BOT (Transparent)
         text_color = "white" if isDarkTheme() else "black"
         
         label.setStyleSheet(f"""
             QLabel {{
-                background-color: {bg_color};
+                background-color: transparent;
                 color: {text_color};
-                border-radius: 10px;
-                padding: 8px 12px;
+                padding: 8px 0px; /* Remove horizontal padding since no box */
             }}
         """)
         label.setWordWrap(True)
-        label.setMaximumWidth(250)
+        # ✅ RESPONSIVE: Use 80% of chat list width for bot messages
+        max_width = int(self.chat_list.width() * 0.8)
+        label.setMaximumWidth(max(max_width, 300))  # At least 300px
         
         layout.addWidget(label)
         layout.addStretch()
         
-        item.setSizeHint(widget.sizeHint())
+        # Calculate accurate height using QFontMetrics
+        size = widget.sizeHint()
+        fm = QFontMetrics(label.font())
+        # ✅ Use actual label width for calculation
+        label_width = label.maximumWidth()
+        rect = fm.boundingRect(0, 0, label_width, 0, Qt.TextWordWrap, text)
+        # Text height + Label Padding (16) + Layout Margins (10) + Extra Buffer
+        # Increased buffer to 80 to ensure NO cutoff even with long text
+        required_height = rect.height() + 80
+        
+        # Set height with minimum 60px
+        size.setHeight(max(size.height(), required_height, 60))
+        item.setSizeHint(size)
+        
         self.chat_list.addItem(item)
         self.chat_list.setItemWidget(item, widget)
-        self.chat_list.scrollToBottom()
+        
+        # ✅ FORCE Qt to re-calculate item geometry after AutoKey pollution
+        item.setSizeHint(size)  # Re-apply to ensure it sticks
+        self.chat_list.updateGeometry()
+        self.chat_list.update()
+        
+        # ✅ DO NOT auto-scroll to bottom after adding bot message
+        # Let user decide when to scroll - prevents losing view of their original message
+        # self.chat_list.scrollToBottom()  # REMOVED
 
     def clearChat(self):
         self.chat_list.clear()
@@ -965,8 +1125,13 @@ class ChatBubble(QWidget):
         
     def on_ai_reply_received(self, reply: str):
         """Handle AI reply from background thread."""
+        self.hide_typing_indicator()
         self.appendBotMessage(reply)
         self.worker.deleteLater() # Cleanup worker
+        
+        # ✅ DO NOT auto-scroll to bottom after bot reply
+        # This allows user to see their original message without being forced to bottom
+        # User can manually scroll down if they want to see the full bot response
 
     # --- Edge Resizing Logic ---
     def mousePressEvent(self, event: QMouseEvent):

@@ -146,14 +146,89 @@ class AIHandler:
                                 },
                                 "required": ["start", "end", "sample_path"]
                             }
+                        },
+                        {
+                            "name": "search_file",
+                            "description": "Search for a file by name recursively in user directories (Desktop, Documents, Downloads).",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "filename": {
+                                        "type": "string",
+                                        "description": "The name of the file to search for (e.g., 'report.docx')."
+                                    },
+                                    "root_path": {
+                                        "type": "string",
+                                        "description": "Optional root path to start search from."
+                                    }
+                                },
+                                "required": ["filename"]
+                            }
+                        },
+                        {
+                            "name": "open_file_path",
+                            "description": "Open a specific file path using the default application.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "path": {
+                                        "type": "string",
+                                        "description": "The absolute path of the file to open."
+                                    }
+                                },
+                                "required": ["path"]
+                            }
+                        },
+                        {
+                            "name": "read_file_content",
+                            "description": "Read the content of a text or code file.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "path": {
+                                        "type": "string",
+                                        "description": "The absolute path of the file to read."
+                                    }
+                                },
+                                "required": ["path"]
+                            }
+                        },
+                        {
+                            "name": "web_search",
+                            "description": "Search the web for information using DuckDuckGo (Free). Use this when you need up-to-date information.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "query": {
+                                        "type": "string",
+                                        "description": "The search query (e.g., 'latest AI news', 'Python 3.13 features')."
+                                    }
+                                },
+                                "required": ["query"]
+                            }
+                        },
+                        {
+                            "name": "run_terminal_command",
+                            "description": "Execute a system terminal command (cmd/powershell). Use this for advanced tasks like killing processes (taskkill), managing files, or running external tools (adb, java, git, etc.).",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "command": {
+                                        "type": "string",
+                                        "description": "The command to execute (e.g., 'taskkill /F /IM Telegram.exe', 'adb devices', 'dir')."
+                                    }
+                                },
+                                "required": ["command"]
+                            }
                         }
                     ]
                 }
             ]
-            
+
             self.model = genai.GenerativeModel(
                 model_name=self.model_name,
-                tools=self.tools
+                tools=self.tools,
+                system_instruction="You are a helpful and intelligent AI assistant for Windows. You can control the computer using tools, but you are also a general-purpose assistant. \n\nPERSONA & TONE:\n- Speak naturally, casually, and friendly, like a human (similar to ChatGPT). Do NOT be robotic.\n- ALWAYS address the user as 'Sếp' (Boss) in Vietnamese.\n- Be concise but helpful.\n\nCAPABILITIES:\n- You have the power to run system commands via 'run_terminal_command'. Use this to perform advanced tasks like managing processes ('taskkill'), using ADB, or running CLI tools. When asked to do something technical like 'kill process', 'check ip', 'reverse engineer apk', DO IT using this tool.\n\nSEARCH & INTELLIGENCE:\n- When using 'web_search', if the exact answer is not in the snippets, try to infer the best possible answer or provide a general answer based on the search results. Do NOT give up easily. For example, if asked about weather and you only see general weather sites, say 'Theo kết quả tìm kiếm, thời tiết có thể là...' or use your internal knowledge if the date is not critical.\n\nIf a user asks something that doesn't require a tool, answer it directly using your knowledge. Do NOT say you cannot do something just because there is no tool for it, unless it requires physical action or private data access."
             )
             self.chat_session = self.model.start_chat(enable_automatic_function_calling=True)
             print("✅ AIHandler: Gemini configured successfully with Tools.")
@@ -240,6 +315,7 @@ class AIHandler:
         candidate = response.candidates[0]
         
         for part in candidate.content.parts:
+            # Check for function call first
             if part.function_call:
                 fc = part.function_call
                 func_name = fc.name
@@ -249,10 +325,6 @@ class AIHandler:
                 
                 # Execute function
                 result = self._execute_function(func_name, args)
-                
-                # Send result back to Gemini
-                # We need to send the function response back to the model to get the final natural language answer.
-                # This is the standard flow.
                 
                 print(f"   → Result: {result}")
                 
@@ -268,8 +340,13 @@ class AIHandler:
                 final_response = self.chat_session.send_message([func_response_part])
                 return final_response.text
             
-            if part.text:
-                final_text += part.text
+            # Only access text if it's NOT a function call
+            try:
+                if part.text:
+                    final_text += part.text
+            except Exception:
+                # Ignore parts that don't have text (like function calls if they slip through)
+                pass
                 
         return final_text
 
@@ -292,6 +369,16 @@ class AIHandler:
                 return SystemController.control_media(**args)
             elif name == "open_telegram_profiles":
                 return SystemController.open_telegram_profiles(**args)
+            elif name == "search_file":
+                return SystemController.search_file(**args)
+            elif name == "open_file_path":
+                return SystemController.open_file_path(**args)
+            elif name == "read_file_content":
+                return SystemController.read_file_content(**args)
+            elif name == "web_search":
+                return SystemController.web_search(**args)
+            elif name == "run_terminal_command":
+                return SystemController.run_terminal_command(**args)
             else:
                 return f"Error: Function {name} not found."
         except Exception as e:

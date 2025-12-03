@@ -119,15 +119,25 @@ class MainWindow(QMainWindow):
             stylesheet = LIGHT_STYLESHEET
             print("🎨 Applying LIGHT stylesheet to AutoKey")
         
-        # Apply to this window
+        print(f"🔍 DEBUG: AutoKey apply_stylesheet called. is_embedded={self.is_embedded}")
+        
+        # ✅ CRITICAL FIX: Do NOT apply ANY stylesheet when embedded
+        # Embedded AutoKey MUST NOT pollute parent Main app's styles
+        # This prevents global QListWidget::item rules from affecting ChatBubble
+        if self.is_embedded:
+            print("⚠️ Embedded mode: Skipping ALL stylesheet application (window + app)")
+            print("   → AutoKey will inherit Main window's Fluent theme")
+            return  # Early exit - no stylesheets applied
+        
+        # Standalone mode - apply styles normally
         self.setStyleSheet(stylesheet)
         
-        # Also apply to QApplication to affect dialogs
+        # Also apply to QApplication to affect dialogs (ONLY in standalone mode)
         from PySide6.QtWidgets import QApplication
         app = QApplication.instance()
         if app:
             app.setStyleSheet(stylesheet)
-            print("✓ Stylesheet applied to QApplication")
+            print("✓ Stylesheet applied to QApplication (standalone mode)")
 
 
     def setup_ui(self):
@@ -1101,7 +1111,7 @@ class MainWindow(QMainWindow):
             
             filename = os.path.basename(filepath)
             self.statusBar().showMessage(f"Loaded {len(self.recorded_events)} events from {filename}")
-            InfoBar.success("Đã tải", f"Đã load: {filename}", parent=self)
+            InfoBar.info("Đã tải", f"Đã load: {filename}", parent=self)
             
         except Exception as e:
             # Restore signals in case of error

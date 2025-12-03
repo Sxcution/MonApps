@@ -448,6 +448,25 @@ class MainWindow(FluentWindow):
         # Context Menu
         menu = QMenu()
         
+        # Increase size by ~10% and style it
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #2b2b2b;
+                border: 1px solid #333;
+                border-radius: 8px;
+                padding: 4px;
+            }
+            QMenu::item {
+                padding: 8px 24px; /* Increased padding for ~10% larger hit area */
+                font-size: 14px;
+                color: white;
+                border-radius: 4px;
+            }
+            QMenu::item:selected {
+                background-color: #0078d4;
+            }
+        """)
+        
         open_action = QAction("Mở", self)
         open_action.triggered.connect(self.show_window)
         menu.addAction(open_action)

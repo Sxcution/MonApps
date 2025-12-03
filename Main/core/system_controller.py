@@ -194,3 +194,167 @@ class SystemController:
             
         except Exception as e:
             return f"Error launching Telegram profiles: {str(e)}"
+
+    @staticmethod
+    def search_file(filename: str, root_path: str = None):
+        """
+        Search for a file by name recursively.
+        If root_path is not provided, searches Desktop, Documents, and Downloads.
+        """
+        print(f"🔍 SystemController: Searching for '{filename}'...")
+        
+        found_files = []
+        search_roots = []
+        
+        if root_path:
+            if os.path.exists(root_path):
+                search_roots.append(root_path)
+            else:
+                return f"Error: Root path '{root_path}' does not exist."
+        else:
+            # Default search locations
+            user_profile = os.path.expanduser("~")
+            search_roots = [
+                os.path.join(user_profile, "Desktop"),
+                os.path.join(user_profile, "Documents"),
+                os.path.join(user_profile, "Downloads")
+            ]
+            
+        try:
+            for root_dir in search_roots:
+                if not os.path.exists(root_dir):
+                    continue
+                    
+                print(f"   → Scanning: {root_dir}")
+                # Walk through directory
+                for root, dirs, files in os.walk(root_dir):
+                    # Skip hidden directories and system folders to speed up
+                    dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ["Windows", "Program Files", "Program Files (x86)", "AppData"]]
+                    
+                    for file in files:
+                        if filename.lower() in file.lower():
+                            full_path = os.path.join(root, file)
+                            found_files.append(full_path)
+                            print(f"   ✓ Found: {full_path}")
+                            
+                            # Limit results
+                            if len(found_files) >= 5:
+                                return found_files
+            
+            if not found_files:
+                return f"No files found matching '{filename}' in user directories."
+                
+            return found_files
+            
+        except Exception as e:
+            return f"Error searching for file: {str(e)}"
+
+    @staticmethod
+    def open_file_path(path: str):
+        """Open a specific file path."""
+        print(f"📂 SystemController: Opening file '{path}'...")
+        
+        # Clean up path
+        path = path.strip('"').strip("'")
+        
+        if not os.path.exists(path):
+            return f"Error: File not found at '{path}'"
+            
+        try:
+            os.startfile(path)
+            return f"Opening {os.path.basename(path)}..."
+        except Exception as e:
+            return f"Error opening file: {str(e)}"
+
+    @staticmethod
+    def read_file_content(path: str):
+        """Read the content of a text file."""
+        print(f"📖 SystemController: Reading file '{path}'...")
+        
+        # Clean up path
+        path = path.strip('"').strip("'")
+        
+        if not os.path.exists(path):
+            return f"Error: File not found at '{path}'"
+            
+        try:
+            # Try reading with utf-8 first
+            with open(path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                
+            # Limit content length to prevent token overflow (e.g., 50KB)
+            if len(content) > 50000:
+                return f"File content (Truncated first 50000 chars):\n{content[:50000]}...\n\n(File too large)"
+            
+            return content
+        except UnicodeDecodeError:
+            return "Error: Cannot read binary file or unknown encoding."
+        except Exception as e:
+            return f"Error reading file: {str(e)}"
+
+    @staticmethod
+    def web_search(query: str):
+        """
+        Search the web using DuckDuckGo (Free API).
+        Returns top 5 results.
+        """
+        print(f"🌍 SystemController: Searching web for '{query}'...")
+        
+        try:
+            from duckduckgo_search import DDGS
+        except ImportError:
+            return "Error: 'duckduckgo-search' library not installed. Please run: pip install duckduckgo-search"
+            
+        try:
+            results = []
+            with DDGS() as ddgs:
+                # Search for top 10 results
+                for r in ddgs.text(query, max_results=10):
+                    results.append(f"- [{r['title']}]({r['href']})\n  {r['body']}")
+            
+            if not results:
+                return f"No results found for '{query}'."
+                
+            return "Web Search Results:\n" + "\n\n".join(results)
+            
+        except Exception as e:
+            return f"Error performing web search: {str(e)}"
+
+    @staticmethod
+    def run_terminal_command(command: str):
+        """
+        Execute a terminal command and return the output.
+        Useful for advanced tasks like 'taskkill', 'adb', 'java', etc.
+        """
+        print(f"💻 SystemController: Running command '{command}'...")
+        
+        try:
+            # Run command with timeout (e.g., 60 seconds)
+            result = subprocess.run(
+                command, 
+                shell=True, 
+                capture_output=True, 
+                text=True, 
+                timeout=60,
+                encoding='utf-8', 
+                errors='replace'
+            )
+            
+            output = result.stdout.strip()
+            error = result.stderr.strip()
+            
+            response = ""
+            if output:
+                response += f"Output:\n{output}\n"
+            if error:
+                response += f"Error/Stderr:\n{error}\n"
+                
+            if not response:
+                response = "Command executed successfully (no output)."
+                
+            return response
+            
+        except subprocess.TimeoutExpired:
+            return "Error: Command timed out after 60 seconds."
+        except Exception as e:
+            return f"Error executing command: {str(e)}"
