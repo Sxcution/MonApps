@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget, 
                                QListWidgetItem, QLabel, QDialog, QFrame, QScrollArea, QSizeGrip, QPushButton, QApplication, QSizePolicy, QTextBrowser)
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QBrush, QPen, QMouseEvent, QPixmap, QClipboard, QKeySequence, QShortcut
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QBrush, QPen, QMouseEvent, QPixmap, QClipboard, QKeySequence, QShortcut, QFont
 from PySide6.QtCore import Qt, QPoint, Signal, QSize, QRect, QBuffer, QByteArray, QEvent, QThread
 
 from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton, LineEdit, 
@@ -597,6 +597,7 @@ class ChatBubble(QWidget):
         self.main_window = parent # Store reference to main window
         self.settings = ChatSettings()
         self.logger = ChatLogger() # Initialize Logger
+        self.logger.start_new_session() # 🔧 Create new session on app start
         self._userMoved = False
         self._isExpanded = False
         self._isOverlay = False  # Track if bubble is in overlay mode
@@ -1444,11 +1445,21 @@ class ChatHistoryDialog(QDialog):
         
         # Left: Session List
         list_layout = QVBoxLayout()
+        
+        header_layout = QHBoxLayout()
         list_label = StrongBodyLabel("Danh sách phiên chat", self)
+        refresh_btn = ToolButton(FIF.SYNC, self)
+        refresh_btn.setToolTip("Làm mới danh sách")
+        refresh_btn.clicked.connect(self.load_session_list)
+        
+        header_layout.addWidget(list_label)
+        header_layout.addStretch()
+        header_layout.addWidget(refresh_btn)
+        
         self.session_list = QListWidget(self)
         self.session_list.itemClicked.connect(self.load_session)
         
-        list_layout.addWidget(list_label)
+        list_layout.addLayout(header_layout)
         list_layout.addWidget(self.session_list)
         
         # Right: Log Viewer

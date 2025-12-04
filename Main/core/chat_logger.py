@@ -9,7 +9,10 @@ class ChatLogger:
     and internal tool usage (search queries, results) for debugging.
     """
     def __init__(self, log_dir="saved_chats"):
-        self.log_dir = log_dir
+        # Ensure log_dir is absolute path relative to project root (Main/)
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.log_dir = os.path.join(base_dir, log_dir)
+        
         self.current_session_id = None
         self.current_log_file = None
         self.session_data = {
