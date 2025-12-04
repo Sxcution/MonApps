@@ -100,6 +100,8 @@ class SystemController:
         Control media/volume using Windows API key events.
         Commands: volume_up, volume_down, mute, play_pause, next, prev
         """
+        # Ensure times is an integer
+        times = int(times)
         print(f"🔊 SystemController: Media Command '{command}' x{times}...")
         
         VK_VOLUME_MUTE = 0xAD
@@ -308,8 +310,8 @@ class SystemController:
         try:
             results = []
             with DDGS() as ddgs:
-                # Search for top 10 results
-                for r in ddgs.text(query, max_results=10):
+                # Search for top 10 results using 'api' backend
+                for r in ddgs.text(query, max_results=10, backend="api"):
                     results.append(f"- [{r['title']}]({r['href']})\n  {r['body']}")
             
             if not results:

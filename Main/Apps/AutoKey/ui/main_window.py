@@ -119,25 +119,18 @@ class MainWindow(QMainWindow):
             stylesheet = LIGHT_STYLESHEET
             print("🎨 Applying LIGHT stylesheet to AutoKey")
         
-        print(f"🔍 DEBUG: AutoKey apply_stylesheet called. is_embedded={self.is_embedded}")
-        
-        # ✅ CRITICAL FIX: Do NOT apply ANY stylesheet when embedded
-        # Embedded AutoKey MUST NOT pollute parent Main app's styles
-        # This prevents global QListWidget::item rules from affecting ChatBubble
-        if self.is_embedded:
-            print("⚠️ Embedded mode: Skipping ALL stylesheet application (window + app)")
-            print("   → AutoKey will inherit Main window's Fluent theme")
-            return  # Early exit - no stylesheets applied
-        
-        # Standalone mode - apply styles normally
+        # Apply to this window
         self.setStyleSheet(stylesheet)
         
-        # Also apply to QApplication to affect dialogs (ONLY in standalone mode)
-        from PySide6.QtWidgets import QApplication
-        app = QApplication.instance()
-        if app:
-            app.setStyleSheet(stylesheet)
-            print("✓ Stylesheet applied to QApplication (standalone mode)")
+        # Also apply to QApplication to affect dialogs (ONLY if not embedded)
+        if not self.is_embedded:
+            from PySide6.QtWidgets import QApplication
+            app = QApplication.instance()
+            if app:
+                app.setStyleSheet(stylesheet)
+                print("✓ Stylesheet applied to QApplication")
+        else:
+            print("ℹ️ Embedded mode: Skipping global QApplication stylesheet application")
 
 
     def setup_ui(self):

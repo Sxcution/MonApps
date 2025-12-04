@@ -98,3 +98,22 @@
 16. **System Control:**
     - **Centralized Controller:** All OS-level commands (Shutdown, Volume, App Launch) MUST be implemented in `core.system_controller.SystemController`.
     - **Media Control:** Use `ctypes` for media/volume control to ensure compatibility.
+
+## X. AI REVIEW PACKAGING PROTOCOL
+17. **Automatic AI Review Packaging:**
+    - **Trigger:** When user says "đóng gói file .zip", "package .zip", or similar commands requesting file packaging for external AI review.
+    - **Smart File Selection:** Identify the main feature/component being worked on (based on recently edited files, error context, or user's current work) and ONLY package related files:
+      1. **Primary Files:** Recently edited/modified files directly related to the current issue/feature
+      2. **Core Documentation:** Always include:
+         - `Main.py` (or equivalent entry point)
+         - `project_structure.md` (project context)
+         - `naming_registry.json` (variable/ID reference)
+      3. **Related Dependencies:** Only if directly related to the primary files:
+         - Core files (e.g., `ai_handler.py` if working on Chat/AI features)
+         - UI parent modules (e.g., if editing `chat_interface.py`, skip AutoKey files)
+      4. **Exclusion Rule:** DO NOT include unrelated feature files (e.g., if working on Chatbot, exclude AutoKey, Android Tool, Notes unless they are dependencies)
+    - **Output Location:** Save the `.zip` file to `{ProjectRoot}/AI_Review/` folder
+    - **Filename Format:** `{FeatureName}_{YYYYMMDD}.zip`
+      - Example: `ChatInterface_20251204.zip`, `AutoKey_20251204.zip`
+    - **Goal:** Streamline code review process with external AI systems (ChatGPT, Claude, etc.) by automatically gathering ONLY relevant files in one package.
+

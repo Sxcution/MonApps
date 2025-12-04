@@ -1,16 +1,74 @@
 import google.generativeai as genai
 import json
 import traceback
+from datetime import datetime
 from core.system_controller import SystemController
 
 class AIHandler:
     """
     Handles communication with Google Gemini API and executes function calls.
     """
-    def __init__(self, api_key: str, model_name: str = "gemini-2.5-flash"):
+    # Enhanced system instruction for ChatGPT-level intelligence
+    ENHANCED_SYSTEM_INSTRUCTION = """Bạn là Mon Assistant - Trợ lý AI thông minh cho Windows.
+
+🌍 CONTEXT & MEMORY (QUAN TRỌNG):
+- Bạn ĐANG ở TP. Hồ Chí Minh, Việt Nam.
+- Thời gian hiện tại: {current_time}
+- LUÔN nhớ nội dung hội thoại trước đó. Nếu user nói "tìm lại xem", "nó đâu", hãy xem lại context cũ.
+- Đừng hỏi lại những gì user vừa cung cấp.
+
+🧠 PERSONALITY:
+- Thông minh, thân thiện, hài hước vừa phải (giống ChatGPT)
+- Gọi user là "Sếp" (nhưng không lạm dụng).
+- Bớt chào hỏi rườm rà. Tập trung vào KẾT QUẢ.
+- Chủ động đề xuất giải pháp, không robot
+
+🔍 INTELLIGENT SEARCH (TỐI ƯU HÓA):
+- **Keyword Expansion (BẮT BUỘC)**: Với các chủ đề quốc tế (Wechat, Facebook, Tech...), HÃY TÌM BẰNG TIẾNG ANH/TRUNG.
+  + Vd: "Nuôi nick Wechat" -> Tìm thêm: "Wechat account warming tips", "How to avoid Wechat ban", "微信养号技巧" (nếu cần).
+  + Vd: "Du lịch Nha Trang" -> Tìm: "Review du lịch Nha Trang [tháng hiện tại]", "Cảnh báo du lịch Nha Trang".
+- **Không bỏ cuộc**: Nếu tìm tiếng Việt không ra, TỰ ĐỘNG tìm tiếng Anh ngay. Đừng báo "không tìm thấy" khi chưa thử tiếng Anh.
+- **Deep Research**: Tự động tổng hợp thông tin từ nhiều nguồn. Đừng hỏi ngược lại user trừ khi quá mơ hồ.
+
+🔧 CAPABILITIES:
+- **System**: `shutdown_pc`, `restart_pc`, `abort_shutdown`, `run_terminal_command`
+- **App/File**: `open_app`, `search_file`, `open_file_path`, `read_file_content`, `create_note`
+- **Web/Media**: `web_search`, `open_url`, `control_media`, `open_telegram_profiles`
+- Dùng `run_terminal_command` cho các tác vụ nâng cao (kill process, adb...).
+
+📋 FORMATTING:
+- **TUYỆT ĐỐI KHÔNG DÙNG MARKDOWN**.
+- Trả lời bằng văn bản thuần (plain text).
+- Không dùng **bold**, *italic*, `code block`.
+- Dùng gạch đầu dòng (-) hoặc số (1.) để liệt kê.
+
+⚠️ ERROR HANDLING (SELF-CORRECTION):
+- Nếu gọi tool bị lỗi (ví dụ: TypeError, ValueError), HÃY TỰ ĐỘNG SỬA VÀ GỌI LẠI.
+- Vd: Lỗi "float object cannot be interpreted as an integer" -> Gọi lại với số nguyên (int).
+- Đừng báo lỗi cho user nếu bạn có thể tự sửa nó.
+
+🔗 TOOL CHAINING:
+- Tự động kết hợp nhiều tool. Ví dụ:
+  + "Tìm file báo cáo rồi mở" → `search_file` + `open_file_path`
+  + "Kill Chrome rồi mở lại" → `run_terminal_command` + `open_app`
+- Nếu tool lỗi, thử cách khác hoặc báo lỗi ngắn gọn.
+
+🎯 PROACTIVE:
+- Lỗi → giải thích + giải pháp + hỏi "fix luôn không?".
+- Mơ hồ → làm rõ yêu cầu trước khi làm.
+
+✨ RULES:
+- Không cần tool → trả lời trực tiếp.
+- Cần tool → gọi NGAY (không xin phép).
+- Luôn có follow-up question
+- Dùng emoji 🔍📊💡⚠️✅❌🚀 để sinh động.
+"""
+
+    def __init__(self, api_key: str, model_name: str = "gemini-2.5-flash", logger=None):
         self.api_key = api_key
         self.model_name = model_name
         self.chat_session = None
+        self.logger = logger # ChatLogger instance
         
         if self.api_key:
             self._configure_genai()
@@ -20,6 +78,10 @@ class AIHandler:
     def _configure_genai(self):
         try:
             genai.configure(api_key=self.api_key)
+            
+            # Inject dynamic context (Time & Location)
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            system_instruction = self.ENHANCED_SYSTEM_INSTRUCTION.format(current_time=current_time)
             
             # Define tools (Function Declarations)
             self.tools = [
@@ -228,9 +290,9 @@ class AIHandler:
             self.model = genai.GenerativeModel(
                 model_name=self.model_name,
                 tools=self.tools,
-                system_instruction="You are a helpful and intelligent AI assistant for Windows. You can control the computer using tools, but you are also a general-purpose assistant. \n\nPERSONA & TONE:\n- Speak naturally, casually, and friendly, like a human (similar to ChatGPT). Do NOT be robotic.\n- ALWAYS address the user as 'Sếp' (Boss) in Vietnamese.\n- Be concise but helpful.\n\nCAPABILITIES:\n- You have the power to run system commands via 'run_terminal_command'. Use this to perform advanced tasks like managing processes ('taskkill'), using ADB, or running CLI tools. When asked to do something technical like 'kill process', 'check ip', 'reverse engineer apk', DO IT using this tool.\n\nSEARCH & INTELLIGENCE:\n- When using 'web_search', if the exact answer is not in the snippets, try to infer the best possible answer or provide a general answer based on the search results. Do NOT give up easily. For example, if asked about weather and you only see general weather sites, say 'Theo kết quả tìm kiếm, thời tiết có thể là...' or use your internal knowledge if the date is not critical.\n\nIf a user asks something that doesn't require a tool, answer it directly using your knowledge. Do NOT say you cannot do something just because there is no tool for it, unless it requires physical action or private data access."
+                system_instruction=system_instruction
             )
-            self.chat_session = self.model.start_chat(enable_automatic_function_calling=True)
+            self.chat_session = self.model.start_chat(enable_automatic_function_calling=False)
             print("✅ AIHandler: Gemini configured successfully with Tools.")
             
         except Exception as e:
@@ -271,36 +333,147 @@ class AIHandler:
             # Send message
             response = self.chat_session.send_message(content)
             
-            # Check for function calls (Manual handling if auto-calling isn't fully supported by lib version)
-            # Note: enable_automatic_function_calling=True in start_chat usually handles this,
-            # but we need to provide the actual function map to the chat session or handle execution.
-            # The library's auto-calling feature executes the code if we pass the functions map?
-            # Actually, `enable_automatic_function_calling` requires us to pass the functions dictionary 
-            # OR we handle the `Part` that is a function call.
-            
-            # Let's inspect the response to see if we need to execute manually.
-            # With `enable_automatic_function_calling=True`, we usually need to pass the functions to the tool_config or similar.
-            # However, a simpler way for this custom setup is to handle it manually or use the `tools` argument properly.
-            
-            # REVISION: To make it robust, let's explicitly handle the function call if the library doesn't do it magically.
-            # But wait, `enable_automatic_function_calling` in `start_chat` is a high-level feature. 
-            # It needs the actual functions to be passed to `tools`? No, `tools` in `GenerativeModel` are declarations.
-            
-            # Let's try the manual execution approach for maximum control and debugging visibility.
-            # We will NOT use `enable_automatic_function_calling=True` to avoid black-box issues, 
-            # instead we will detect `function_call` parts.
-            
-            # Re-initializing without auto-calling to handle manually
-            # self.chat_session = self.model.start_chat(enable_automatic_function_calling=False)
-            
-            # Actually, let's stick to the manual parsing for now to ensure we connect to SystemController.
-            
-            return self._handle_response_parts(response)
+            # Loop to handle tool chaining (Manual handling since auto is disabled)
+            while True:
+                # Check for function call in the response
+                function_call_part = None
+                if response.candidates:
+                    for part in response.candidates[0].content.parts:
+                        if part.function_call:
+                            function_call_part = part
+                            break
+                
+                if function_call_part:
+                    # Execute function
+                    fc = function_call_part.function_call
+                    func_name = fc.name
+                    args = dict(fc.args)
+                    
+                    print(f"🤖 AIHandler: Function Call Detected: {func_name}({args})")
+                    result = self._execute_function(func_name, args)
+                    print(f"   → Result: {result}")
+                    
+                    # Send function response back
+                    func_response_part = genai.protos.Part(
+                        function_response=genai.protos.FunctionResponse(
+                            name=func_name,
+                            response={"result": result}
+                        )
+                    )
+                    
+                    # Get next response
+                    response = self.chat_session.send_message([func_response_part])
+                    continue # Loop back to check if there are more function calls
+                else:
+                    # No function call, return text
+                    return response.text
 
         except Exception as e:
             print(f"❌ AIHandler: Error processing message: {e}")
             traceback.print_exc()
             return f"Error: {str(e)}"
+    
+    def process_message_stream(self, user_text: str, image_data: bytes = None):
+        """
+        Stream message to Gemini, yield chunks as they arrive.
+        Supports multi-turn function calling (Tool Chaining).
+        """
+        if not self.api_key or not self.chat_session:
+            yield "⚠️ Please configure your Gemini API Key in Settings first."
+            return
+
+        # Log User Message
+        if self.logger:
+            self.logger.log_turn("user", user_text)
+
+        try:
+            print(f"📤 AIHandler: Streaming to Gemini: '{user_text}' (Image: {bool(image_data)})")
+            
+            content = []
+            if user_text:
+                content.append(user_text)
+                
+            if image_data:
+                import PIL.Image
+                import io
+                image = PIL.Image.open(io.BytesIO(image_data))
+                content.append(image)
+                if "translate" not in user_text.lower() and "dịch" not in user_text.lower():
+                     content.append("Nếu hình ảnh là đoạn chat (Zalo, WeChat...), hãy dịch sát nghĩa sang tiếng Việt. Tuyệt đối KHÔNG giải thích, chỉ dịch nội dung ngắn gọn như Google Dịch.")
+
+            # Initial send
+            current_response_stream = self.chat_session.send_message(content, stream=True)
+            
+            full_ai_response = ""
+            tool_logs = [] # Capture tool usage for logging
+            
+            # Loop to handle tool chaining (Max 10 turns to prevent infinite loops)
+            max_turns = 10
+            turn_count = 0
+            
+            while turn_count < max_turns:
+                turn_count += 1
+                function_call_found = False
+                function_call_part = None
+                
+                for chunk in current_response_stream:
+                    # Check for function call
+                    if chunk.candidates:
+                        for part in chunk.candidates[0].content.parts:
+                            if part.function_call:
+                                function_call_found = True
+                                function_call_part = part
+                                break # Stop yielding text, handle function
+                            elif part.text:
+                                full_ai_response += part.text
+                                yield part.text
+                    
+                    if function_call_found:
+                        break
+                
+                if function_call_found and function_call_part:
+                    # Execute function
+                    fc = function_call_part.function_call
+                    func_name = fc.name
+                    args = dict(fc.args)
+                    
+                    print(f"🤖 AIHandler: Function Call Detected: {func_name}({args})")
+                    yield f"\\n\\n*🔄 Đang thực hiện: `{func_name}`...*\\n\\n" # Notify user
+                    
+                    result = self._execute_function(func_name, args)
+                    print(f"   → Result: {result}")
+                    
+                    # Log Tool Usage
+                    tool_logs.append({
+                        "tool": func_name,
+                        "args": args,
+                        "result": result
+                    })
+
+                    # Send function response back to Gemini
+                    func_response_part = genai.protos.Part(
+                        function_response=genai.protos.FunctionResponse(
+                            name=func_name,
+                            response={"result": result}
+                        )
+                    )
+                    
+                    # Get next stream (continue conversation)
+                    current_response_stream = self.chat_session.send_message([func_response_part], stream=True)
+                    continue # Loop back to process new stream
+                else:
+                    # No function call, stream finished
+                    break
+            
+            # Log AI Response with Tool Metadata
+            if self.logger:
+                metadata = {"tool_calls": tool_logs} if tool_logs else None
+                self.logger.log_turn("model", full_ai_response, metadata)
+
+        except Exception as e:
+            print(f"❌ AIHandler: Error streaming message: {e}")
+            traceback.print_exc()
+            yield f"Error: {str(e)}"
 
     def _handle_response_parts(self, response) -> str:
         """

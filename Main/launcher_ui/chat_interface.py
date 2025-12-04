@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget, 
-                               QListWidgetItem, QLabel, QDialog, QFrame, QScrollArea, QSizeGrip, QPushButton, QApplication, QSizePolicy)
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QBrush, QPen, QMouseEvent, QPixmap, QClipboard, QKeySequence, QShortcut, QFontMetrics
+                               QListWidgetItem, QLabel, QDialog, QFrame, QScrollArea, QSizeGrip, QPushButton, QApplication, QSizePolicy, QTextBrowser)
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QBrush, QPen, QMouseEvent, QPixmap, QClipboard, QKeySequence, QShortcut
 from PySide6.QtCore import Qt, QPoint, Signal, QSize, QRect, QBuffer, QByteArray, QEvent, QThread
 
 from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton, LineEdit, 
@@ -8,6 +8,8 @@ from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton, LineEdit,
                             BodyLabel, Theme, isDarkTheme, TransparentToolButton,
                             ComboBox, ToolButton, IndeterminateProgressRing)
 from core.ai_handler import AIHandler
+from core.chat_logger import ChatLogger
+from core.markdown_utils import markdown_to_html
 
 import json
 import os
@@ -15,7 +17,7 @@ import os
 
 
 class AIWorker(QThread):
-    """Background worker for AI processing."""
+    """Background worker for AI processing (non-streaming)."""
     finished = Signal(str)
 
     def __init__(self, ai_handler, user_text, image_data=None):
@@ -31,16 +33,79 @@ class AIWorker(QThread):
         except Exception as e:
             self.finished.emit(f"❌ Error: {str(e)}")
 
+class AIStreamWorker(QThread):
+    """Background worker for streaming AI responses."""
+    chunk_received = Signal(str)  # Emitted for each text chunk
+    finished = Signal()  # Emitted when streaming completes
+    error = Signal(str)  # Emitted on error
+
+    def __init__(self, ai_handler, user_text, image_data=None):
+        super().__init__()
+        self.ai_handler = ai_handler
+        self.user_text = user_text
+        self.image_data = image_data
+        self._stop_requested = False
+
+    def run(self):
+        try:
+            for chunk in self.ai_handler.process_message_stream(self.user_text, self.image_data):
+                if self._stop_requested:
+                    break
+                if chunk:
+                    self.chunk_received.emit(chunk)
+            self.finished.emit()
+        except Exception as e:
+            self.error.emit(f"❌ Error: {str(e)}")
+    
+    def stop(self):
+        """Request to stop streaming."""
+        self._stop_requested = True
+
+class MarkdownLabel(QTextBrowser):
+    """Custom widget to render markdown with syntax highlighting."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        
+        # Configure as read-only display widget
+        self.setReadOnly(True)
+        self.setOpenExternalLinks(True)
+        
+        # Frameless, transparent background
+        self.setFrameShape(QFrame.NoFrame)
+        self.setStyleSheet("""
+            QTextBrowser {
+                background: transparent;
+                border: none;
+                padding: 0px;
+            }
+        """)
+        
+        # Word wrap
+        self.setLineWrapMode(QTextBrowser.WidgetWidth)
+        
+    def set_markdown(self, markdown_text: str):
+        """Convert and display markdown text."""
+        html = markdown_to_html(markdown_text)
+        self.setHtml(html)
+    
+    def append_markdown(self, markdown_chunk: str):
+        """Append markdown text to existing content (for streaming)."""
+        # Get current plain text content and append
+        current_markdown = self.toPlainText() + markdown_chunk
+        self.set_markdown(current_markdown)
+
 class ChatSettings:
     """Data class to hold chatbot settings with persistence."""
     # Use absolute path relative to this file to ensure persistence works
     SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chat_settings.json")
 
-    def __init__(self, api_keys: list = None, active_key_index: int = 0, bot_name: str = "Mon Assistant", system_rule: str = ""):
+    def __init__(self, api_keys: list = None, active_key_index: int = 0, bot_name: str = "Mon Assistant", system_rule: str = "", model_name: str = "gemini-2.5-flash", enable_streaming: bool = True):
         self.api_keys = api_keys
         self.active_key_index = active_key_index
         self.bot_name = bot_name
         self.system_rule = system_rule
+        self.model_name = model_name
+        self.enable_streaming = enable_streaming
         
         if self.api_keys is None:
             self.api_keys = [{"name": "Default", "key": ""}]
@@ -58,7 +123,9 @@ class ChatSettings:
             "api_keys": self.api_keys,
             "active_key_index": self.active_key_index,
             "bot_name": self.bot_name,
-            "system_rule": self.system_rule
+            "system_rule": self.system_rule,
+            "model_name": self.model_name,
+            "enable_streaming": self.enable_streaming
         }
         try:
             with open(self.SETTINGS_FILE, "w", encoding="utf-8") as f:
@@ -79,6 +146,8 @@ class ChatSettings:
                 self.active_key_index = data.get("active_key_index", 0)
                 self.bot_name = data.get("bot_name", "Mon Assistant")
                 self.system_rule = data.get("system_rule", "")
+                self.model_name = data.get("model_name", "gemini-2.5-flash")
+                self.enable_streaming = data.get("enable_streaming", True)
             print("✅ ChatSettings loaded.")
         except Exception as e:
             print(f"❌ Error loading ChatSettings: {e}")
@@ -325,6 +394,45 @@ class ChatSettingsDialog(QDialog):
         if 0 <= self.settings.active_key_index < self.combo_active.count():
             self.combo_active.setCurrentIndex(self.settings.active_key_index)
         
+        # Model Selection
+        layout.addWidget(BodyLabel("Mô hình Gemini:", self))
+        self.model_combo = ComboBox(self)
+        self.model_combo.addItems([
+            "gemini-2.5-flash (⚡ Nhanh, miễn phí)",
+            "gemini-2.5-pro (🧠 Thông minh hơn, chậm hơn)",
+            "gemini-1.5-flash-8b (⚡⚡ Siêu nhanh, đơn giản)"
+        ])
+        # Map display to actual model names
+        self.model_map = {
+            0: "gemini-2.5-flash",
+            1: "gemini-2.5-pro",
+            2: "gemini-1.5-flash-8b"
+        }
+        # Set current model
+        current_model = self.settings.model_name
+        for idx, model_name in self.model_map.items():
+            if model_name == current_model:
+                self.model_combo.setCurrentIndex(idx)
+                break
+        layout.addWidget(self.model_combo)
+        
+        # Streaming Enable/Disable
+        from qfluentwidgets import SwitchButton
+        streaming_layout = QHBoxLayout()
+        streaming_layout.addWidget(BodyLabel("Bật Streaming:", self))
+        self.streaming_switch = SwitchButton(self)
+        self.streaming_switch.setChecked(self.settings.enable_streaming)
+        streaming_layout.addWidget(self.streaming_switch)
+        
+        # History Button
+        self.history_btn = PushButton(FIF.HISTORY, "Lịch sử Chat", self)
+        self.history_btn.setToolTip("Xem lại lịch sử chat và log")
+        self.history_btn.clicked.connect(self.show_history)
+        streaming_layout.addWidget(self.history_btn)
+        
+        streaming_layout.addStretch()
+        layout.addLayout(streaming_layout)
+        
         # System Rule
         layout.addWidget(BodyLabel("Luật hệ thống:", self))
         self.rule_input = TextEdit(self)
@@ -344,6 +452,11 @@ class ChatSettingsDialog(QDialog):
         btn_layout.addWidget(self.btn_cancel)
         btn_layout.addWidget(self.btn_save)
         layout.addLayout(btn_layout)
+
+    def show_history(self):
+        """Open Chat History Dialog."""
+        dialog = ChatHistoryDialog(self)
+        dialog.exec()
 
     def add_key_row(self, name, key):
         item = QListWidgetItem(self.keys_list)
@@ -391,7 +504,9 @@ class ChatSettingsDialog(QDialog):
             api_keys=keys,
             active_key_index=self.combo_active.currentIndex(),
             bot_name=self.bot_name_input.text().strip() or "Mon Assistant",
-            system_rule=self.rule_input.toPlainText().strip()
+            system_rule=self.rule_input.toPlainText().strip(),
+            model_name=self.model_map[self.model_combo.currentIndex()],
+            enable_streaming=self.streaming_switch.isChecked()
         )
 
 class DraggableButton(QPushButton):
@@ -481,6 +596,7 @@ class ChatBubble(QWidget):
         super().__init__(parent) 
         self.main_window = parent # Store reference to main window
         self.settings = ChatSettings()
+        self.logger = ChatLogger() # Initialize Logger
         self._userMoved = False
         self._isExpanded = False
         self._isOverlay = False  # Track if bubble is in overlay mode
@@ -493,8 +609,8 @@ class ChatBubble(QWidget):
         self._resize_start_geo = None
         self.setMouseTracking(True) # Enable mouse tracking for cursor update
         
-        # Initialize AI Handler
-        self.ai_handler = AIHandler(self.settings.current_key)
+        # Initialize AI Handler with model from settings and logger
+        self.ai_handler = AIHandler(self.settings.current_key, self.settings.model_name, logger=self.logger)
         
         # Setup UI - Initially as embedded widget (no overlay flags)
         # Will switch to overlay mode after first chat interaction
@@ -570,6 +686,38 @@ class ChatBubble(QWidget):
         # Initial sizing
         self.adjustSize()
 
+    def resizeEvent(self, event):
+        """Handle resize events to update all chat message label widths."""
+        super().resizeEvent(event)
+        
+        if not hasattr(self, 'chat_list'):
+            return
+            
+        # Calculate new maximum width for labels
+        # 👉 Luôn update theo chiều rộng viewport hiện tại
+        available_width = int(self.chat_list.viewport().width() * 0.9)
+        
+        # Update all existing message labels
+        for i in range(self.chat_list.count()):
+            item = self.chat_list.item(i)
+            widget = self.chat_list.itemWidget(item)
+            
+            if widget:
+                # Find all QLabel widgets in the item
+                labels = widget.findChildren(BodyLabel)
+                for label in labels:
+                    # Update maximum width
+                    label.setMaximumWidth(available_width)
+                    label.updateGeometry()
+                
+                # Update item size hint after label width change
+                widget.adjustSize()
+                from PySide6.QtCore import QSize
+                size_hint = widget.sizeHint()
+                # Add extra vertical padding to prevent text cutoff
+                size_hint = QSize(size_hint.width(), size_hint.height() + 10)
+                item.setSizeHint(size_hint)
+
     def _setup_chat_card(self):
         """Build the internal layout of the chat card."""
         layout = QVBoxLayout(self.chat_card)
@@ -602,34 +750,28 @@ class ChatBubble(QWidget):
         # --- Chat History ---
         self.chat_list = QListWidget(self.chat_card)
         self.chat_list.setObjectName("chatHistoryList") # Unique ID for styling isolation
+        self.chat_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.chat_list.setFrameShape(QFrame.NoFrame)
         self.chat_list.setVerticalScrollMode(QListWidget.ScrollPerPixel)
-        
-        # ✅ CRITICAL: Force dynamic item sizing (Qt-specific)
-        # This tells Qt to respect setSizeHint() for each item individually
-        self.chat_list.setUniformItemSizes(False)  # Allow different heights per item
-        self.chat_list.setResizeMode(QListWidget.Adjust)  # Adjust on content change
-        
-        # ✅ Use Qt-compatible stylesheet (NO !important - not supported in QSS)
-        # ID selector #chatHistoryList provides high specificity
-        # Use explicit rgb() colors to prevent inheritance from AutoKey
+        # ✅ Dark theme background for chat area with ID selector for higher specificity
         self.chat_list.setStyleSheet("""
-            QListWidget#chatHistoryList { 
-                background-color: rgb(43, 43, 43);
+            #chatHistoryList { 
+                background: #2b2b2b; 
+                border-radius: 5px; 
+                outline: none;
                 border: none;
-                border-radius: 0px;
             }
-            QListWidget#chatHistoryList::item {
-                background-color: transparent;
-                border: none;
-                padding: 8px 20px 8px 8px;
-                /* NO height specification - let Qt use setSizeHint() */
+            #chatHistoryList::item {
+                border-bottom: none; /* Remove AutoKey's global border */
+                height: auto;        /* Remove AutoKey's fixed height */
+                min-height: 40px;    /* Maintain minimum height */
+                padding: 5px;
             }
-            QListWidget#chatHistoryList::item:selected {
-                background-color: transparent;
+            #chatHistoryList::item:selected {
+                background: transparent;
             }
-            QListWidget#chatHistoryList::item:hover {
-                background-color: transparent;
+            #chatHistoryList::item:hover {
+                background: transparent;
             }
         """)
         layout.addWidget(self.chat_list, 1)  # Give it stretch factor to fill space
@@ -915,17 +1057,14 @@ class ChatBubble(QWidget):
         layout.setContentsMargins(0, 5, 0, 5)
         layout.setSpacing(10)
         
-        # Progress Ring with EXTRA protection against distortion
+        # Progress Ring
         ring = IndeterminateProgressRing()
         ring.setFixedSize(20, 20)
-        ring.setMinimumSize(20, 20)  # Enforce minimum
-        ring.setMaximumSize(20, 20)  # Enforce maximum
-        # Prevent ring from being stretched by layout
-        ring.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         ring.start()
         
         # Label
         label = BodyLabel("Đang suy nghĩ...", widget)
+        label.setWordWrap(True)
         
         # Theme-aware styling
         bg_color = "#3e3e3e" if isDarkTheme() else "#f0f0f0"
@@ -941,25 +1080,23 @@ class ChatBubble(QWidget):
         container = QWidget()
         container.setObjectName("TypingContainer")
         container.setStyleSheet(container_style)
-        container.setFixedHeight(36)  # Fixed height for container
         container_layout = QHBoxLayout(container)
         container_layout.setContentsMargins(12, 8, 12, 8)
-        container_layout.setSpacing(8)
-        container_layout.addWidget(ring, 0, Qt.AlignLeft | Qt.AlignVCenter)
-        container_layout.addWidget(label, 0, Qt.AlignLeft | Qt.AlignVCenter)
-        container_layout.addStretch()  # Push content to left, let container stay compact
+        container_layout.addWidget(ring)
+        container_layout.addWidget(label)
         
-        # Set container to not expand
-        container.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        container.adjustSize()  # Shrink to content
+        layout.addWidget(container)
+        layout.addStretch()
         
-        layout.addWidget(container, 0, Qt.AlignLeft)  # No stretch, align left
-        layout.addStretch()  # Push everything to the left
+        # 👉 Đo lại size và cộng thêm chiều cao để không bị cắt chữ
+        widget.adjustSize()
+        from PySide6.QtCore import QSize
+        size_hint = widget.sizeHint()
+        size_hint = QSize(size_hint.width(), size_hint.height() + 8)
+        item.setSizeHint(size_hint)
         
-        item.setSizeHint(widget.sizeHint())
         self.chat_list.addItem(item)
         self.chat_list.setItemWidget(item, widget)
-        # ✅ Scroll to bottom to show typing indicator
         self.chat_list.scrollToBottom()
         
         self.typing_item = item
@@ -970,6 +1107,17 @@ class ChatBubble(QWidget):
             row = self.chat_list.row(self.typing_item)
             self.chat_list.takeItem(row)
             self.typing_item = None
+
+    def _updateItemSize(self, item, widget):
+        """Update QListWidgetItem size hint after widget layout is complete."""
+        if item and widget:
+            # Get the actual size needed by the widget
+            widget.adjustSize()
+            size_hint = widget.sizeHint()
+            # Add extra vertical padding to prevent text cutoff
+            from PySide6.QtCore import QSize
+            size_hint = QSize(size_hint.width(), size_hint.height() + 10)
+            item.setSizeHint(size_hint)
 
     def appendUserMessage(self, text: str, image: QPixmap = None):
         item = QListWidgetItem()
@@ -1011,44 +1159,30 @@ class ChatBubble(QWidget):
                 }}
             """)
             label.setWordWrap(True)
-            # ✅ RESPONSIVE: Use 70% of chat list width, not fixed 450px
-            max_width = int(self.chat_list.width() * 0.7)
-            label.setMaximumWidth(max(max_width, 250))  # At least 250px
+            label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
+            # 👉 Ép bubble user rộng ~90% chat_list để không bị wrap vô lý
+            available_width = int(self.chat_list.viewport().width() * 0.9)
+            label.setFixedWidth(available_width)   # ⬅ THAY vì setMaximumWidth
+
             content_layout.addWidget(label, 0, Qt.AlignRight)
             
         layout.addLayout(content_layout)
         
-        # Calculate accurate height using QFontMetrics
-        size = widget.sizeHint()
-        if text:
-            fm = QFontMetrics(label.font())
-            # ✅ Use actual label width for calculation, not fixed 426
-            label_width = label.maximumWidth() - 24  # Subtract padding
-            rect = fm.boundingRect(0, 0, label_width, 0, Qt.TextWordWrap, text)
-            # Text height + Label Padding (16) + Layout Margins (10) + Buffer (34)
-            required_height = rect.height() + 80
-            # Add height for image if present (approx 200px + margins)
-            if image:
-                required_height += 210
-            
-            size.setHeight(max(size.height(), required_height))
-        else:
-             # Image only
-             if image:
-                 size.setHeight(220)
-
-        item.setSizeHint(size)
+        # Add item first, then set widget, then update size
         self.chat_list.addItem(item)
         self.chat_list.setItemWidget(item, widget)
         
-        # ✅ FORCE Qt to re-calculate item geometry after AutoKey pollution
-        item.setSizeHint(size)  # Re-apply to ensure it sticks
-        self.chat_list.updateGeometry()
-        self.chat_list.update()
+        # Force layout update before setting size hint
+        widget.updateGeometry()
+        from PySide6.QtCore import QTimer
+        # Use QTimer to update size after layout is complete
+        QTimer.singleShot(0, lambda: self._updateItemSize(item, widget))
         
         self.chat_list.scrollToBottom()
 
     def appendBotMessage(self, text: str):
+        """Append bot message with plain text rendering."""
         item = QListWidgetItem()
         item.setTextAlignment(Qt.AlignLeft)
         
@@ -1056,58 +1190,77 @@ class ChatBubble(QWidget):
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(0, 5, 0, 5)
         
+        # Use BodyLabel for plain text rendering
         label = BodyLabel(text, widget)
-        
-        # Theme-aware styling for BOT (Transparent)
-        text_color = "white" if isDarkTheme() else "black"
-        
-        label.setStyleSheet(f"""
-            QLabel {{
-                background-color: transparent;
-                color: {text_color};
-                padding: 8px 0px; /* Remove horizontal padding since no box */
-            }}
-        """)
         label.setWordWrap(True)
-        # ✅ RESPONSIVE: Use 80% of chat list width for bot messages
-        max_width = int(self.chat_list.width() * 0.8)
-        label.setMaximumWidth(max(max_width, 300))  # At least 300px
+        label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        
+        # Set max width
+        available_width = int(self.chat_list.viewport().width() * 0.9)
+        label.setMaximumWidth(available_width)
+        
+        # Add copy button
+        copy_btn = TransparentToolButton(FIF.COPY, widget)
+        copy_btn.setFixedSize(24, 24)
+        copy_btn.setToolTip("Sao chép")
+        copy_btn.clicked.connect(lambda: QApplication.clipboard().setText(text))
+        
+        layout.addWidget(label)
+        layout.addWidget(copy_btn, 0, Qt.AlignTop)
+        layout.addStretch()
+        
+        # Add item
+        self.chat_list.addItem(item)
+        self.chat_list.setItemWidget(item, widget)
+        
+        # Update size
+        widget.updateGeometry()
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, lambda: self._updateItemSize(item, widget))
+        
+        self.chat_list.scrollToBottom()
+    
+    def appendBotMessageStreaming(self, label_ref=None):
+        """Create or return a bot message for streaming updates."""
+        if label_ref:
+            return label_ref
+        
+        # Create new streaming message
+        item = QListWidgetItem()
+        item.setTextAlignment(Qt.AlignLeft)
+        
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(0, 5, 0, 5)
+        
+        # Create BodyLabel for streaming
+        label = BodyLabel("", widget)
+        label.setWordWrap(True)
+        label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        
+        available_width = int(self.chat_list.viewport().width() * 0.9)
+        label.setMaximumWidth(available_width)
         
         layout.addWidget(label)
         layout.addStretch()
         
-        # Calculate accurate height using QFontMetrics
-        size = widget.sizeHint()
-        fm = QFontMetrics(label.font())
-        # ✅ Use actual label width for calculation
-        label_width = label.maximumWidth()
-        rect = fm.boundingRect(0, 0, label_width, 0, Qt.TextWordWrap, text)
-        # Text height + Label Padding (16) + Layout Margins (10) + Extra Buffer
-        # Increased buffer to 80 to ensure NO cutoff even with long text
-        required_height = rect.height() + 80
-        
-        # Set height with minimum 60px
-        size.setHeight(max(size.height(), required_height, 60))
-        item.setSizeHint(size)
-        
         self.chat_list.addItem(item)
         self.chat_list.setItemWidget(item, widget)
         
-        # ✅ FORCE Qt to re-calculate item geometry after AutoKey pollution
-        item.setSizeHint(size)  # Re-apply to ensure it sticks
-        self.chat_list.updateGeometry()
-        self.chat_list.update()
+        # Store references for cleanup
+        self.streaming_item = item
+        self.streaming_widget = widget
+        self.streaming_label = label
+        self.streaming_text = ""  # Accumulate text
         
-        # ✅ DO NOT auto-scroll to bottom after adding bot message
-        # Let user decide when to scroll - prevents losing view of their original message
-        # self.chat_list.scrollToBottom()  # REMOVED
+        return label
 
     def clearChat(self):
         self.chat_list.clear()
 
     def request_ai_reply(self, user_text: str, image: QPixmap = None):
         """
-        Call Gemini API via AIHandler in background thread.
+        Call Gemini API via AIHandler with streaming or non-streaming based on settings.
         """
         # Convert QPixmap to bytes if present
         image_data = None
@@ -1117,21 +1270,69 @@ class ChatBubble(QWidget):
             buffer.open(QBuffer.WriteOnly)
             image.save(buffer, "PNG")
             image_data = byte_array.data()
+        
+        # Check if streaming is enabled
+        if self.settings.enable_streaming:
+            # Create streaming bot message
+            self.appendBotMessageStreaming()
             
-        # Create and start worker
-        self.worker = AIWorker(self.ai_handler, user_text, image_data)
-        self.worker.finished.connect(self.on_ai_reply_received)
-        self.worker.start()
+            # Create and start stream worker
+            self.stream_worker = AIStreamWorker(self.ai_handler, user_text, image_data)
+            self.stream_worker.chunk_received.connect(self.on_stream_chunk)
+            self.stream_worker.finished.connect(self.on_stream_finished)
+            self.stream_worker.error.connect(self.on_stream_error)
+            self.stream_worker.start()
+        else:
+            # Non-streaming mode (fallback)
+            self.worker = AIWorker(self.ai_handler, user_text, image_data)
+            self.worker.finished.connect(self.on_ai_reply_received)
+            self.worker.start()
+    
+    def on_stream_chunk(self, chunk: str):
+        """Handle incoming stream chunk."""
+        self.streaming_text += chunk
+        if hasattr(self, 'streaming_label') and self.streaming_label:
+            try:
+                self.streaming_label.setText(self.streaming_text)
+                self.streaming_widget.updateGeometry()
+                self._updateItemSize(self.streaming_item, self.streaming_widget)
+                # Force scroll to bottom
+                self.chat_list.scrollToBottom()
+                # Ensure visibility of the last item
+                self.chat_list.scrollToItem(self.streaming_item)
+            except:
+                pass
+    
+    def on_stream_finished(self):
+        """Handle stream completion."""
+        self.hide_typing_indicator()
+        # Add copy button to final message
+        if hasattr(self, 'streaming_widget') and self.streaming_widget:
+            layout = self.streaming_widget.layout()
+            copy_btn = TransparentToolButton(FIF.COPY, self.streaming_widget)
+            copy_btn.setFixedSize(24, 24)
+            copy_btn.setToolTip("Sao chép")
+            copy_btn.clicked.connect(lambda: QApplication.clipboard().setText(self.streaming_text))
+            layout.insertWidget(1, copy_btn, 0, Qt.AlignTop)
+        
+        # Cleanup
+        if hasattr(self, 'stream_worker'):
+            self.stream_worker.deleteLater()
+        self.streaming_text = ""
+    
+    def on_stream_error(self, error_msg: str):
+        """Handle stream error."""
+        self.hide_typing_indicator()
+        if hasattr(self, 'streaming_label'):
+            self.streaming_label.set_markdown(f"**Error**: {error_msg}")
+        if hasattr(self, 'stream_worker'):
+            self.stream_worker.deleteLater()
         
     def on_ai_reply_received(self, reply: str):
         """Handle AI reply from background thread."""
         self.hide_typing_indicator()
         self.appendBotMessage(reply)
         self.worker.deleteLater() # Cleanup worker
-        
-        # ✅ DO NOT auto-scroll to bottom after bot reply
-        # This allows user to see their original message without being forced to bottom
-        # User can manually scroll down if they want to see the full bot response
 
     # --- Edge Resizing Logic ---
     def mousePressEvent(self, event: QMouseEvent):
@@ -1231,3 +1432,53 @@ class ChatBubble(QWidget):
         self.setGeometry(*new_geo)
         # Resize internal card to match
         self.chat_card.resize(new_geo[2], new_geo[3])
+
+class ChatHistoryDialog(QDialog):
+    """Dialog to view past chat sessions and logs."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Lịch sử Chat & Logs")
+        self.resize(900, 600)
+        
+        layout = QHBoxLayout(self)
+        
+        # Left: Session List
+        list_layout = QVBoxLayout()
+        list_label = StrongBodyLabel("Danh sách phiên chat", self)
+        self.session_list = QListWidget(self)
+        self.session_list.itemClicked.connect(self.load_session)
+        
+        list_layout.addWidget(list_label)
+        list_layout.addWidget(self.session_list)
+        
+        # Right: Log Viewer
+        viewer_layout = QVBoxLayout()
+        viewer_label = StrongBodyLabel("Chi tiết Log (JSON)", self)
+        self.log_viewer = TextEdit(self)
+        self.log_viewer.setReadOnly(True)
+        self.log_viewer.setFont(QFont("Consolas", 10))
+        
+        viewer_layout.addWidget(viewer_label)
+        viewer_layout.addWidget(self.log_viewer)
+        
+        layout.addLayout(list_layout, 1)
+        layout.addLayout(viewer_layout, 2)
+        
+        self.logger = ChatLogger()
+        self.load_session_list()
+        
+    def load_session_list(self):
+        """Load saved sessions into list."""
+        sessions = self.logger.get_all_sessions()
+        self.session_list.clear()
+        for session in sessions:
+            self.session_list.addItem(session)
+            
+    def load_session(self, item):
+        """Load selected session content."""
+        filename = item.text()
+        data = self.logger.load_session(filename)
+        if data:
+            self.log_viewer.setText(json.dumps(data, indent=2, ensure_ascii=False))
+        else:
+            self.log_viewer.setText("Error loading log file.")
