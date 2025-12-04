@@ -1,7 +1,15 @@
 import google.generativeai as genai
 import json
 import traceback
+import sys
+import os
 from datetime import datetime
+
+# Add parent directory to path to import from Main/core
+main_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if main_dir not in sys.path:
+    sys.path.insert(0, main_dir)
+    
 from core.system_controller import SystemController
 
 class AIHandler:

@@ -7,9 +7,9 @@ from qfluentwidgets import (CardWidget, PrimaryPushButton, PushButton, LineEdit,
                             FluentIcon as FIF, TextEdit, InfoBar, StrongBodyLabel,
                             BodyLabel, Theme, isDarkTheme, TransparentToolButton,
                             ComboBox, ToolButton, IndeterminateProgressRing)
-from core.ai_handler import AIHandler
-from core.chat_logger import ChatLogger
-from core.markdown_utils import markdown_to_html
+from ..core.ai_handler import AIHandler
+from ..core.chat_logger import ChatLogger
+from ..core.markdown_utils import markdown_to_html
 
 import json
 import os
@@ -96,8 +96,8 @@ class MarkdownLabel(QTextBrowser):
 
 class ChatSettings:
     """Data class to hold chatbot settings with persistence."""
-    # Use absolute path relative to this file to ensure persistence works
-    SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chat_settings.json")
+    # Use absolute path relative to AIChat module to ensure persistence works
+    SETTINGS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "chat_settings.json")
 
     def __init__(self, api_keys: list = None, active_key_index: int = 0, bot_name: str = "Mon Assistant", system_rule: str = "", model_name: str = "gemini-2.5-flash", enable_streaming: bool = True):
         self.api_keys = api_keys
@@ -596,8 +596,7 @@ class ChatBubble(QWidget):
         super().__init__(parent) 
         self.main_window = parent # Store reference to main window
         self.settings = ChatSettings()
-        self.logger = ChatLogger() # Initialize Logger
-        self.logger.start_new_session() # 🔧 Create new session on app start
+        self.logger = ChatLogger() # Initialize Logger (session created on first message)
         self._userMoved = False
         self._isExpanded = False
         self._isOverlay = False  # Track if bubble is in overlay mode

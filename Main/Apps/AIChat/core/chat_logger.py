@@ -8,8 +8,8 @@ class ChatLogger:
     Handles logging of chat sessions, including user messages, AI responses,
     and internal tool usage (search queries, results) for debugging.
     """
-    def __init__(self, log_dir="saved_chats"):
-        # Ensure log_dir is absolute path relative to project root (Main/)
+    def __init__(self, log_dir="data/saved_chats"):
+        # Ensure log_dir is absolute path relative to AIChat root
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.log_dir = os.path.join(base_dir, log_dir)
         

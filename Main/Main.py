@@ -2,26 +2,18 @@ import sys
 import os
 from datetime import datetime
 
-# CRITICAL: Set working directory and create debug log
-log_file = None
+# CRITICAL: Set working directory
 try:
     # Get Main directory
     main_root = os.path.dirname(os.path.abspath(__file__))
     
-    # Create debug log
-    log_path = os.path.join(main_root, "main_launch.log")
-    log_file = open(log_path, "a", encoding="utf-8")
-    
     def log(msg):
+        """Print to console only (no file logging)"""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        log_msg = f"[{timestamp}] {msg}\n"
-        if log_file:
-            log_file.write(log_msg)
-            log_file.flush()
-        print(msg)
+        print(f"[{timestamp}] {msg}")
     
     log("=" * 50)
-    log(f"Main.pyw launched")
+    log(f"Main.py launched")
     log(f"Python: {sys.executable}")
     log(f"Version: {sys.version}")
     log(f"Current Working Dir Before: {os.getcwd()}")
@@ -41,11 +33,9 @@ try:
         log(f"Apps folder contents: {os.listdir(apps_path)[:5]}")  # First 5 items
     
 except Exception as e:
-    if log_file:
-        log(f"ERROR during setup: {e}")
-        import traceback
-        log_file.write(traceback.format_exc())
+    import traceback
     print(f"[Main] ERROR: {e}")
+    traceback.print_exc()
 
 from PySide6.QtWidgets import QApplication
 from core.config_manager import ConfigManager

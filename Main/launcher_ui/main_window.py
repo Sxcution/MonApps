@@ -10,7 +10,7 @@ from launcher_ui.app_settings_interface import AppSettingsInterface
 from launcher_ui.log_interface import LogInterface
 from launcher_ui.widget_samples_interface import WidgetSamplesInterface
 from launcher_ui.notes_interface import NotesInterface
-from launcher_ui.chat_interface import ChatBubble
+from Apps.AIChat.main import ChatBubble
 import os
 import sys
 import ctypes
