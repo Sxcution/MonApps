@@ -117,3 +117,20 @@
       - Example: `ChatInterface_20251204.zip`, `AutoKey_20251204.zip`
     - **Goal:** Streamline code review process with external AI systems (ChatGPT, Claude, etc.) by automatically gathering ONLY relevant files in one package.
 
+## XI. RULE COMMAND PROTOCOL
+
+18. **Rule Trigger Command:**
+    - **Trigger:** When user says "Rule", "/Rule", or "đọc Rule"
+    - **Immediate Action:** 
+      1. READ and ACKNOWLEDGE this `Rule.md` file
+      2. READ `project_structure.md` to understand current architecture
+      3. READ `naming_registry.json` to load existing variable names
+    - **Compliance:** STRICTLY follow all rules in this document for the entire session
+
+19. **Post-Coding Documentation Update:**
+    - **Trigger:** After completing ANY coding task that adds new buttons, features, or UI elements
+    - **Mandatory Updates:**
+      1. **`project_structure.md`:** Add new files, update file descriptions if functionality changed
+      2. **`naming_registry.json`:** Add new UI element IDs, button names, variable names
+    - **Format:** Notify user when updates are complete
+    - **Goal:** Keep documentation in sync with codebase to prevent orphan files and naming conflicts

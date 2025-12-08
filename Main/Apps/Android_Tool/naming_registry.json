@@ -1,0 +1,35 @@
+{
+    "ui_elements": {
+        "main_tabs": "mainTabs",
+        "shared_log": "shared_log",
+        "settings_btn": "settings_btn",
+        "welcome_tab": "welcome_tab",
+        "modandroid_widget": "modandroid_widget",
+        "adb_comment_tab": "adb_comment_tab",
+        "decompile_tab": "decompile_tab",
+        "rom_tools_tab": "rom_tools_tab",
+        "smart_file_display": "smart_file_display",
+        "smart_patch_btn": "smart_patch_btn",
+        "smart_choose_btn": "smart_choose_btn",
+        "smart_progress_bar": "smart_progress_bar",
+        "smart_overwrite_checkbox": "smart_overwrite_checkbox",
+        "gps_tab": "gps_tab",
+        "gps_file_path_edit": "gps_file_path_edit",
+        "gps_patch_btn": "gps_patch_btn",
+        "fm_log_output": "fm_log_output",
+        "flash_worker": "flash_worker",
+        "flash_thread": "flash_thread"
+    },
+    "workers": {
+        "adb_command_worker": "AdbCommandWorker",
+        "file_import_worker": "FileImportWorker",
+        "zip_extract_worker": "ZipExtractWorker",
+        "file_scan_worker": "FileScanWorker",
+        "multi_device_worker": "MultiDeviceWorker"
+    },
+    "file_types": {
+        "services_jar": "services.jar",
+        "build_prop": "build.prop",
+        "init_rc": "init.rc"
+    }
+}

@@ -456,6 +456,7 @@ class MainHub(QMainWindow):
         self.tabs.setObjectName("mainTabs")  # Set ID để target RIÊNG
         self.tabs.setDocumentMode(True)
         self.tabs.setTabPosition(QTabWidget.TabPosition.North)
+        self.tabs.setAcceptDrops(False)  # Allow drops to propagate to child widgets
         
         # CHỈ tăng tab CHÍNH - KHÔNG ảnh hưởng tabs con bên trong ModAndroid
         # Dùng #objectName selector để KHÔNG cascade xuống nested tabs
@@ -534,21 +535,9 @@ class MainHub(QMainWindow):
         clear_btn.setMaximumWidth(120)
         log_layout.addWidget(clear_btn)
         
-        # Add welcome tab
-        self.add_welcome_tab()
-        
-        
-        # Add ModAndroid tab (MUST be after shared_log is created)
+        # Add ModAndroid tab ONLY (Telegram is now in main launcher)
         if HAS_MODANDROID:
             self.add_modandroid_tab()
-        
-        # Add Telegram tab
-        if HAS_TELEGRAM:
-            self.add_telegram_tab()
-        
-        # Add placeholder for future modules
-        self.add_placeholder_tab("💬 Module 3", "Module 3 sẽ được thêm vào đây...", "wechat")
-        self.add_placeholder_tab("🔧 Module 4", "Module 4 sẽ được thêm vào đây...", "settings")
         
         # Add to splitter
         splitter.addWidget(self.tabs)

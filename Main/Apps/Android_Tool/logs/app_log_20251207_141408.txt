@@ -1,0 +1,37 @@
+14:14:08 | INFO | ============================================================
+14:14:08 | INFO | 🚀 TOOL HUB STARTED
+14:14:08 | INFO | ============================================================
+14:14:09 | INFO | 💾 Config loaded from: C:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\config\config.json
+14:14:09 | INFO | 📋 All function logs connected to shared output panel
+14:14:09 | INFO | 📱 Shared log output connected to ModAndroid
+14:14:09 | INFO | ✅ ModAndroid module loaded successfully
+14:14:09 | INFO | 📂 Đã load cache cho 9 sessions
+14:14:09 | INFO | 📂 Đã load 2 nhóm session
+14:14:09 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+14:14:09 | INFO | 📂 Restore nhóm đã chọn: M1
+14:14:09 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+14:14:09 | INFO | 📱 Đã load 2 nhóm session
+14:14:09 | INFO | ✅ Telegram module loaded successfully
+14:14:09 | INFO | ============================================================
+14:14:09 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+14:14:09 | INFO | ============================================================
+14:14:09 | INFO | ✅ Loaded modules (2):
+14:14:09 | INFO |    - 📱 Mod Android
+14:14:09 | INFO |    - 💬 Telegram
+14:14:09 | INFO | ============================================================
+14:14:52 | CRITICAL | ❌ UNCAUGHT EXCEPTION:
+Traceback (most recent call last):
+  File "C:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\ModAndroid.pyw", line 3647, in smart_auto_patch
+    self._beginBusy()
+  File "C:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\ModAndroid.pyw", line 3282, in _beginBusy
+    from PyQt6.QtGui import QCursor
+ModuleNotFoundError: No module named 'PyQt6.QtGui'
+14:14:52 | CRITICAL | ============================================================
+14:15:07 | CRITICAL | ❌ UNCAUGHT EXCEPTION:
+Traceback (most recent call last):
+  File "C:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\ModAndroid.pyw", line 3647, in smart_auto_patch
+    self._beginBusy()
+  File "C:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\ModAndroid.pyw", line 3282, in _beginBusy
+    from PyQt6.QtGui import QCursor
+ModuleNotFoundError: No module named 'PyQt6.QtGui'
+14:15:07 | CRITICAL | ============================================================

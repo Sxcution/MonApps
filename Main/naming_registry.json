@@ -34,7 +34,15 @@
         "btn_history": "history_btn",
         "btn_refresh_history": "refresh_history_btn",
         "chat_history_dialog": "ChatHistoryDialog",
-        "chat_settings_dialog": "ChatSettingsDialog"
+        "chat_settings_dialog": "ChatSettingsDialog",
+        "smart_file_display": "smart_file_display",
+        "smart_patch_btn": "smart_patch_btn",
+        "smart_choose_btn": "smart_choose_btn",
+        "smart_progress_bar": "smart_progress_bar",
+        "smart_overwrite_checkbox": "smart_overwrite_checkbox",
+        "rom_tools_tab": "rom_tools_tab",
+        "telegram_interface": "telegramInterface",
+        "embedded_telegram": "embeddedTelegram"
     },
     "GlobalConfig": {
         "PrimaryColor": "#2986ff",

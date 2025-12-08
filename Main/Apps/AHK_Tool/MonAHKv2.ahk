@@ -49,7 +49,7 @@ DebugLog(message) {
 ; =====================================================================
 
 PgUp::
-    RunAsUser("C:\Users\Mon\AppData\Local\Programs\Python\Python311\pythonw.exe", "c:\Users\Mon\Desktop\Mon\Main\Main.pyw", "c:\Users\Mon\Desktop\Mon\Main")
+    RunAsUser("C:\Users\Mon\AppData\Local\Programs\Python\Python311\pythonw.exe", """c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Main.pyw""", "c:\Users\Mon\Desktop\Protect\Mon Apps\Main")
 return
 
 PgDn::
@@ -58,7 +58,7 @@ PgDn::
     ; Wait a bit for process to terminate
     Sleep, 500
     ; Restart Main.pyw
-    RunAsUser("C:\Users\Mon\AppData\Local\Programs\Python\Python311\pythonw.exe", "c:\Users\Mon\Desktop\Mon\Main\Main.pyw", "c:\Users\Mon\Desktop\Mon\Main")
+    RunAsUser("C:\Users\Mon\AppData\Local\Programs\Python\Python311\pythonw.exe", """c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Main.pyw""", "c:\Users\Mon\Desktop\Protect\Mon Apps\Main")
 return
 
 KillMainPyw() {
@@ -202,7 +202,7 @@ sleep 100
 return
 
 ^3::
-Sendinput https://github.com/monsxcution/STool_v2
+Sendinput https://github.com/Sxcution/MonAndroid
 sleep 100
 return
 

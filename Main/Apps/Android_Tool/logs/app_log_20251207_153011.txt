@@ -1,0 +1,28 @@
+15:30:11 | INFO | ============================================================
+15:30:11 | INFO | 🚀 TOOL HUB STARTED
+15:30:11 | INFO | ============================================================
+15:30:11 | INFO | 💾 Config loaded from: c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\config\config.json
+15:30:11 | INFO | 📋 All function logs connected to shared output panel
+15:30:11 | INFO | 📱 Shared log output connected to ModAndroid
+15:30:11 | INFO | ✅ ModAndroid module loaded successfully
+15:30:11 | INFO | ============================================================
+15:30:11 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+15:30:11 | INFO | ============================================================
+15:30:11 | INFO | ✅ Loaded modules (2):
+15:30:11 | INFO |    - 📱 Mod Android
+15:30:11 | INFO |    - 💬 Telegram
+15:30:11 | INFO | ============================================================
+15:30:52 | INFO | 📂 Đã load cache cho 9 sessions
+15:30:52 | INFO | 📂 Đã load 2 nhóm session
+15:30:52 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+15:30:52 | INFO | 📂 Restore nhóm đã chọn: M1
+15:30:52 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+15:30:52 | INFO | 📱 Đã load 2 nhóm session
+15:31:43 | INFO | ⏰ Lịch tự động đã BẬT - Sẽ chạy lúc 18:00 mỗi ngày
+15:31:45 | INFO | ⏰ Lịch tự động đã TẮT
+15:31:45 | INFO | ⏰ Lịch tự động đã BẬT - Sẽ chạy lúc 18:00 mỗi ngày
+15:31:45 | INFO | ⏰ Lịch tự động đã TẮT
+15:31:46 | INFO | ⏰ Lịch tự động đã BẬT - Sẽ chạy lúc 18:00 mỗi ngày
+15:31:46 | INFO | ⏰ Lịch tự động đã TẮT
+15:31:46 | INFO | ⏰ Lịch tự động đã BẬT - Sẽ chạy lúc 18:00 mỗi ngày
+15:31:46 | INFO | ⏰ Lịch tự động đã TẮT

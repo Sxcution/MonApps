@@ -5,7 +5,7 @@ from qfluentwidgets import (FluentWindow, NavigationItemPosition, FluentIcon as 
 from core.config_manager import ConfigManager
 from launcher_ui.home_interface import HomeInterface
 from launcher_ui.settings_interface import SettingsInterface
-from launcher_ui.tools_interface import ToolsInterface
+# tools_interface removed - AutoKey, Android, Telegram are now top-level
 from launcher_ui.app_settings_interface import AppSettingsInterface
 from launcher_ui.log_interface import LogInterface
 from launcher_ui.widget_samples_interface import WidgetSamplesInterface
@@ -49,7 +49,7 @@ class MainWindow(FluentWindow):
         # Create Interfaces
         self.home_interface = HomeInterface(self)
         self.settings_interface = SettingsInterface(self)
-        self.tools_interface = ToolsInterface(self)
+        # tools_interface removed - apps are now top-level
         self.app_settings_interface = AppSettingsInterface(self)
         self.log_interface = LogInterface(self)
         self.widget_samples_interface = WidgetSamplesInterface(self)
@@ -58,20 +58,23 @@ class MainWindow(FluentWindow):
         # Add Interfaces to Navigation
         self.addSubInterface(self.home_interface, FIF.HOME, "Home")
         
-        # Add Notes between Home and Apps
+        # Add Notes 
         self.addSubInterface(self.notes_interface, FIF.DOCUMENT, "Ghi Chú", position=NavigationItemPosition.TOP)
         
-        # Add Tools Group (NO children - just a placeholder to organize apps)
-        self.addSubInterface(self.tools_interface, FIF.TILES, "Apps", position=NavigationItemPosition.TOP)
-        
-        # Add AutoKey and Android as CHILDREN of Tools
+        # AutoKey as TOP-LEVEL (no parent)
         self.autokey_interface = QWidget()
         self.autokey_interface.setObjectName("autokeyInterface")
-        self.addSubInterface(self.autokey_interface, FIF.GAME, "AutoKey", parent=self.tools_interface)
+        self.addSubInterface(self.autokey_interface, FIF.GAME, "AutoKey", position=NavigationItemPosition.TOP)
         
+        # Android Tool as TOP-LEVEL (no parent)
         self.android_interface = QWidget()
         self.android_interface.setObjectName("androidInterface")
-        self.addSubInterface(self.android_interface, FIF.FOLDER, "Android Tool", parent=self.tools_interface)
+        self.addSubInterface(self.android_interface, FIF.FOLDER, "Android Tool", position=NavigationItemPosition.TOP)
+        
+        # Telegram as TOP-LEVEL (no parent)
+        self.telegram_interface = QWidget()
+        self.telegram_interface.setObjectName("telegramInterface")
+        self.addSubInterface(self.telegram_interface, FIF.SEND, "Telegram", position=NavigationItemPosition.TOP)
         
         # Add Log Interface (BOTTOM, before Settings)
         self.addSubInterface(self.log_interface, FIF.INFO, "Nhật ký", position=NavigationItemPosition.BOTTOM)
@@ -116,6 +119,7 @@ class MainWindow(FluentWindow):
         self.embedded_autokey = None
         self.embedded_android = None
         self.embedded_notes = None
+        self.embedded_telegram = None
 
         # Chat Bubble (Floating)
         # Initialize but don't show immediately to avoid layout interference
@@ -159,8 +163,8 @@ class MainWindow(FluentWindow):
         widget = self.stackedWidget.widget(index)
         print(f"\n🔄 Tab changed to: {widget.objectName()}")
         
-        # Disable animation for Apps, Enable for others
-        if widget.objectName() in ["autokeyInterface", "androidInterface", "notesInterface"]:
+        # Disable animation for embedded apps
+        if widget.objectName() in ["autokeyInterface", "androidInterface", "notesInterface", "telegramInterface"]:
             pass
             
         if widget.objectName() == "autokeyInterface":
@@ -168,10 +172,9 @@ class MainWindow(FluentWindow):
             print(f"  → External mode: {self.config.get('external_autokey', True)}")
             if self.config.get("external_autokey", True):
                 self.home_interface.launch_autokey()
-                self.switchTo(self.tools_interface)
+                self.switchTo(self.home_interface)  # Switch to Home when external
             else:
                 self.embed_autokey()
-                # Debug embedded widget state
                 if self.embedded_autokey:
                     print(f"  → AutoKey visible: {self.embedded_autokey.isVisible()}")
                     print(f"  → AutoKey size: {self.embedded_autokey.size()}")
@@ -182,14 +185,17 @@ class MainWindow(FluentWindow):
             print(f"  → External mode: {self.config.get('external_android', True)}")
             if self.config.get("external_android", True):
                 self.home_interface.launch_android()
-                self.switchTo(self.tools_interface)
+                self.switchTo(self.home_interface)  # Switch to Home when external
             else:
                 self.embed_android()
-                # Debug embedded widget state
                 if self.embedded_android:
                     print(f"  → Android visible: {self.embedded_android.isVisible()}")
                     print(f"  → Android size: {self.embedded_android.size()}")
                     print(f"  → Container size: {self.android_interface.size()}")
+        
+        elif widget.objectName() == "telegramInterface":
+            print(f"  → Switching to Telegram interface")
+            self.embed_telegram()
         
         elif widget.objectName() == "notesInterface":
             print(f"  → Switching to Notes interface")
@@ -359,6 +365,58 @@ class MainWindow(FluentWindow):
             self.embedded_notes.show()
             print(f"✓ Notes shown")
     
+    def embed_telegram(self):
+        """Embed Telegram widget into Telegram interface."""
+        # Ensure container layout exists
+        if self.telegram_interface.layout() is None:
+            layout = QVBoxLayout(self.telegram_interface)
+            layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Initialize only once
+        if not self.embedded_telegram:
+            try:
+                print("📱 Embedding Telegram widget...")
+                
+                # Path to Telegram module
+                android_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Apps", "Android_Tool")
+                if android_path not in sys.path:
+                    sys.path.insert(0, android_path)
+                
+                modules_dir = os.path.join(android_path, "modules")
+                telegram_module_path = os.path.join(modules_dir, "Telegram", "telegram_module.py")
+                
+                if os.path.exists(telegram_module_path):
+                    import importlib.util
+                    spec = importlib.util.spec_from_file_location("telegram_module", telegram_module_path)
+                    telegram_module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(telegram_module)
+                    
+                    self.embedded_telegram = telegram_module.TelegramToolWidget()
+                    self.embedded_telegram.setObjectName("embeddedTelegram")
+                    
+                    self.telegram_interface.layout().addWidget(self.embedded_telegram)
+                    print(f"✓ Telegram embedded successfully")
+                else:
+                    # Create placeholder if module doesn't exist
+                    from PySide6.QtWidgets import QLabel
+                    placeholder = QLabel("Telegram module not found.\nPath: " + telegram_module_path)
+                    placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                    self.telegram_interface.layout().addWidget(placeholder)
+                    self.embedded_telegram = placeholder
+                    print(f"⚠️ Telegram module not found, showing placeholder")
+                
+            except Exception as e:
+                import traceback
+                print(f"❌ Error embedding Telegram:")
+                traceback.print_exc()
+                InfoBar.error("Lỗi", f"Không thể nhúng Telegram: {e}", parent=self)
+                return
+        
+        # ALWAYS ensure it's visible (runs every time)
+        if self.embedded_telegram:
+            self.embedded_telegram.show()
+            print(f"✓ Telegram shown")
+    
     def close_autokey(self):
         """Close and unload AutoKey embedded app"""
         print("🔴 Closing AutoKey...")
@@ -381,7 +439,7 @@ class MainWindow(FluentWindow):
                 self.highlight_running_app("autokey", False)
                 
                 # Switch to tools interface
-                self.switchTo(self.tools_interface)
+                self.switchTo(self.home_interface)  # Switch to Home after close
                 
                 InfoBar.success("Đã đóng", "AutoKey đã được đóng", parent=self)
                 print("✓ AutoKey closed successfully")

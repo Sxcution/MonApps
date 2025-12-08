@@ -1,0 +1,31 @@
+06:00:17 | INFO | ============================================================
+06:00:17 | INFO | 🚀 TOOL HUB STARTED
+06:00:17 | INFO | ============================================================
+06:00:17 | INFO | 💾 Config loaded from: c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\config\config.json
+06:00:17 | INFO | 📋 All function logs connected to shared output panel
+06:00:17 | INFO | 📱 Shared log output connected to ModAndroid
+06:00:17 | INFO | ✅ ModAndroid module loaded successfully
+06:00:17 | INFO | 📂 Đã load cache cho 9 sessions
+06:00:17 | INFO | 📂 Đã load 2 nhóm session
+06:00:17 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+06:00:17 | INFO | 📂 Restore nhóm đã chọn: M1
+06:00:17 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+06:00:17 | INFO | 📱 Đã load 2 nhóm session
+06:00:17 | INFO | ✅ Telegram module loaded successfully
+06:00:17 | INFO | ============================================================
+06:00:17 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+06:00:17 | INFO | ============================================================
+06:00:17 | INFO | ✅ Loaded modules (2):
+06:00:17 | INFO |    - 📱 Mod Android
+06:00:17 | INFO |    - 💬 Telegram
+06:00:17 | INFO | ============================================================
+06:00:25 | CRITICAL | ❌ UNCAUGHT EXCEPTION:
+Traceback (most recent call last):
+  File "c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\ModAndroid.pyw", line 1987, in rom_tools_tab_dropEvent
+    self.smart_handle_dropped_paths(paths)
+  File "c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\ModAndroid.pyw", line 3557, in smart_handle_dropped_paths
+    self.fm_log_output.append(f"✅ Phát hiện: {file_type} → {os.path.basename(path)}")
+  File "c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\ModAndroid.pyw", line 1556, in append
+    from PyQt6.QtGui import QTextCursor
+ModuleNotFoundError: No module named 'PyQt6.QtGui'
+06:00:25 | CRITICAL | ============================================================

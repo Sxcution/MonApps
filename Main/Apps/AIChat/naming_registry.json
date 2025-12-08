@@ -1,0 +1,22 @@
+{
+    "ui_elements": {
+        "chat_bubble_btn": "ChatBubbleBtn",
+        "chat_window": "chat_window",
+        "chat_input": "chat_input",
+        "chat_send_btn": "send_btn",
+        "chat_list": "chatHistoryList",
+        "chat_card": "chat_card",
+        "typing_container": "TypingContainer",
+        "btn_history": "history_btn",
+        "btn_refresh_history": "refresh_history_btn",
+        "chat_history_dialog": "ChatHistoryDialog",
+        "chat_settings_dialog": "ChatSettingsDialog",
+        "btn_detach": "detach_btn",
+        "btn_settings": "settings_btn"
+    },
+    "config_keys": {
+        "gemini_api_key": "gemini_api_key",
+        "model_name": "model_name",
+        "temperature": "temperature"
+    }
+}

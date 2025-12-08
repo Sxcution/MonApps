@@ -291,8 +291,229 @@ class FileScanWorker(QObject):
         self._cancel = True
 
 
-
-
+class AdbCommandWorker(QObject):
+    """
+    Worker cho các lệnh ADB nặng (push file, twrp wipe/install)
+    Chạy trên background thread, emit log realtime, không block UI
+    
+    Signals:
+        progress: int (0-100) - Tiến độ công việc (chủ yếu cho push)
+        log: str - Log message realtime
+        finished: bool, str - (success, result_message)
+        error: str - Thông báo lỗi
+        cancelled: void - Báo hiệu đã hủy
+    
+    Usage:
+        worker = AdbCommandWorker([
+            ("shell", {"cmd": "twrp set tw_ro_mode 0"}),
+            ("shell", {"cmd": "twrp wipe data"}),
+            ("push", {"src": "/path/to/file.zip", "dest": "/tmp/"}),
+            ("shell", {"cmd": "twrp install /tmp/file.zip"})
+        ], serial="abc123")
+        
+        worker.log.connect(log_widget.append)
+        worker.finished.connect(on_done)
+        
+        thread = QThread()
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        thread.start()
+    """
+    
+    progress = Signal(int)          # 0..100
+    log = Signal(str)               # Realtime log
+    finished = Signal(bool, str)    # (success, message)
+    error = Signal(str)             # Error message
+    cancelled = Signal()            # Cancelled
+    
+    def __init__(self, commands: list, serial: str = None):
+        """
+        Args:
+            commands: List of (cmd_type, cmd_args) tuples
+                - ("shell", {"cmd": "twrp wipe data"})
+                - ("push", {"src": path, "dest": "/tmp/"})
+            serial: Device serial (optional, if None uses default device)
+        """
+        super().__init__()
+        self.commands = commands
+        self.serial = serial
+        self._cancel = False
+        
+        # Import subprocess here to avoid circular import
+        import subprocess
+        self.subprocess = subprocess
+    
+    def _get_serial_arg(self):
+        """Get ADB serial argument string"""
+        return f"-s {self.serial}" if self.serial else ""
+    
+    @Slot()
+    def run(self):
+        """Execute all commands sequentially on background thread"""
+        import re
+        
+        try:
+            total_commands = len(self.commands)
+            success_count = 0
+            
+            for idx, (cmd_type, cmd_args) in enumerate(self.commands, 1):
+                if self._cancel:
+                    self.log.emit("⚠️ Đã hủy bởi user")
+                    self.cancelled.emit()
+                    return
+                
+                self.log.emit(f"\n📌 [{idx}/{total_commands}] Đang thực hiện: {cmd_type}")
+                
+                if cmd_type == "shell":
+                    success = self._run_shell_command(cmd_args.get("cmd", ""))
+                elif cmd_type == "push":
+                    success = self._run_push_command(
+                        cmd_args.get("src", ""),
+                        cmd_args.get("dest", "/tmp/")
+                    )
+                else:
+                    self.log.emit(f"   ⚠️ Không hỗ trợ command type: {cmd_type}")
+                    success = False
+                
+                if success:
+                    success_count += 1
+                
+                # Update overall progress
+                overall_progress = int(idx * 100 / total_commands)
+                self.progress.emit(overall_progress)
+            
+            # Final result
+            if success_count == total_commands:
+                self.log.emit(f"\n✅ Hoàn thành tất cả {total_commands} lệnh!")
+                self.finished.emit(True, f"Thành công: {success_count}/{total_commands}")
+            else:
+                self.log.emit(f"\n⚠️ Hoàn thành {success_count}/{total_commands} lệnh")
+                self.finished.emit(False, f"Thành công: {success_count}/{total_commands}")
+                
+        except Exception as e:
+            self.log.emit(f"❌ Lỗi: {e}")
+            self.error.emit(f"Lỗi: {repr(e)}")
+    
+    def _run_shell_command(self, cmd: str) -> bool:
+        """Run adb shell command with timeout"""
+        if not cmd:
+            return False
+        
+        serial_arg = self._get_serial_arg()
+        full_cmd = f"adb {serial_arg} shell {cmd}".strip()
+        
+        self.log.emit(f"   $ {full_cmd}")
+        
+        try:
+            # Use run() with timeout instead of Popen + readline
+            # This avoids blocking on buffered output
+            result = self.subprocess.run(
+                full_cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=180  # 3 minutes timeout for heavy commands like format
+            )
+            
+            # Output stdout lines
+            output = (result.stdout or "") + (result.stderr or "")
+            for line in output.strip().split('\n'):
+                line = line.strip()
+                if line:
+                    self.log.emit(f"   {line}")
+            
+            # Check for TWRP-specific success/error
+            output_lower = output.lower()
+            has_error = any(kw in output_lower for kw in [
+                "error", "failed", "unable to", "cannot"
+            ])
+            
+            if result.returncode == 0 and not has_error:
+                self.log.emit(f"   ✅ Thành công")
+                return True
+            else:
+                self.log.emit(f"   ⚠️ Exit code: {result.returncode}")
+                return result.returncode == 0
+                
+        except self.subprocess.TimeoutExpired:
+            self.log.emit(f"   ❌ Timeout (3 phút)")
+            return False
+        except Exception as e:
+            self.log.emit(f"   ❌ Exception: {e}")
+            return False
+    
+    def _run_push_command(self, src: str, dest: str) -> bool:
+        """Run adb push with progress tracking"""
+        import os
+        
+        if not src or not os.path.exists(src):
+            self.log.emit(f"   ❌ File không tồn tại: {src}")
+            return False
+        
+        serial_arg = self._get_serial_arg()
+        filename = os.path.basename(src)
+        dest_file = dest.rstrip('/') + '/' + filename
+        
+        full_cmd = f'adb {serial_arg} push "{src}" {dest_file}'.strip()
+        
+        self.log.emit(f"   $ {full_cmd}")
+        
+        # Get file size for progress
+        file_size = os.path.getsize(src)
+        file_size_mb = file_size / 1024 / 1024
+        self.log.emit(f"   📦 File size: {file_size_mb:.2f} MB")
+        
+        try:
+            import time
+            start_time = time.time()
+            
+            process = self.subprocess.Popen(
+                full_cmd,
+                shell=True,
+                stdout=self.subprocess.PIPE,
+                stderr=self.subprocess.STDOUT,
+                text=True
+            )
+            
+            # Read output (adb push shows progress)
+            for line in iter(process.stdout.readline, ''):
+                if self._cancel:
+                    process.terminate()
+                    return False
+                
+                line = line.rstrip()
+                if line:
+                    self.log.emit(f"   {line}")
+                    
+                    # Try to parse progress from adb push output
+                    # Format: "file.zip: 50% (123456/246912)"
+                    import re
+                    match = re.search(r'(\d+)%', line)
+                    if match:
+                        pct = int(match.group(1))
+                        self.progress.emit(pct)
+            
+            process.wait()
+            
+            elapsed = time.time() - start_time
+            speed = file_size_mb / elapsed if elapsed > 0 else 0
+            
+            if process.returncode == 0:
+                self.log.emit(f"   ✅ Push thành công ({speed:.2f} MB/s)")
+                return True
+            else:
+                self.log.emit(f"   ❌ Push thất bại (exit code: {process.returncode})")
+                return False
+                
+        except Exception as e:
+            self.log.emit(f"   ❌ Exception: {e}")
+            return False
+    
+    @Slot()
+    def cancel(self):
+        """Request cancel"""
+        self.log.emit("🔍 [AdbCommandWorker] Cancel requested")
+        self._cancel = True
 
 
 

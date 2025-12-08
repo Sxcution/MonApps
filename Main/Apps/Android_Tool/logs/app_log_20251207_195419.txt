@@ -1,0 +1,23 @@
+19:54:19 | INFO | ============================================================
+19:54:19 | INFO | 🚀 TOOL HUB STARTED
+19:54:19 | INFO | ============================================================
+19:54:20 | INFO | 💾 Config loaded from: c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\config\config.json
+19:54:20 | INFO | 📋 All function logs connected to shared output panel
+19:54:20 | INFO | 📱 Shared log output connected to ModAndroid
+19:54:20 | INFO | ✅ ModAndroid module loaded successfully
+19:54:20 | INFO | ============================================================
+19:54:20 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+19:54:20 | INFO | ============================================================
+19:54:20 | INFO | ✅ Loaded modules (2):
+19:54:20 | INFO |    - 📱 Mod Android
+19:54:20 | INFO |    - 💬 Telegram
+19:54:20 | INFO | ============================================================
+19:54:41 | INFO | 🔒 UI Locked - Worker running
+19:54:45 | INFO | 📂 Đã load cache cho 9 sessions
+19:54:45 | INFO | 📂 Đã load 2 nhóm session
+19:54:45 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+19:54:46 | INFO | 📂 Restore nhóm đã chọn: M1
+19:54:46 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+19:54:46 | INFO | 📱 Đã load 2 nhóm session
+19:55:53 | INFO | 🔓 UI Unlocked - Worker finished
+19:59:12 | INFO | 💾 Đã lưu serial: 269c5ad06a0d7ece

@@ -1,0 +1,34 @@
+06:02:23 | INFO | ============================================================
+06:02:23 | INFO | 🚀 TOOL HUB STARTED
+06:02:23 | INFO | ============================================================
+06:02:23 | INFO | 💾 Config loaded from: c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\config\config.json
+06:02:23 | INFO | 📋 All function logs connected to shared output panel
+06:02:23 | INFO | 📱 Shared log output connected to ModAndroid
+06:02:23 | INFO | ✅ ModAndroid module loaded successfully
+06:02:23 | INFO | 📂 Đã load cache cho 9 sessions
+06:02:23 | INFO | 📂 Đã load 2 nhóm session
+06:02:23 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+06:02:23 | INFO | 📂 Restore nhóm đã chọn: M1
+06:02:23 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+06:02:23 | INFO | 📱 Đã load 2 nhóm session
+06:02:23 | INFO | ✅ Telegram module loaded successfully
+06:02:23 | INFO | ============================================================
+06:02:23 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+06:02:23 | INFO | ============================================================
+06:02:23 | INFO | ✅ Loaded modules (2):
+06:02:23 | INFO |    - 📱 Mod Android
+06:02:23 | INFO |    - 💬 Telegram
+06:02:23 | INFO | ============================================================
+06:02:30 | CRITICAL | ❌ UNCAUGHT EXCEPTION:
+Traceback (most recent call last):
+  File "c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\ModAndroid.pyw", line 1575, in <lambda>
+    self.rom_tools_tab.dropEvent = lambda event: self.rom_tools_tab_dropEvent(event)
+                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\ModAndroid.pyw", line 1987, in rom_tools_tab_dropEvent
+    self.smart_handle_dropped_paths(paths)
+  File "c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\ModAndroid.pyw", line 3557, in smart_handle_dropped_paths
+    self.fm_log_output.append(f"✅ Phát hiện: {file_type} → {os.path.basename(path)}")
+  File "c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\ModAndroid.pyw", line 1556, in append
+    from PyQt6.QtGui import QTextCursor
+ModuleNotFoundError: No module named 'PyQt6.QtGui'
+06:02:30 | CRITICAL | ============================================================

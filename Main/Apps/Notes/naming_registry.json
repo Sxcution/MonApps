@@ -1,0 +1,10 @@
+{
+    "ui_elements": {
+        "notes_widget": "NotesWidget",
+        "notes_editor": "notes_editor",
+        "btn_bold": "bold_btn",
+        "btn_italic": "italic_btn",
+        "btn_underline": "underline_btn",
+        "btn_list": "list_btn"
+    }
+}

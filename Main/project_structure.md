@@ -33,7 +33,14 @@ This directory contains the central launcher and the sub-projects `AutoKey` and 
             - `notes_module.py`: Main Notes widget and logic
             - `debug_ime.py`: Debug tool for IME/Vietnamese typing issues
     - `Android_Tool/`: Contains the Android management tool.
-        - `Main.py`: Entry point for Android Tool.
+        - `Main.py`: Entry point for Android Tool (MainHub class).
+        - `modules/ModAndroid/ModAndroid.pyw`: Core patching module with tabs:
+            - ADB Comment: Execute ADB commands
+            - Dịch ngược Jar/APK: Decompile/recompile tools
+            - Patch File: Smart ROM patcher with multi-file support
+                - Supports drag-drop of multiple files/folders
+                - Duplicate file detection with confirmation dialog
+                - Parallel patching with progress tracking
     - `AHK_Tool/`: Contains the AHK helper tool.
         - `MonAHKv2.ahk`: Main AHK script (Uses RunAsUser for correct IME support)
 - `core/`: Core functionality
@@ -42,11 +49,11 @@ This directory contains the central launcher and the sub-projects `AutoKey` and 
     - `system_controller.py`: Executes system-level commands (Shutdown, Volume, etc.)
     - `single_instance_manager.py`: Handles single instance logic using Windows Named Mutex and Messaging
 - `launcher_ui/`: UI components for the launcher
-    - `main_window.py`: Main FluentWindow with independent app navigation buttons, close handlers
+    - `main_window.py`: Main FluentWindow with top-level navigation (Home, Ghi Chú, AutoKey, Android Tool, Telegram, Nhật ký, Cài đặt)
     - `home_interface.py`: Home page with app launch buttons
     - `notes_interface.py`: Notes interface embedding the Notes module
     - `settings_interface.py`: General settings page with widget samples button
-    - `tools_interface.py`: Empty placeholder interface (no content)
+    - `tools_interface.py`: [DEPRECATED] No longer used - apps are now top-level
     - `app_settings_interface.py`: App-specific settings (placeholder)
     - `log_interface.py`: Log display with copy functionality
     - `widget_samples_interface.py`: UI Components Gallery showcasing all Fluent Design buttons and widgets
@@ -57,11 +64,11 @@ This directory contains the central launcher and the sub-projects `AutoKey` and 
 - `pyperclip` (for log copy button)
 
 ## Key Features
-- Reduced navigation panel expanded width by 50% (150px)
-- AutoKey and Android Tool as **independent navigation buttons** (not submenu of Tools)
-- Tools interface is empty placeholder (click shows blank page)
+- Reduced navigation panel expanded width by 50% (120px)
+- **AutoKey, Android Tool, Telegram as TOP-LEVEL navigation tabs** (not submenu)
+- Each tool embedded directly in main window (no separate windows required)
 - Close button (✖) in AutoKey toolbar to unload embedded app
-- App embedding system for AutoKey and Android Tool
+- Android Tool shows only ModAndroid tabs (ADB, Dịch ngược, Patch File)
 
 ## Theme System (CRITICAL - Read Before Modifications)
 

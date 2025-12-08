@@ -36,15 +36,43 @@ import time
 import json
 from pathlib import Path
 
-from PySide6.QtCore import QThread, Signal, QDir, Qt, QObject
+from PySide6.QtCore import QThread, Signal, QDir, Qt, QObject, QEvent
+
+# Worker for background ADB operations
+try:
+    from .worker_file_import import AdbCommandWorker
+except ImportError:
+    # Fallback for direct execution
+    import sys
+    import os
+    _current_dir = os.path.dirname(os.path.abspath(__file__))
+    if _current_dir not in sys.path:
+        sys.path.insert(0, _current_dir)
+    from worker_file_import import AdbCommandWorker
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QPushButton, QFileDialog,
+    QApplication, QWidget, QVBoxLayout, QFileDialog,
     QTextEdit, QProgressBar, QLineEdit, QLabel, QTabWidget, QHBoxLayout,
     QTreeView, QMenu, QStackedWidget, QDialog, QDialogButtonBox, QMessageBox,
     QCheckBox, QInputDialog, QListWidget, QListWidgetItem, QFileSystemModel
 )
 from PySide6.QtGui import QFont, QScreen, QAction
 from functools import partial
+
+# Fluent UI Components
+try:
+    from qfluentwidgets import (
+        PushButton, PrimaryPushButton, TransparentPushButton,
+        LineEdit, TextEdit, ProgressBar, CheckBox,
+        InfoBar, InfoBarPosition, MessageBox as FluentMessageBox,
+        BodyLabel, TitleLabel, CaptionLabel
+    )
+    HAS_FLUENT = True
+except ImportError:
+    # Fallback to standard Qt widgets if qfluentwidgets not available
+    from PySide6.QtWidgets import QPushButton as PushButton
+    PrimaryPushButton = PushButton
+    TransparentPushButton = PushButton
+    HAS_FLUENT = False
 
 # =============================================================================
 # CONFIG MANAGER - Save/Load Settings
@@ -1411,7 +1439,22 @@ class MultiDeviceWorker(QThread):
         file_name = os.path.basename(file_path)
         logs.append(f"[{idx}/{total}] 📱 {serial}: Bắt đầu flash {file_name}...")
         
-        # Push file
+        # Step 1: Unlock TWRP
+        unlock_cmd = f'adb -s {serial} shell twrp set tw_ro_mode 0'
+        result = subprocess.run(unlock_cmd, shell=True, capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            logs.append(f"[{idx}/{total}] 🔓 {serial}: TWRP đã unlock")
+        
+        # Step 2: Format data (heavier than wipe)
+        logs.append(f"[{idx}/{total}] 🗑️ {serial}: Đang format data...")
+        wipe_cmd = f'adb -s {serial} shell twrp format data'
+        result = subprocess.run(wipe_cmd, shell=True, capture_output=True, text=True, timeout=120)
+        if result.returncode == 0:
+            logs.append(f"[{idx}/{total}] ✅ {serial}: Format data thành công")
+        else:
+            logs.append(f"[{idx}/{total}] ⚠️ {serial}: Format có thể không thành công")
+        
+        # Step 3: Push file
         dest_file = dest_path.rstrip('/') + '/' + file_name
         push_cmd = f'adb -s {serial} push "{file_path}" {dest_file}'
         result = subprocess.run(push_cmd, shell=True, capture_output=True, text=True, timeout=120)
@@ -1423,7 +1466,7 @@ class MultiDeviceWorker(QThread):
         
         logs.append(f"[{idx}/{total}] ✅ {serial}: Push thành công")
         
-        # Flash
+        # Step 4: Flash ROM
         if method == "twrp_install":
             flash_cmd = f'adb -s {serial} shell twrp install {dest_file}'
             result = subprocess.run(flash_cmd, shell=True, capture_output=True, text=True, timeout=300)
@@ -1510,6 +1553,9 @@ class MainWindow(QWidget):
             }
         """)
         
+        # Disable drops on tabs to allow propagation to child tab widgets
+        self.tabs.setAcceptDrops(False)
+        
         main_layout.addWidget(self.tabs)
 
         # --- START ADB COMMENT TAB CODE ---
@@ -1553,7 +1599,7 @@ class MainWindow(QWidget):
         if self.shared_log_output:
             self.shared_log_output.append(text)
             # Auto-scroll to bottom
-            from PyQt6.QtGui import QTextCursor
+            from PySide6.QtGui import QTextCursor
             cursor = self.shared_log_output.textCursor()
             cursor.movePosition(QTextCursor.MoveOperation.End)
             self.shared_log_output.setTextCursor(cursor)
@@ -1571,8 +1617,8 @@ class MainWindow(QWidget):
         
         # Enable drag & drop for this tab
         self.rom_tools_tab.setAcceptDrops(True)
-        self.rom_tools_tab.dragEnterEvent = self.rom_tools_tab_dragEnterEvent
-        self.rom_tools_tab.dropEvent = self.rom_tools_tab_dropEvent
+        self.rom_tools_tab.dragEnterEvent = lambda event: self.rom_tools_tab_dragEnterEvent(event)
+        self.rom_tools_tab.dropEvent = lambda event: self.rom_tools_tab_dropEvent(event)
         
         # Instructions (no header)
         instructions = QLabel(
@@ -1585,41 +1631,50 @@ class MainWindow(QWidget):
         instructions.setTextFormat(Qt.TextFormat.RichText)  # Enable HTML rendering
         instructions.setWordWrap(True)
         instructions.setStyleSheet("padding: 10px; border: 1px solid #555; border-radius: 5px;")
+        instructions.setAcceptDrops(False)  # Ensure drops go to parent
         layout.addWidget(instructions)
         
         # File selection area
         file_select_layout = QHBoxLayout()
-        file_select_layout.addWidget(QLabel("File/Folder đã chọn:"))
+        lbl_file_folder = QLabel("File/Folder đã chọn:")
+        lbl_file_folder.setAcceptDrops(False)
+        file_select_layout.addWidget(lbl_file_folder)
         self.smart_file_display = QLineEdit()
         self.smart_file_display.setPlaceholderText("Chưa chọn file hoặc thư mục")
         self.smart_file_display.setReadOnly(True)
+        self.smart_file_display.setAcceptDrops(False)  # Ensure drops go to parent
         file_select_layout.addWidget(self.smart_file_display, 1)
         
-        self.smart_choose_btn = QPushButton("📁 Chọn...")
+        self.smart_choose_btn = PushButton("📁 Chọn...")
         self.smart_choose_btn.clicked.connect(self.smart_choose_file_or_folder)
+        self.smart_choose_btn.setAcceptDrops(False)
         file_select_layout.addWidget(self.smart_choose_btn)
         layout.addLayout(file_select_layout)
         
         # Main action button (use default PyQt6 style)
-        self.smart_patch_btn = QPushButton("⚡ Phân tích và Tự động lưu")
+        self.smart_patch_btn = PushButton("⚡ Phân tích và Tự động lưu")
         self.smart_patch_btn.clicked.connect(self.smart_auto_patch)
         self.smart_patch_btn.setEnabled(False)
         self.smart_patch_btn.setFont(QFont('Segoe UI', 10, QFont.Weight.Bold))
+        self.smart_patch_btn.setAcceptDrops(False)
         layout.addWidget(self.smart_patch_btn)
         
         # Progress bar
         self.smart_progress_bar = QProgressBar()
         self.smart_progress_bar.setValue(0)
+        self.smart_progress_bar.setAcceptDrops(False)
         layout.addWidget(self.smart_progress_bar)
         
         # Utility buttons + Overwrite checkbox
         utility_layout = QHBoxLayout()
-        self.smart_open_folder_btn = QPushButton("📂 Mở thư mục đã Patched")
+        self.smart_open_folder_btn = PushButton("📂 Mở thư mục đã Patched")
         self.smart_open_folder_btn.clicked.connect(self.open_patched_folder)
+        self.smart_open_folder_btn.setAcceptDrops(False)
         utility_layout.addWidget(self.smart_open_folder_btn)
         
-        self.smart_overwrite_checkbox = QCheckBox("✏️ Ghi đè file gốc")
+        self.smart_overwrite_checkbox = CheckBox("Ghi đè file gốc")
         self.smart_overwrite_checkbox.setToolTip("Khi tích, file sẽ được patch và ghi đè trực tiếp vào file gốc thay vì lưu vào thư mục Patched")
+        self.smart_overwrite_checkbox.setAcceptDrops(False)
         utility_layout.addWidget(self.smart_overwrite_checkbox)
         
         utility_layout.addStretch()
@@ -1639,15 +1694,15 @@ class MainWindow(QWidget):
         layout.addWidget(QLabel("1. Kéo và thả file services.jar vào đây hoặc chọn file:"))
         self.gps_file_path_edit = QLineEdit(); self.gps_file_path_edit.setPlaceholderText("Chưa chọn file services.jar"); self.gps_file_path_edit.setReadOnly(True)
         layout.addWidget(self.gps_file_path_edit)
-        self.gps_choose_file_btn = QPushButton("Chọn File services.jar"); self.gps_choose_file_btn.clicked.connect(self.select_gps_file)
+        self.gps_choose_file_btn = PushButton("Chọn File services.jar"); self.gps_choose_file_btn.clicked.connect(self.select_gps_file)
         layout.addWidget(self.gps_choose_file_btn)
         
-        self.gps_patch_btn = QPushButton("Bắt đầu vá lỗi GPS")
+        self.gps_patch_btn = PushButton("Bắt đầu vá lỗi GPS")
         self.gps_patch_btn.clicked.connect(self.start_gps_patch)
         self.gps_patch_btn.setEnabled(False)
         self.gps_patch_btn.setFont(QFont('Segoe UI', 10, QFont.Weight.Bold))
 
-        self.gps_open_folder_btn = QPushButton("📂 Mở thư mục đã vá")
+        self.gps_open_folder_btn = PushButton("📂 Mở thư mục đã vá")
         self.gps_open_folder_btn.clicked.connect(self.open_patched_folder)
         self.gps_open_folder_btn.setEnabled(True)
 
@@ -1667,12 +1722,12 @@ class MainWindow(QWidget):
         layout.addWidget(QLabel("1. Chọn file build.prop và/hoặc init.rc:"))
         self.adb_file_path_edit = QLineEdit(); self.adb_file_path_edit.setPlaceholderText("Chưa chọn file"); self.adb_file_path_edit.setReadOnly(True)
         layout.addWidget(self.adb_file_path_edit)
-        self.adb_choose_file_btn = QPushButton("Chọn File (build.prop, init.rc)"); self.adb_choose_file_btn.clicked.connect(self.select_adb_files)
+        self.adb_choose_file_btn = PushButton("Chọn File (build.prop, init.rc)"); self.adb_choose_file_btn.clicked.connect(self.select_adb_files)
         layout.addWidget(self.adb_choose_file_btn)
-        self.adb_patch_btn = QPushButton("Phân tích và Tự động lưu"); self.adb_patch_btn.clicked.connect(self.start_adb_patch); self.adb_patch_btn.setEnabled(False)
+        self.adb_patch_btn = PushButton("Phân tích và Tự động lưu"); self.adb_patch_btn.clicked.connect(self.start_adb_patch); self.adb_patch_btn.setEnabled(False)
         self.adb_patch_btn.setFont(QFont('Segoe UI', 10, QFont.Weight.Bold))
         
-        self.adb_open_folder_btn = QPushButton("📂 Mở thư mục đã vá")
+        self.adb_open_folder_btn = PushButton("📂 Mở thư mục đã vá")
         self.adb_open_folder_btn.clicked.connect(self.open_patched_folder)
         self.adb_open_folder_btn.setEnabled(True)
 
@@ -1689,16 +1744,16 @@ class MainWindow(QWidget):
         
         # 1. Action Buttons Area (No changes here)
         action_layout = QHBoxLayout()
-        self.fm_autopatch_btn = QPushButton("🚀 Auto Patch")
+        self.fm_autopatch_btn = PushButton("🚀 Auto Patch")
         self.fm_autopatch_btn.clicked.connect(self.start_auto_patching)
         self.fm_autopatch_btn.setEnabled(False)
         self.fm_autopatch_btn.setFont(QFont('Segoe UI', 10, QFont.Weight.Bold))
         
-        self.fm_view_buildprop_btn = QPushButton("Xem build.prop")
+        self.fm_view_buildprop_btn = PushButton("Xem build.prop")
         self.fm_view_buildprop_btn.clicked.connect(lambda: self.show_file_preview('build.prop'))
         self.fm_view_buildprop_btn.setEnabled(False)
         
-        self.fm_view_initrc_btn = QPushButton("Xem init.rc")
+        self.fm_view_initrc_btn = PushButton("Xem init.rc")
         self.fm_view_initrc_btn.clicked.connect(lambda: self.show_file_preview('init.rc'))
         self.fm_view_initrc_btn.setEnabled(False)
 
@@ -1755,11 +1810,11 @@ class MainWindow(QWidget):
         self.decompile_input_path = QLineEdit(); self.decompile_input_path.setReadOnly(True); self.decompile_input_path.setPlaceholderText("Chưa chọn file")
         decompile_buttons_layout = QHBoxLayout()
         decompile_buttons_layout.addWidget(self.decompile_input_path)
-        decompile_select_btn = QPushButton("Chọn File"); decompile_select_btn.clicked.connect(self.select_decompile_file)
+        decompile_select_btn = PushButton("Chọn File"); decompile_select_btn.clicked.connect(self.select_decompile_file)
         decompile_buttons_layout.addWidget(decompile_select_btn)
         layout.addLayout(decompile_buttons_layout)
         
-        self.decompile_btn = QPushButton("Dịch ngược"); self.decompile_btn.clicked.connect(self.start_decompile); self.decompile_btn.setEnabled(False)
+        self.decompile_btn = PushButton("Dịch ngược"); self.decompile_btn.clicked.connect(self.start_decompile); self.decompile_btn.setEnabled(False)
         self.decompile_btn.setFont(QFont('Segoe UI', 10, QFont.Weight.Bold))
         layout.addWidget(self.decompile_btn)
 
@@ -1768,16 +1823,16 @@ class MainWindow(QWidget):
         self.recompile_input_path = QLineEdit(); self.recompile_input_path.setReadOnly(True); self.recompile_input_path.setPlaceholderText("Chưa chọn thư mục")
         recompile_buttons_layout = QHBoxLayout()
         recompile_buttons_layout.addWidget(self.recompile_input_path)
-        recompile_select_btn = QPushButton("Chọn Thư mục"); recompile_select_btn.clicked.connect(self.select_recompile_folder)
+        recompile_select_btn = PushButton("Chọn Thư mục"); recompile_select_btn.clicked.connect(self.select_recompile_folder)
         recompile_buttons_layout.addWidget(recompile_select_btn)
         layout.addLayout(recompile_buttons_layout)
 
-        self.recompile_btn = QPushButton("Đóng gói lại"); self.recompile_btn.clicked.connect(self.start_recompile); self.recompile_btn.setEnabled(False)
+        self.recompile_btn = PushButton("Đóng gói lại"); self.recompile_btn.clicked.connect(self.start_recompile); self.recompile_btn.setEnabled(False)
         self.recompile_btn.setFont(QFont('Segoe UI', 10, QFont.Weight.Bold))
         layout.addWidget(self.recompile_btn)
         
         # Open folder button
-        open_output_btn = QPushButton("📂 Mở thư mục Output (Decompiled/Rebuilt)"); open_output_btn.clicked.connect(self.open_output_folders)
+        open_output_btn = PushButton("📂 Mở thư mục Output (Decompiled/Rebuilt)"); open_output_btn.clicked.connect(self.open_output_folders)
         layout.addWidget(open_output_btn)
         layout.addStretch()  # Push content to top
 
@@ -1836,14 +1891,14 @@ class MainWindow(QWidget):
         top_row_layout.addWidget(self.adb_serial_input)
         
         # Auto-detect device button (inline)
-        auto_detect_btn = QPushButton("🔍")
+        auto_detect_btn = PushButton("🔍")
         auto_detect_btn.setMaximumWidth(40)
         auto_detect_btn.setToolTip("Tự động phát hiện thiết bị")
         auto_detect_btn.clicked.connect(self.detect_adb_device)
         top_row_layout.addWidget(auto_detect_btn)
         
         # Multi Device toggle button
-        self.multi_device_btn = QPushButton("📱 Multi")
+        self.multi_device_btn = PushButton("📱 Multi")
         self.multi_device_btn.setMaximumWidth(70)
         self.multi_device_btn.setCheckable(True)
         self.multi_device_btn.setToolTip("Điều khiển nhiều thiết bị cùng lúc")
@@ -1866,7 +1921,7 @@ class MainWindow(QWidget):
         top_row_layout.addWidget(QLabel("|"))
         
         # Danh sách File button (replacement for "Tệp đã chọn")
-        self.file_list_btn = QPushButton("📄 Danh sách File")
+        self.file_list_btn = PushButton("📄 Danh sách File")
         self.file_list_btn.clicked.connect(self.show_file_list_menu)
         self.file_list_btn.setMinimumWidth(150)
         top_row_layout.addWidget(self.file_list_btn)
@@ -1879,7 +1934,7 @@ class MainWindow(QWidget):
         top_row_layout.addWidget(self.adb_file_display)
         
         # File command menu button
-        self.file_cmd_btn = QPushButton("📁 Lệnh Tệp Tin")
+        self.file_cmd_btn = PushButton("📁 Lệnh Tệp Tin")
         self.file_cmd_btn.clicked.connect(self.show_file_command_menu)
         top_row_layout.addWidget(self.file_cmd_btn)
         
@@ -1904,17 +1959,17 @@ class MainWindow(QWidget):
         
         # Quick command buttons: Mode, Reboot, Logcat
         # Mode button (với menu dropdown)
-        self.mode_btn = QPushButton("🔧 Mode")
+        self.mode_btn = PushButton("🔧 Mode")
         self.mode_btn.clicked.connect(self.show_mode_menu)
         quick_buttons_container.addWidget(self.mode_btn)
         
         # Reboot button
-        reboot_btn = QPushButton("🔌 Reboot")
+        reboot_btn = PushButton("🔌 Reboot")
         reboot_btn.clicked.connect(partial(self.insert_quick_command, "adb reboot"))
         quick_buttons_container.addWidget(reboot_btn)
         
         # Logcat button
-        logcat_btn = QPushButton("📊 Logcat")
+        logcat_btn = PushButton("📊 Logcat")
         logcat_btn.clicked.connect(partial(self.insert_quick_command, "adb logcat -d | tail -50"))
         quick_buttons_container.addWidget(logcat_btn)
         
@@ -1923,7 +1978,7 @@ class MainWindow(QWidget):
         layout.addLayout(cmd_row_layout)
         
         # Execute Button (giữ nguyên vị trí cũ)
-        self.adb_exec_btn = QPushButton("▶️ Thực thi lệnh")
+        self.adb_exec_btn = PushButton("▶️ Thực thi lệnh")
         self.adb_exec_btn.clicked.connect(self.execute_adb_commands)
         self.adb_exec_btn.setFont(QFont('Segoe UI', 10, QFont.Weight.Bold))
         layout.addWidget(self.adb_exec_btn)
@@ -1971,18 +2026,22 @@ class MainWindow(QWidget):
     
     def rom_tools_tab_dropEvent(self, event):
         """Handle drop event for ROM Tools tab."""
-        urls = event.mimeData().urls()
-        if urls:
-            paths = []
-            for url in urls:
-                path = url.toLocalFile()
-                if os.path.exists(path):
-                    paths.append(path)
-            
-            if paths:
-                self.smart_handle_dropped_paths(paths)
-            
-            event.acceptProposedAction()
+        try:
+            urls = event.mimeData().urls()
+            if urls:
+                paths = []
+                for url in urls:
+                    path = url.toLocalFile()
+                    if os.path.exists(path):
+                        paths.append(path)
+                
+                if paths:
+                    self.smart_handle_dropped_paths(paths)
+                
+                event.acceptProposedAction()
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
     
     def show_file_command_menu(self):
         """Show file command menu with options."""
@@ -2117,21 +2176,31 @@ class MainWindow(QWidget):
         self.adb_comment_log.append(f"\n{'='*30}\n")
     
     def push_files_to_tmp(self):
-        """Push all dropped files to /tmp on device."""
-        if not self.adb_dropped_files:
+        """Push the currently selected file to /tmp on device using background worker."""
+        # Get the file to push - prioritize current_selected_file, then last in adb_dropped_files
+        file_to_push = None
+        
+        if hasattr(self, 'current_selected_file') and self.current_selected_file and os.path.exists(self.current_selected_file):
+            file_to_push = self.current_selected_file
+        elif self.adb_dropped_files:
+            file_to_push = self.adb_dropped_files[-1]  # Last added file
+        
+        if not file_to_push:
             self.adb_comment_log.append("❌ Không có file nào để push!")
             return
+        
+        file_name = os.path.basename(file_to_push)
         
         # Check multi device mode
         if self.multi_device_btn.isChecked() and self.multi_device_serials:
             self.adb_comment_log.append(f"\n{'='*30}")
-            self.adb_comment_log.append(f"📤 MULTI DEVICE - Push {len(self.adb_dropped_files)} file cho {len(self.multi_device_serials)} thiết bị (max 4 parallel)")
+            self.adb_comment_log.append(f"📤 MULTI DEVICE - Push {file_name} cho {len(self.multi_device_serials)} thiết bị (max 4 parallel)")
             self.adb_comment_log.append(f"{'='*30}\n")
             
             if self.multi_device_worker and self.multi_device_worker.isRunning():
                 self.multi_device_worker.wait()
             
-            self.multi_device_worker = MultiDeviceWorker("push_files", self.multi_device_serials, files=self.adb_dropped_files)
+            self.multi_device_worker = MultiDeviceWorker("push_files", self.multi_device_serials, files=[file_to_push])
             self.multi_device_worker.log_signal.connect(self.adb_comment_log.append)
             self.multi_device_worker.finished_signal.connect(
                 lambda: self.adb_comment_log.append(f"\n{'='*30}\n✅ HOÀN TẤT! Đã push file\n{'='*30}\n")
@@ -2139,49 +2208,47 @@ class MainWindow(QWidget):
             self.multi_device_worker.start()
             return
         
-        # Single device mode
+        # Single device mode - use background worker
         serial = self.adb_serial_input.text().strip()
         
         self.adb_comment_log.append(f"\n{'='*30}")
-        self.adb_comment_log.append(f"📤 Bắt đầu push {len(self.adb_dropped_files)} file vào /tmp...")
+        self.adb_comment_log.append(f"📤 Push file: {file_name}")
         if serial:
             self.adb_comment_log.append(f"📱 Serial: {serial}")
-        self.adb_comment_log.append(f"{'='*30}\n")
-        
-        for idx, file_path in enumerate(self.adb_dropped_files, 1):
-            file_name = os.path.basename(file_path)
-            self.adb_comment_log.append(f"[{idx}/{len(self.adb_dropped_files)}] Pushing: {file_name}")
-            
-            # Build adb push command
-            if serial:
-                cmd = f'adb -s {serial} push "{file_path}" /tmp/'
-            else:
-                cmd = f'adb push "{file_path}" /tmp/'
-            
-            try:
-                result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=60)
-                
-                if result.returncode == 0:
-                    self.adb_comment_log.append(f"✅ Đã push: {file_name}")
-                    if result.stdout:
-                        # Extract transfer speed if available
-                        output_lines = result.stdout.strip().split('\n')
-                        if output_lines:
-                            self.adb_comment_log.append(f"   {output_lines[-1]}")
-                else:
-                    self.adb_comment_log.append(f"❌ Thất bại: {file_name}")
-                    if result.stderr:
-                        self.adb_comment_log.append(f"   Error: {result.stderr.strip()}")
-                        
-            except subprocess.TimeoutExpired:
-                self.adb_comment_log.append(f"❌ Timeout: {file_name} (file quá lớn?)")
-            except Exception as e:
-                self.adb_comment_log.append(f"❌ Lỗi: {e}")
-            
-            self.adb_comment_log.append("")
-        
         self.adb_comment_log.append(f"{'='*30}")
-        self.adb_comment_log.append("✅ Hoàn tất push file!")
+        
+        # Build command for single file
+        commands = [("push", {"src": file_to_push, "dest": "/tmp/"})]
+        
+        # Start background worker
+        self._start_push_worker(commands, serial)
+    
+    def _start_push_worker(self, commands, serial):
+        """Start ADB worker for push operation on background thread."""
+        self.push_worker = AdbCommandWorker(commands, serial=serial)
+        self.push_thread = QThread()
+        
+        self.push_worker.moveToThread(self.push_thread)
+        
+        self.push_thread.started.connect(self.push_worker.run)
+        self.push_worker.log.connect(self.adb_comment_log.append)
+        self.push_worker.progress.connect(lambda p: None)  # Progress handler
+        self.push_worker.finished.connect(self._on_push_finished)
+        self.push_worker.error.connect(lambda e: self.adb_comment_log.append(f"❌ {e}"))
+        self.push_worker.finished.connect(self.push_thread.quit)
+        self.push_worker.finished.connect(self.push_worker.deleteLater)
+        self.push_thread.finished.connect(self.push_thread.deleteLater)
+        
+        self.push_thread.start()
+        self.adb_comment_log.append("\n🚀 Đang push (background thread - UI không đơ)...")
+    
+    def _on_push_finished(self, success, message):
+        """Handle push completion."""
+        self.adb_comment_log.append(f"\n{'='*30}")
+        if success:
+            self.adb_comment_log.append(f"✅ PUSH HOÀN TẤT! {message}")
+        else:
+            self.adb_comment_log.append(f"⚠️ Push kết thúc: {message}")
         self.adb_comment_log.append(f"{'='*30}\n")
     
     def show_flash_file_dialog(self):
@@ -2229,12 +2296,12 @@ class MainWindow(QWidget):
         layout.addWidget(QLabel("Phương thức flash:"))
         method_layout = QHBoxLayout()
         
-        twrp_install_btn = QPushButton("TWRP Install (twrp install)")
+        twrp_install_btn = PushButton("TWRP Install (twrp install)")
         twrp_install_btn.clicked.connect(lambda: self.execute_flash(
             index_input.text(), dest_input.text(), "twrp_install", dialog
         ))
         
-        dd_flash_btn = QPushButton("DD Flash (dd if=... of=...)")
+        dd_flash_btn = PushButton("DD Flash (dd if=... of=...)")
         dd_flash_btn.clicked.connect(lambda: self.execute_flash(
             index_input.text(), dest_input.text(), "dd", dialog
         ))
@@ -2251,7 +2318,7 @@ class MainWindow(QWidget):
         dialog.exec()
     
     def execute_flash(self, index_text, dest_path, method, dialog):
-        """Execute flash command."""
+        """Execute flash command using background worker (non-blocking UI)."""
         try:
             index = int(index_text.strip() or "1") - 1
             if index < 0 or index >= len(self.adb_dropped_files):
@@ -2286,7 +2353,7 @@ class MainWindow(QWidget):
                 self.multi_device_worker.start()
                 return
             
-            # Single device mode
+            # Single device mode - use background worker
             serial = self.adb_serial_input.text().strip()
             
             # Validate serial
@@ -2296,114 +2363,69 @@ class MainWindow(QWidget):
             
             self.adb_comment_log.append(f"\n{'='*30}")
             self.adb_comment_log.append(f"⚡ Bắt đầu flash: {file_name}")
-            if serial:
-                self.adb_comment_log.append(f"📱 Serial: {serial}")
-            self.adb_comment_log.append(f"{'='*30}\n")
+            self.adb_comment_log.append(f"📱 Serial: {serial}")
+            self.adb_comment_log.append(f"{'='*30}")
             
-            # Auto-unlock TWRP before flashing
-            self.adb_comment_log.append("🔓 Tự động unlock TWRP...")
-            unlock_cmd = f'adb -s {serial} shell twrp set tw_ro_mode 0' if serial else 'adb shell twrp set tw_ro_mode 0'
-            try:
-                unlock_result = subprocess.run(unlock_cmd, shell=True, capture_output=True, text=True, timeout=5)
-                if unlock_result.returncode == 0:
-                    self.adb_comment_log.append("   ✅ TWRP đã unlock (read-write mode)")
-                else:
-                    self.adb_comment_log.append("   ⚠️ Không unlock được (có thể đã unlock rồi)")
-            except:
-                self.adb_comment_log.append("   ⚠️ Bỏ qua bước unlock")
-            
-            self.adb_comment_log.append("")
-            
-            # First push file to destination
+            # Build command list for worker
             dest_file = dest_path.rstrip('/') + '/' + file_name
-            push_cmd = f'adb -s {serial} push "{file_path}" {dest_file}' if serial else f'adb push "{file_path}" {dest_file}'
             
-            self.adb_comment_log.append(f"📤 Push file to {dest_file}...")
-            result = subprocess.run(push_cmd, shell=True, capture_output=True, text=True, timeout=120)
-            
-            if result.returncode != 0:
-                self.adb_comment_log.append(f"❌ Push thất bại!")
-                if result.stderr:
-                    self.adb_comment_log.append(f"   {result.stderr.strip()}")
-                return
-            
-            self.adb_comment_log.append("✅ Push thành công!")
-            
-            # Execute flash command
             if method == "twrp_install":
-                flash_cmd = f'adb -s {serial} shell twrp install {dest_file}' if serial else f'adb shell twrp install {dest_file}'
-                self.adb_comment_log.append(f"\n⚡ Flashing via TWRP...")
+                commands = [
+                    ("shell", {"cmd": "twrp set tw_ro_mode 0"}),  # Unlock TWRP
+                    ("shell", {"cmd": "twrp format data"}),        # Format data (heavier than wipe)
+                    ("push", {"src": file_path, "dest": dest_path}),  # Push file
+                    ("shell", {"cmd": f"twrp install {dest_file}"})   # Flash ROM
+                ]
+                self.adb_comment_log.append("\n📋 Quy trình: Unlock → Format Data → Push → Flash")
             else:  # dd method
                 self.adb_comment_log.append(f"\n⚠️ DD Flash cần chỉ định partition thủ công!")
                 self.adb_comment_log.append(f"   Ví dụ: adb shell dd if={dest_file} of=/dev/block/...")
                 return
             
-            self.adb_comment_log.append(f"$ {flash_cmd}")
-            result = subprocess.run(flash_cmd, shell=True, capture_output=True, text=True, timeout=300)
-            
-            # Display output
-            if result.stdout:
-                self.adb_comment_log.append(f"\n📤 Output từ TWRP:\n{result.stdout.strip()}")
-            if result.stderr:
-                self.adb_comment_log.append(f"\n⚠️ Stderr:\n{result.stderr.strip()}")
-            
-            # Parse TWRP output to detect actual success/failure
-            output_combined = (result.stdout or "") + (result.stderr or "")
-            output_lower = output_combined.lower()
-            
-            # Check for failure keywords
-            failure_keywords = [
-                "error installing zip",
-                "script aborted",
-                "updater process ended with error",
-                "error: 1",
-                "error: 25",
-                "installation failed",
-                "unable to mount",
-                "failed to mount",
-                "no such file",
-                "permission denied"
-            ]
-            
-            # Check for success keywords
-            success_keywords = [
-                "script succeeded",
-                "done processing script file",
-                "installation complete"
-            ]
-            
-            has_error = any(keyword in output_lower for keyword in failure_keywords)
-            has_success = any(keyword in output_lower for keyword in success_keywords)
-            
-            # Determine actual result
-            if has_error:
-                self.adb_comment_log.append("\n❌ Flash thất bại! (TWRP báo lỗi)")
-                
-                # Try to extract error reason
-                for line in output_combined.split('\n'):
-                    line_lower = line.lower()
-                    if any(kw in line_lower for kw in ["error", "failed", "aborted"]):
-                        self.adb_comment_log.append(f"   Lý do: {line.strip()}")
-                        break
-                        
-            elif has_success:
-                self.adb_comment_log.append("\n✅ Flash thành công! (TWRP xác nhận)")
-                
-            elif result.returncode == 0:
-                self.adb_comment_log.append("\n✅ Flash hoàn tất! (Exit code: 0)")
-                self.adb_comment_log.append("   ℹ️ Không tìm thấy log xác nhận từ TWRP")
-                
-            else:
-                self.adb_comment_log.append(f"\n❌ Flash thất bại! (Exit code: {result.returncode})")
-            
-            self.adb_comment_log.append(f"{'='*30}\n")
+            # Create and start worker
+            self._start_flash_worker(commands, serial)
             
         except ValueError:
             self.adb_comment_log.append("❌ Số thứ tự không hợp lệ!")
-        except subprocess.TimeoutExpired:
-            self.adb_comment_log.append("❌ Timeout: Lệnh flash chạy quá lâu!")
         except Exception as e:
             self.adb_comment_log.append(f"❌ Lỗi: {e}")
+    
+    def _start_flash_worker(self, commands, serial):
+        """Start ADB worker for flash operation on background thread."""
+        # Create worker
+        self.flash_worker = AdbCommandWorker(commands, serial=serial)
+        self.flash_thread = QThread()
+        
+        # Move worker to thread
+        self.flash_worker.moveToThread(self.flash_thread)
+        
+        # Connect signals
+        self.flash_thread.started.connect(self.flash_worker.run)
+        self.flash_worker.log.connect(self.adb_comment_log.append)
+        self.flash_worker.progress.connect(self._on_flash_progress)
+        self.flash_worker.finished.connect(self._on_flash_finished)
+        self.flash_worker.error.connect(lambda e: self.adb_comment_log.append(f"❌ {e}"))
+        self.flash_worker.finished.connect(self.flash_thread.quit)
+        self.flash_worker.finished.connect(self.flash_worker.deleteLater)
+        self.flash_thread.finished.connect(self.flash_thread.deleteLater)
+        
+        # Start worker thread
+        self.flash_thread.start()
+        self.adb_comment_log.append("\n🚀 Đang thực hiện (background thread)...")
+    
+    def _on_flash_progress(self, progress):
+        """Handle flash progress update."""
+        # Can update a progress bar here if needed
+        pass
+    
+    def _on_flash_finished(self, success, message):
+        """Handle flash completion."""
+        self.adb_comment_log.append(f"\n{'='*30}")
+        if success:
+            self.adb_comment_log.append(f"✅ FLASH HOÀN TẤT! {message}")
+        else:
+            self.adb_comment_log.append(f"⚠️ Flash kết thúc: {message}")
+        self.adb_comment_log.append(f"{'='*30}\n")
     
     def clear_dropped_files(self):
         """Clear the list of dropped files."""
@@ -3260,8 +3282,8 @@ class MainWindow(QWidget):
             self.recompile_btn.setEnabled(False)
         
         # Show cursor as busy
-        from PyQt6.QtGui import QCursor
-        from PyQt6.QtCore import Qt
+        from PySide6.QtGui import QCursor
+        from PySide6.QtCore import Qt
         QApplication.setOverrideCursor(QCursor(Qt.CursorShape.WaitCursor))
         
         # Log status
@@ -3275,6 +3297,11 @@ class MainWindow(QWidget):
         # Re-enable các nút chọn file
         if hasattr(self, 'smart_choose_btn'):
             self.smart_choose_btn.setEnabled(True)
+        
+        # Re-enable smart patch button (check if files detected)
+        if hasattr(self, 'smart_patch_btn') and hasattr(self, 'smart_detected_files'):
+            if self.smart_detected_files:
+                self.smart_patch_btn.setEnabled(True)
         
         # Re-enable GPS tab buttons (check if file selected)
         if hasattr(self, 'gps_choose_file_btn'):
@@ -3528,34 +3555,176 @@ class MainWindow(QWidget):
             self.smart_handle_dropped_paths([file_path])
     
     def smart_handle_dropped_paths(self, paths):
-        """Handle dropped files/folders - auto-detect type."""
-        self.smart_selected_paths = paths
-        self.smart_detected_files = {}
+        """Handle dropped files/folders - auto-detect type with multi-file support.
+        Files ACCUMULATE across multiple drops until patched or cleared."""
+        self.smart_selected_paths.extend(paths) if hasattr(self, 'smart_selected_paths') else setattr(self, 'smart_selected_paths', paths)
+        
+        # DO NOT reset - accumulate files across multiple drops
+        # Format: { 'services.jar': [{'path': ..., 'source': ...}, ...] }
+        new_detected = {}
         self.smart_progress_bar.setValue(0)
         
         for path in paths:
             if os.path.isdir(path):
                 # Scan directory for known files
                 self.fm_log_output.append(f"📂 Quét thư mục: {path}")
-                self.smart_scan_directory(path)
+                self._smart_scan_directory_multi(path, new_detected)
             elif os.path.isfile(path):
                 # Detect single file type
                 file_type = self.smart_detect_file_type(path)
                 if file_type:
-                    self.smart_detected_files[file_type] = path
-                    self.fm_log_output.append(f"✅ Phát hiện: {file_type} → {os.path.basename(path)}")
+                    source_folder = os.path.basename(os.path.dirname(path))
+                    self._add_detected_file(new_detected, file_type, path, source_folder)
                 else:
                     self.fm_log_output.append(f"⚠️ Không nhận diện được: {os.path.basename(path)}")
         
+        # Merge new files with existing (accumulate)
+        self._merge_detected_files(new_detected)
+        
         # Update UI
-        if self.smart_detected_files:
-            files_str = ", ".join([f"{k} ({os.path.basename(v)})" for k, v in self.smart_detected_files.items()])
-            self.smart_file_display.setText(files_str)
-            self.smart_patch_btn.setEnabled(True)
-            self.fm_log_output.append(f"\n🎯 Sẵn sàng patch: {len(self.smart_detected_files)} file")
-        else:
-            self.smart_file_display.setText("Không tìm thấy file hợp lệ")
-            self.smart_patch_btn.setEnabled(False)
+        try:
+            if self.smart_detected_files:
+                # Build display string showing all files
+                display_parts = []
+                total_files = 0
+                for file_type, file_list in self.smart_detected_files.items():
+                    total_files += len(file_list)
+                    if len(file_list) == 1:
+                        display_parts.append(f"{file_type} ({file_list[0]['source']})")
+                    else:
+                        display_parts.append(f"{file_type} ({len(file_list)} files)")
+                
+                self.smart_file_display.setText(", ".join(display_parts))
+                self.smart_patch_btn.setEnabled(True)
+                self.fm_log_output.append(f"\n🎯 TỔNG CỘNG: {total_files} file sẵn sàng patch")
+                QApplication.processEvents()
+            else:
+                self.smart_file_display.setText("Không tìm thấy file hợp lệ")
+                self.smart_patch_btn.setEnabled(False)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+    
+    def _merge_detected_files(self, new_detected):
+        """Merge new detected files with existing, checking for duplicates."""
+        for file_type, new_files in new_detected.items():
+            if file_type not in self.smart_detected_files:
+                self.smart_detected_files[file_type] = []
+            
+            # Check for duplicates before adding
+            existing_paths = [f['path'] for f in self.smart_detected_files[file_type]]
+            
+            for new_file in new_files:
+                if new_file['path'] in existing_paths:
+                    # Duplicate path - warn and skip
+                    self.fm_log_output.append(f"⚠️ Đã có sẵn: {os.path.basename(new_file['path'])} [{new_file['source']}]")
+                else:
+                    # Check if same filename from different source (potential conflict)
+                    new_basename = os.path.basename(new_file['path'])
+                    existing_basenames = {os.path.basename(f['path']): f['source'] for f in self.smart_detected_files[file_type]}
+                    
+                    if new_basename in existing_basenames:
+                        # Same filename, different source - this is the duplicate scenario
+                        existing_source = existing_basenames[new_basename]
+                        self.fm_log_output.append(f"📋 Thêm file trùng tên: {new_basename}")
+                        self.fm_log_output.append(f"   - Đã có: [{existing_source}]")
+                        self.fm_log_output.append(f"   - Thêm: [{new_file['source']}]")
+                    
+                    self.smart_detected_files[file_type].append(new_file)
+    
+    def _add_detected_file(self, detected_dict, file_type, path, source):
+        """Add a file to detected dict, checking for duplicates."""
+        if file_type not in detected_dict:
+            detected_dict[file_type] = []
+        
+        # Check if this exact path already exists
+        existing_paths = [f['path'] for f in detected_dict[file_type]]
+        if path not in existing_paths:
+            detected_dict[file_type].append({'path': path, 'source': source})
+            self.fm_log_output.append(f"✅ Phát hiện: {file_type} → {os.path.basename(path)} [{source}]")
+    
+    def _check_and_merge_duplicates(self, new_detected):
+        """Check for duplicates and show warning dialog if found."""
+        duplicates_found = False
+        
+        for file_type, new_files in new_detected.items():
+            if len(new_files) > 1:
+                # Multiple files of same type detected
+                duplicates_found = True
+                self.fm_log_output.append(f"\n⚠️ CẢNH BÁO: Phát hiện {len(new_files)} file {file_type} trùng loại!")
+                for i, f in enumerate(new_files, 1):
+                    self.fm_log_output.append(f"   {i}. {f['path']}")
+                
+                # Show confirmation dialog
+                from PySide6.QtWidgets import QMessageBox
+                msg = QMessageBox(self)
+                msg.setIcon(QMessageBox.Icon.Warning)
+                msg.setWindowTitle("Phát hiện file trùng loại")
+                msg.setText(f"Phát hiện {len(new_files)} file {file_type} từ các thư mục khác nhau.\n\nBạn muốn xử lý thế nào?")
+                
+                btn_all = msg.addButton("Patch tất cả", QMessageBox.ButtonRole.AcceptRole)
+                btn_last = msg.addButton("Chỉ file cuối", QMessageBox.ButtonRole.DestructiveRole)
+                btn_cancel = msg.addButton("Hủy", QMessageBox.ButtonRole.RejectRole)
+                
+                msg.exec()
+                
+                clicked = msg.clickedButton()
+                if clicked == btn_all:
+                    self.fm_log_output.append(f"✅ Đã chọn: Patch tất cả {len(new_files)} file {file_type}")
+                    if file_type not in self.smart_detected_files:
+                        self.smart_detected_files[file_type] = []
+                    self.smart_detected_files[file_type].extend(new_files)
+                elif clicked == btn_last:
+                    self.fm_log_output.append(f"✅ Đã chọn: Chỉ patch file cuối {new_files[-1]['path']}")
+                    self.smart_detected_files[file_type] = [new_files[-1]]
+                else:
+                    self.fm_log_output.append(f"❌ Đã hủy patch {file_type}")
+                    # Don't add this file type
+            else:
+                # Single file - just add
+                if file_type not in self.smart_detected_files:
+                    self.smart_detected_files[file_type] = []
+                self.smart_detected_files[file_type].extend(new_files)
+        
+        return duplicates_found
+    
+    def _smart_scan_directory_multi(self, directory, detected_dict):
+        """Scan directory recursively with multi-file support (uses deferred processing)."""
+        # Use QApplication.processEvents() periodically to keep UI responsive
+        file_count = 0
+        for root, dirs, files in os.walk(directory):
+            for filename in files:
+                file_path = os.path.join(root, filename)
+                file_type = self.smart_detect_file_type(file_path)
+                
+                if file_type:
+                    # Validate content before adding
+                    is_valid = False
+                    if file_type == 'services.jar':
+                        is_valid = True
+                    elif file_type == 'build.prop':
+                        try:
+                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                content = f.read(1024)  # Read only first 1KB for speed
+                                is_valid = 'ro.build' in content or 'ro.product' in content
+                        except:
+                            pass
+                    elif file_type == 'init.rc':
+                        try:
+                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                content = f.read(1024)
+                                is_valid = 'service' in content or 'on boot' in content
+                        except:
+                            pass
+                    
+                    if is_valid:
+                        source_folder = os.path.basename(root)
+                        self._add_detected_file(detected_dict, file_type, file_path, source_folder)
+                
+                # Process events every 10 files to keep UI responsive
+                file_count += 1
+                if file_count % 10 == 0:
+                    QApplication.processEvents()
     
     def smart_detect_file_type(self, file_path):
         """Detect file type based on name and content."""
@@ -3604,13 +3773,10 @@ class MainWindow(QWidget):
                             pass
     
     def smart_auto_patch(self):
-        """Auto-patch all detected files."""
+        """Auto-patch all detected files (supports multiple files per type)."""
         if not self.smart_detected_files:
             self.fm_log_output.append("❌ Không có file nào để patch!")
             return
-        
-        # 🔍 DEBUG: Start smart auto patch
-        self.append("🔍 [UI] Starting smart auto patch...")
         
         self.fm_log_output.clear()
         
@@ -3625,49 +3791,126 @@ class MainWindow(QWidget):
         self.fm_log_output.append(f"🚀 BẮT ĐẦU PATCH TỰ ĐỘNG ({mode_text})")
         self.fm_log_output.append("="*30 + "\n")
         
-        total_files = len(self.smart_detected_files)
-        completed = 0
+        # Count total files
+        total_files = sum(len(files) for files in self.smart_detected_files.values())
+        self._smart_patch_completed = 0
+        self._smart_patch_total = total_files
+        self._smart_patch_threads = []
         
-        # Patch services.jar
+        # Patch all services.jar files
         if 'services.jar' in self.smart_detected_files:
-            self.fm_log_output.append("📦 Patch services.jar (GPS)...")
-            jar_path = self.smart_detected_files['services.jar']
+            jar_files = self.smart_detected_files['services.jar']
+            self.fm_log_output.append(f"📦 Patch {len(jar_files)} file services.jar (GPS)...")
             
-            # Directly call GPS patcher thread
-            self.gps_patcher_thread = GpsPatcherThread(jar_path, self.patched_dir, overwrite_original=overwrite)
-            self.gps_patcher_thread.log_message.connect(self.fm_log_output.append)
-            self.gps_patcher_thread.patch_finished.connect(lambda success, msg: self.smart_on_gps_finished(success, msg))
-            self.gps_patcher_thread.cancelled.connect(self.smart_on_cancelled)
-            self.gps_patcher_thread.start()
-            
-            completed += 1
-            self.smart_progress_bar.setValue(int(completed / total_files * 100))
+            for file_info in jar_files:
+                jar_path = file_info['path']
+                source = file_info['source']
+                self.fm_log_output.append(f"   → {os.path.basename(jar_path)} [{source}]")
+                
+                # Create thread for each file
+                thread = GpsPatcherThread(jar_path, self.patched_dir, overwrite_original=overwrite)
+                thread.log_message.connect(self.fm_log_output.append)
+                thread.patch_finished.connect(lambda success, msg, s=source: self._on_smart_file_done(success, msg, 'services.jar', s))
+                thread.cancelled.connect(self.smart_on_cancelled)
+                self._smart_patch_threads.append(thread)
+                thread.start()
         
-        # Patch build.prop and init.rc
-        if 'build.prop' in self.smart_detected_files or 'init.rc' in self.smart_detected_files:
-            build_prop_path = self.smart_detected_files.get('build.prop')
-            init_rc_path = self.smart_detected_files.get('init.rc')
+        # Patch all build.prop and init.rc files
+        build_prop_files = self.smart_detected_files.get('build.prop', [])
+        init_rc_files = self.smart_detected_files.get('init.rc', [])
+        
+        # Group build.prop and init.rc from same source for batch processing
+        # For now, process each file individually
+        for file_info in build_prop_files:
+            path = file_info['path']
+            source = file_info['source']
+            self.fm_log_output.append(f"📝 Patch build.prop (ADB) [{source}]...")
             
-            if build_prop_path:
-                self.fm_log_output.append("📝 Patch build.prop (ADB)...")
-            if init_rc_path:
-                self.fm_log_output.append("⚙️ Patch init.rc (Auto-boot)...")
+            thread = AdbPatcherThread(path, None)
+            thread.log_message.connect(self.fm_log_output.append)
+            thread.patch_finished.connect(lambda success, files, ow=overwrite, s=source: self._on_smart_adb_done(success, files, ow, 'build.prop', s))
+            thread.cancelled.connect(self.smart_on_cancelled)
+            self._smart_patch_threads.append(thread)
+            thread.start()
+        
+        for file_info in init_rc_files:
+            path = file_info['path']
+            source = file_info['source']
+            self.fm_log_output.append(f"⚙️ Patch init.rc (Auto-boot) [{source}]...")
             
-            # Directly call ADB patcher thread
-            self.adb_patcher_thread = AdbPatcherThread(build_prop_path, init_rc_path)
-            self.adb_patcher_thread.log_message.connect(self.fm_log_output.append)
-            self.adb_patcher_thread.patch_finished.connect(lambda success, files: self.smart_save_adb_files(success, files, overwrite))
-            self.adb_patcher_thread.cancelled.connect(self.smart_on_cancelled)
-            self.adb_patcher_thread.start()
-            
-            completed += (1 if build_prop_path else 0) + (1 if init_rc_path else 0)
-            self.smart_progress_bar.setValue(int(completed / total_files * 100))
+            thread = AdbPatcherThread(None, path)
+            thread.log_message.connect(self.fm_log_output.append)
+            thread.patch_finished.connect(lambda success, files, ow=overwrite, s=source: self._on_smart_adb_done(success, files, ow, 'init.rc', s))
+            thread.cancelled.connect(self.smart_on_cancelled)
+            self._smart_patch_threads.append(thread)
+            thread.start()
         
         self.fm_log_output.append(f"\n{'='*30}")
-        self.fm_log_output.append(f"✅ HOÀN TẤT! Đã patch {completed}/{total_files} file")
+        self.fm_log_output.append(f"⏳ Đang xử lý {total_files} file...")
+        self.fm_log_output.append("="*30)
+    
+    def _on_smart_file_done(self, success, msg, file_type, source):
+        """Callback for single file patch completion."""
+        self._smart_patch_completed += 1
+        progress = int(self._smart_patch_completed / self._smart_patch_total * 100)
+        self.smart_progress_bar.setValue(progress)
+        
+        if success:
+            self.fm_log_output.append(f"✅ {file_type} [{source}]: {msg}")
+        else:
+            self.fm_log_output.append(f"❌ {file_type} [{source}]: {msg}")
+        
+        # Check if all done
+        if self._smart_patch_completed >= self._smart_patch_total:
+            self._end_smart_patch()
+    
+    def _on_smart_adb_done(self, success, modified_files, overwrite, file_type, source):
+        """Callback for ADB file patch completion with auto-save."""
+        if success and modified_files:
+            # Auto-save the patched files
+            for filename, content in modified_files.items():
+                try:
+                    if overwrite:
+                        # Find original path
+                        original_path = None
+                        for f in self.smart_detected_files.get(file_type, []):
+                            if f['source'] == source:
+                                original_path = f['path']
+                                break
+                        if original_path:
+                            with open(original_path, 'w', encoding='utf-8') as f:
+                                f.write(content)
+                            self.fm_log_output.append(f"💾 Đã ghi đè: {original_path}")
+                    else:
+                        # Save to patched folder with source subfolder
+                        patched_subdir = os.path.join(self.patched_dir, source)
+                        os.makedirs(patched_subdir, exist_ok=True)
+                        save_path = os.path.join(patched_subdir, filename)
+                        with open(save_path, 'w', encoding='utf-8') as f:
+                            f.write(content)
+                        self.fm_log_output.append(f"💾 Đã lưu: {save_path}")
+                except Exception as e:
+                    self.fm_log_output.append(f"❌ Lỗi lưu {filename}: {e}")
+        
+        self._on_smart_file_done(success, "OK" if success else "Failed", file_type, source)
+    
+    def _end_smart_patch(self):
+        """End smart patch and unlock UI."""
+        self._endBusy()
+        overwrite = self.smart_overwrite_checkbox.isChecked()
+        
+        self.fm_log_output.append(f"\n{'='*30}")
+        self.fm_log_output.append(f"✅ HOÀN TẤT! Đã patch {self._smart_patch_completed}/{self._smart_patch_total} file")
         if not overwrite:
             self.fm_log_output.append(f"📁 File đã lưu tại: {self.patched_dir}")
         self.fm_log_output.append("="*30)
+        
+        # Reset detected files for next batch
+        self.smart_detected_files = {}
+        self.smart_selected_paths = []
+        self.smart_file_display.setText("")
+        self.smart_patch_btn.setEnabled(False)
+        self.fm_log_output.append("\n💡 Kéo thả file mới để tiếp tục...")
     
     def smart_on_gps_finished(self, success, msg):
         """Callback for GPS patch finished in smart auto patch"""

@@ -9,11 +9,22 @@ def is_admin():
     except:
         return False
 
-# CRITICAL: Auto-elevate to Admin if not already
-if not is_admin():
-    # Re-run the program with admin rights
-    ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
-    sys.exit()
+# TEMPORARILY DISABLED: Auto-elevate to Admin
+# Uncomment to re-enable admin mode
+# if not is_admin():
+#     # Re-run the program with admin rights using pythonw.exe (no console)
+#     script = os.path.abspath(__file__)
+#     params = f'"{script}"'
+#     if len(sys.argv) > 1:
+#         params += ' ' + ' '.join(f'"{arg}"' for arg in sys.argv[1:])
+#     
+#     # Use pythonw.exe instead of python.exe to avoid console window
+#     pythonw = sys.executable.replace('python.exe', 'pythonw.exe')
+#     if not os.path.exists(pythonw):
+#         pythonw = sys.executable  # Fallback to python.exe if pythonw not found
+#     
+#     ctypes.windll.shell32.ShellExecuteW(None, "runas", pythonw, params, None, 1)
+#     sys.exit()
 
 # CRITICAL: Set working directory
 try:
@@ -80,6 +91,36 @@ def global_exception_handler(exc_type, exc_value, exc_traceback):
 # Install global exception handler
 sys.excepthook = global_exception_handler
 
+# CRITICAL: Allow drag-drop from non-elevated processes (Explorer) to this elevated app
+# Windows UIPI (User Interface Privilege Isolation) blocks drag-drop by default
+def enable_drag_drop_for_elevated_app():
+    """Allow drag-drop messages to pass through UIPI when running as admin."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        
+        # Message filter constants
+        MSGFLT_ALLOW = 1
+        WM_DROPFILES = 0x0233
+        WM_COPYDATA = 0x004A
+        WM_COPYGLOBALDATA = 0x0049
+        
+        # ChangeWindowMessageFilter - allows messages through UIPI
+        ChangeWindowMessageFilter = ctypes.windll.user32.ChangeWindowMessageFilter
+        ChangeWindowMessageFilter.argtypes = [wintypes.UINT, wintypes.DWORD]
+        ChangeWindowMessageFilter.restype = wintypes.BOOL
+        
+        # Allow drag-drop related messages
+        ChangeWindowMessageFilter(WM_DROPFILES, MSGFLT_ALLOW)
+        ChangeWindowMessageFilter(WM_COPYDATA, MSGFLT_ALLOW)
+        ChangeWindowMessageFilter(WM_COPYGLOBALDATA, MSGFLT_ALLOW)
+        
+        print("✓ UIPI bypass enabled for drag-drop")
+    except Exception as e:
+        print(f"⚠️ Could not enable UIPI bypass: {e}")
+
+# Enable drag-drop BEFORE creating any windows
+enable_drag_drop_for_elevated_app()
 
 from PySide6.QtWidgets import QApplication, QMessageBox
 from core.config_manager import ConfigManager

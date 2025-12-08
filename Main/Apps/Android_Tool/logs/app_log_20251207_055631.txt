@@ -1,0 +1,41 @@
+05:56:31 | INFO | ============================================================
+05:56:31 | INFO | 🚀 TOOL HUB STARTED
+05:56:31 | INFO | ============================================================
+05:56:31 | INFO | 💾 Config loaded from: C:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\config\config.json
+05:56:31 | INFO | 📋 All function logs connected to shared output panel
+05:56:31 | INFO | 📱 Shared log output connected to ModAndroid
+05:56:31 | INFO | ✅ ModAndroid module loaded successfully
+05:56:31 | INFO | 📂 Đã load cache cho 9 sessions
+05:56:31 | INFO | 📂 Đã load 2 nhóm session
+05:56:31 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+05:56:31 | INFO | 📂 Restore nhóm đã chọn: M1
+05:56:31 | INFO | 📊 Hiển thị nhóm 'M1' với 102 sessions
+05:56:31 | INFO | 📱 Đã load 2 nhóm session
+05:56:31 | INFO | ✅ Telegram module loaded successfully
+05:56:31 | INFO | ============================================================
+05:56:31 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+05:56:31 | INFO | ============================================================
+05:56:31 | INFO | ✅ Loaded modules (2):
+05:56:31 | INFO |    - 📱 Mod Android
+05:56:31 | INFO |    - 💬 Telegram
+05:56:31 | INFO | ============================================================
+05:56:42 | CRITICAL | ❌ UNCAUGHT EXCEPTION:
+Traceback (most recent call last):
+  File "C:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\ModAndroid.pyw", line 1983, in rom_tools_tab_dropEvent
+    self.smart_handle_dropped_paths(paths)
+  File "C:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\ModAndroid.pyw", line 3551, in smart_handle_dropped_paths
+    self.fm_log_output.append(f"✅ Phát hiện: {file_type} → {os.path.basename(path)}")
+  File "C:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\ModAndroid.pyw", line 1556, in append
+    from PyQt6.QtGui import QTextCursor
+ModuleNotFoundError: No module named 'PyQt6.QtGui'
+05:56:42 | CRITICAL | ============================================================
+05:57:14 | CRITICAL | ❌ UNCAUGHT EXCEPTION:
+Traceback (most recent call last):
+  File "C:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\ModAndroid.pyw", line 3533, in smart_choose_file_or_folder
+    self.smart_handle_dropped_paths([file_path])
+  File "C:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\ModAndroid.pyw", line 3551, in smart_handle_dropped_paths
+    self.fm_log_output.append(f"✅ Phát hiện: {file_type} → {os.path.basename(path)}")
+  File "C:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\ModAndroid.pyw", line 1556, in append
+    from PyQt6.QtGui import QTextCursor
+ModuleNotFoundError: No module named 'PyQt6.QtGui'
+05:57:14 | CRITICAL | ============================================================

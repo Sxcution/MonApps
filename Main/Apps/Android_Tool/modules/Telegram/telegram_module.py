@@ -17,12 +17,25 @@ logger = logging.getLogger('telegram_module')
 
 from PySide6.QtCore import Qt, QThread, Signal, Slot, QObject, QTimer, QRect, QPoint
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton,
+    QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
     QTextEdit, QLabel, QFileDialog, QMessageBox, QCheckBox,
     QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget,
     QComboBox, QMenu, QStyle, QStyledItemDelegate
 )
 from PySide6.QtGui import QFont, QAction, QCursor, QPainter, QPen, QColor
+
+# Fluent UI Components
+try:
+    from qfluentwidgets import (
+        PushButton, PrimaryPushButton, TransparentPushButton,
+        InfoBar, InfoBarPosition
+    )
+    HAS_FLUENT = True
+except ImportError:
+    from PySide6.QtWidgets import QPushButton as PushButton
+    PrimaryPushButton = PushButton
+    TransparentPushButton = PushButton
+    HAS_FLUENT = False
 
 
 class CheckBoxHeader(QHeaderView):
@@ -950,7 +963,7 @@ class TelegramToolWidget(QWidget):
         control_row = QHBoxLayout()
         
         # Left side: Run button + Delay settings
-        self.run_stop_btn = QPushButton("▶️ Run")
+        self.run_stop_btn = PushButton("▶️ Run")
         self.run_stop_btn.setFont(QFont('Segoe UI', 10, QFont.Weight.Bold))
         self.run_stop_btn.clicked.connect(self.toggle_run_stop)
         self.run_stop_btn.setMinimumWidth(100)
@@ -978,7 +991,7 @@ class TelegramToolWidget(QWidget):
         control_row.addWidget(QLabel("|"))
         
         # Right side: Session management (after Random)
-        self.session_btn = QPushButton("📁 Session")
+        self.session_btn = PushButton("📁 Session")
         self.session_btn.setMinimumWidth(100)
         self.session_btn.clicked.connect(self.show_session_menu)
         control_row.addWidget(self.session_btn)
@@ -1063,11 +1076,11 @@ class TelegramToolWidget(QWidget):
         # Left side: Scenario header + buttons
         scenario_header = QHBoxLayout()
         scenario_header.addWidget(QLabel("Kịch bản (mỗi dòng một nội dung):"))
-        gen_btn = QPushButton("🎲 Tạo Kịch Bản")
+        gen_btn = PushButton("🎲 Tạo Kịch Bản")
         gen_btn.setMaximumWidth(130)
         gen_btn.clicked.connect(self.generate_scenario)
         scenario_header.addWidget(gen_btn)
-        save_btn = QPushButton("💾 Lưu Mẫu")
+        save_btn = PushButton("💾 Lưu Mẫu")
         save_btn.setMaximumWidth(100)
         save_btn.clicked.connect(self.save_scenario)
         scenario_header.addWidget(save_btn)
@@ -1077,7 +1090,7 @@ class TelegramToolWidget(QWidget):
         # Right side: Admin header + button
         admin_header = QHBoxLayout()
         admin_header.addWidget(QLabel("Nội dung Admin trả lời:"))
-        save_admin_btn = QPushButton("💾 Lưu")
+        save_admin_btn = PushButton("💾 Lưu")
         save_admin_btn.setMaximumWidth(80)
         save_admin_btn.clicked.connect(self.save_admin_responses)
         admin_header.addWidget(save_admin_btn)
@@ -1282,12 +1295,12 @@ class TelegramToolWidget(QWidget):
         layout.addWidget(list_widget)
         
         # Delete button
-        delete_btn = QPushButton("❌ Xóa Nhóm Đã Chọn")
+        delete_btn = PushButton("❌ Xóa Nhóm Đã Chọn")
         delete_btn.clicked.connect(lambda: self.delete_selected_group(list_widget, dialog))
         layout.addWidget(delete_btn)
         
         # Close button
-        close_btn = QPushButton("Đóng")
+        close_btn = PushButton("Đóng")
         close_btn.clicked.connect(dialog.accept)
         layout.addWidget(close_btn)
         

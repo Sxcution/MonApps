@@ -140,21 +140,62 @@ class SettingsInterface(QWidget):
         ConfigManager.save(self.config)
         startup_folder = os.path.join(os.getenv('APPDATA'), r'Microsoft\Windows\Start Menu\Programs\Startup')
         shortcut_path = os.path.join(startup_folder, "MonToolHub.lnk")
+        vbs_path = os.path.join(startup_folder, "MonToolHub_Admin.vbs")
+        
         if checked:
-            target = os.path.abspath(sys.argv[0])
-            working_dir = os.path.dirname(target)
-            script = f'$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut("{shortcut_path}"); $s.TargetPath = "{sys.executable}"; $s.Arguments = "{target}"; $s.WorkingDirectory = "{working_dir}"; $s.Save()'
-            subprocess.run(["powershell", "-Command", script], shell=True)
-            InfoBar.success("Thành công", "Đã thêm vào khởi động cùng Windows", parent=self.window())
+            # Get absolute path to Main.pyw using __file__ of Main module
+            main_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            target_script = os.path.join(main_dir, "Main.pyw")
+            
+            # Use pythonw.exe to avoid console window
+            pythonw = sys.executable.replace('python.exe', 'pythonw.exe')
+            if not os.path.exists(pythonw):
+                pythonw = sys.executable
+            
+            try:
+                # Create .lnk shortcut using PowerShell (no UAC needed, works at startup)
+                # ShellExecute "runas" in VBS CANNOT work at Windows startup because no one clicks UAC
+                ps_command = f'''
+$WshShell = New-Object -ComObject WScript.Shell
+$Shortcut = $WshShell.CreateShortcut("{shortcut_path}")
+$Shortcut.TargetPath = "{pythonw}"
+$Shortcut.Arguments = '"{target_script}"'
+$Shortcut.WorkingDirectory = "{main_dir}"
+$Shortcut.WindowStyle = 7
+$Shortcut.Save()
+'''
+                result = subprocess.run(
+                    ["powershell", "-Command", ps_command],
+                    capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW
+                )
+                
+                if result.returncode != 0:
+                    raise Exception(f"PowerShell error: {result.stderr}")
+                
+                # Remove old VBS script if exists (from previous version)
+                if os.path.exists(vbs_path):
+                    os.remove(vbs_path)
+                
+                print(f"✓ Startup shortcut created: {shortcut_path}")
+                print(f"  Target: {pythonw} \"{target_script}\"")
+                InfoBar.info("Đã bật", "Đã thêm vào khởi động cùng Windows", parent=self.window())
+            except Exception as e:
+                print(f"✗ Failed to create startup: {e}")
+                InfoBar.error("Lỗi", f"Không thể tạo startup: {e}", parent=self.window())
         else:
+            # Remove shortcut
             if os.path.exists(shortcut_path):
                 os.remove(shortcut_path)
-                InfoBar.success("Thành công", "Đã gỡ khỏi khởi động cùng Windows", parent=self.window())
+            # Remove old VBS if exists
+            if os.path.exists(vbs_path):
+                os.remove(vbs_path)
+            print(f"✓ Startup removed")
+            InfoBar.info("Đã tắt", "Đã gỡ khỏi khởi động cùng Windows", parent=self.window())
 
     def on_run_in_background_changed(self, checked):
         self.config["run_in_background"] = checked
         ConfigManager.save(self.config)
-        InfoBar.success("Đã lưu", "Cài đặt chạy ngầm đã được cập nhật", parent=self.window())
+        InfoBar.info("Đã lưu", "Cài đặt chạy ngầm đã được cập nhật", parent=self.window())
 
     def on_external_changed(self, key, checked):
         self.config[key] = checked
