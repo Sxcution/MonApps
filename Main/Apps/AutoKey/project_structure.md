@@ -28,6 +28,7 @@
 - `styles.py`: CSS stylesheets for the application.
 
 ## Utils (`utils/`)
+- `preset_shortcuts.py`: Preset keyboard shortcut definitions (Alt+Tab, Ctrl+Shift+Esc, etc.)
 - `direct_input.py`: Low-level Windows API wrapper for DirectInput simulation (games).
 - `image_finder.py`: OpenCV wrapper for image matching.
 - `window_utils.py`: Helpers for window management (focus, rect).

@@ -195,8 +195,16 @@ class MouseActionDialog(QDialog):
             # Load duration for hold
             self.duration_spin.setValue(self.event_data.get('duration', 500))
         elif etype == 'mouse_click':
+            click_count = self.event_data.get('click_count', 1)
+            try:
+                click_count = int(click_count)
+            except (TypeError, ValueError):
+                click_count = 1
+
             if button == 'Button.right':
                 self.type_combo.setCurrentText("Click Phải")
+            elif click_count >= 2:
+                self.type_combo.setCurrentText("Double Click")
             else:
                 self.type_combo.setCurrentText("Click")
                 
@@ -256,7 +264,12 @@ class MouseActionDialog(QDialog):
             data['pressed'] = True 
             if etype_text == "Click Phải":
                 data['button'] = 'Button.right'
+                data['click_count'] = 1
+            elif etype_text == "Double Click":
+                data['button'] = 'Button.left'
+                data['click_count'] = 2
             else:
                 data['button'] = 'Button.left'
+                data['click_count'] = 1
                 
         return data

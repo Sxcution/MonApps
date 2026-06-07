@@ -9,22 +9,21 @@ def is_admin():
     except:
         return False
 
-# TEMPORARILY DISABLED: Auto-elevate to Admin
-# Uncomment to re-enable admin mode
-# if not is_admin():
-#     # Re-run the program with admin rights using pythonw.exe (no console)
-#     script = os.path.abspath(__file__)
-#     params = f'"{script}"'
-#     if len(sys.argv) > 1:
-#         params += ' ' + ' '.join(f'"{arg}"' for arg in sys.argv[1:])
-#     
-#     # Use pythonw.exe instead of python.exe to avoid console window
-#     pythonw = sys.executable.replace('python.exe', 'pythonw.exe')
-#     if not os.path.exists(pythonw):
-#         pythonw = sys.executable  # Fallback to python.exe if pythonw not found
-#     
-#     ctypes.windll.shell32.ShellExecuteW(None, "runas", pythonw, params, None, 1)
-#     sys.exit()
+# ✅ RE-ENABLED: Auto-elevate to Admin (required for AutoKey hotkeys in games)
+if not is_admin():
+    # Re-run the program with admin rights using pythonw.exe (no console)
+    script = os.path.abspath(__file__)
+    params = f'"{script}"'
+    if len(sys.argv) > 1:
+        params += ' ' + ' '.join(f'"{arg}"' for arg in sys.argv[1:])
+    
+    # Use pythonw.exe instead of python.exe to avoid console window
+    pythonw = sys.executable.replace('python.exe', 'pythonw.exe')
+    if not os.path.exists(pythonw):
+        pythonw = sys.executable  # Fallback to python.exe if pythonw not found
+    
+    ctypes.windll.shell32.ShellExecuteW(None, "runas", pythonw, params, None, 1)
+    sys.exit()
 
 # CRITICAL: Set working directory
 try:

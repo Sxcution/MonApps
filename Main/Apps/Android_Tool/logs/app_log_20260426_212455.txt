@@ -1,0 +1,19 @@
+21:24:55 | INFO | ============================================================
+21:24:55 | INFO | 🚀 TOOL HUB STARTED
+21:24:55 | INFO | ============================================================
+21:24:56 | INFO | 💾 Config loaded from: c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\config\config.json
+21:24:56 | INFO | 📋 All function logs connected to shared output panel
+21:24:56 | INFO | 📱 Shared log output connected to ModAndroid
+21:24:56 | INFO | ✅ ModAndroid module loaded successfully
+21:24:56 | INFO | ============================================================
+21:24:56 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+21:24:56 | INFO | ============================================================
+21:24:56 | INFO | ✅ Loaded modules (2):
+21:24:56 | INFO |    - 📱 Mod Android
+21:24:56 | INFO |    - 💬 Telegram
+21:24:56 | INFO | ============================================================
+21:28:18 | INFO | response: https://www.bing.com/search?q=gi%C3%A1+v%C3%A0ng+h%C3%B4m+nay 200
+21:28:38 | INFO | Error to search using bing backend: https://www.bing.com/search RuntimeError: error sending request for url (https://www.bing.com/search?q=gi%C3%A1+v%C3%A0ng+SJC+h%C3%B4m+nay): operation timed out
+
+Caused by:
+    operation timed out

@@ -3,6 +3,7 @@ import json
 import traceback
 import sys
 import os
+import subprocess
 from datetime import datetime
 
 # Add parent directory to path to import from Main/core
@@ -14,8 +15,12 @@ from core.system_controller import SystemController
 
 class AIHandler:
     """
-    Handles communication with Google Gemini API and executes function calls.
+    Handles communication with AI providers and executes function calls.
     """
+    DEFAULT_HERMES_SCRIPT = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..", "Mon AI", "hermes")
+    )
+
     # Enhanced system instruction for ChatGPT-level intelligence
     ENHANCED_SYSTEM_INSTRUCTION = """Bạn là Mon Assistant - Trợ lý AI thông minh cho Windows.
 
@@ -72,19 +77,52 @@ class AIHandler:
 - Dùng emoji 🔍📊💡⚠️✅❌🚀 để sinh động.
 """
 
-    def __init__(self, api_key: str, model_name: str = "gemini-2.5-flash", logger=None):
+    def __init__(
+        self,
+        api_key: str,
+        model_name: str = "gemini-2.5-flash",
+        logger=None,
+        provider: str = "gemini",
+        hermes_path: str = "",
+        hermes_model: str = "",
+        hermes_provider: str = "",
+        hermes_toolsets: str = "",
+        hermes_timeout: int = 240,
+    ):
         self.api_key = api_key
         self.model_name = model_name
         self.chat_session = None
+        self.model = None
+        self.tools = []
         self.logger = logger # ChatLogger instance
+        self.provider = self._normalize_provider(provider)
+        self.hermes_path = hermes_path or self.DEFAULT_HERMES_SCRIPT
+        self.hermes_model = (hermes_model or "").strip()
+        self.hermes_provider = (hermes_provider or "").strip()
+        self.hermes_toolsets = (hermes_toolsets or "").strip()
+        self.hermes_timeout = hermes_timeout
         
-        if self.api_key:
+        if self.provider == "hermes":
+            print(f"AIHandler: Hermes Agent provider enabled: {self.hermes_path}")
+        elif self.api_key:
             self._configure_genai()
         else:
             print("⚠️ AIHandler: No API Key provided.")
 
+    def _normalize_provider(self, provider: str) -> str:
+        value = (provider or "gemini").strip().lower()
+        if value in {"hermes", "hermes agent", "hermes-agent"}:
+            return "hermes"
+        return "gemini"
+
     def _configure_genai(self):
         try:
+            self.chat_session = None
+            self.model = None
+            if not self.api_key:
+                print("AIHandler: Gemini API key is empty.")
+                return
+
             genai.configure(api_key=self.api_key)
             
             # Inject dynamic context (Time & Location)
@@ -309,14 +347,158 @@ class AIHandler:
 
     def update_api_key(self, api_key: str):
         """Update API Key and reconfigure."""
-        self.api_key = api_key
+        self.update_settings(api_key=api_key)
+
+    def update_settings(
+        self,
+        api_key: str = None,
+        model_name: str = None,
+        provider: str = None,
+        hermes_path: str = None,
+        hermes_model: str = None,
+        hermes_provider: str = None,
+        hermes_toolsets: str = None,
+    ):
+        """Update provider settings and reconfigure the active backend."""
+        if api_key is not None:
+            self.api_key = api_key
+        if model_name is not None:
+            self.model_name = model_name
+        if provider is not None:
+            self.provider = self._normalize_provider(provider)
+        if hermes_path is not None:
+            self.hermes_path = hermes_path or self.DEFAULT_HERMES_SCRIPT
+        if hermes_model is not None:
+            self.hermes_model = (hermes_model or "").strip()
+        if hermes_provider is not None:
+            self.hermes_provider = (hermes_provider or "").strip()
+        if hermes_toolsets is not None:
+            self.hermes_toolsets = (hermes_toolsets or "").strip()
+
+        self.chat_session = None
+        self.model = None
+        if self.provider == "hermes":
+            print(f"AIHandler: Switched to Hermes Agent: {self.hermes_path}")
+            return
+
         self._configure_genai()
+
+    def _resolve_hermes_script(self) -> str:
+        path = os.path.expandvars(os.path.expanduser(self.hermes_path or self.DEFAULT_HERMES_SCRIPT))
+        if os.path.isdir(path):
+            for name in ("hermes", "hermes.py", "cli.py"):
+                candidate = os.path.join(path, name)
+                if os.path.exists(candidate):
+                    return candidate
+        return path
+
+    def _resolve_hermes_python(self, hermes_script: str) -> str:
+        hermes_dir = os.path.dirname(os.path.abspath(hermes_script))
+        candidates = [
+            os.path.join(hermes_dir, ".venv", "Scripts", "python.exe"),
+            os.path.join(hermes_dir, "venv", "Scripts", "python.exe"),
+            sys.executable,
+        ]
+        for candidate in candidates:
+            if candidate and os.path.exists(candidate):
+                return candidate
+        return sys.executable
+
+    def _default_hermes_model(self) -> str:
+        if (self.model_name or "").lower().startswith("gemini"):
+            return self.model_name
+        return ""
+
+    def _infer_hermes_provider(self, model_name: str) -> str:
+        model = (model_name or "").strip().lower()
+        if model.startswith("gemini") or model.startswith("google/"):
+            return "gemini"
+        if model.startswith("gpt-") or model.startswith("openai/"):
+            return "openai"
+        return ""
+
+    def _build_hermes_command(self, prompt: str):
+        hermes_script = self._resolve_hermes_script()
+        if not os.path.exists(hermes_script):
+            raise FileNotFoundError(f"Hermes launcher not found: {hermes_script}")
+
+        cmd = [self._resolve_hermes_python(hermes_script), hermes_script, "-z", prompt]
+        effective_model = self.hermes_model or self._default_hermes_model()
+        effective_provider = self.hermes_provider or self._infer_hermes_provider(effective_model)
+        if effective_model:
+            cmd.extend(["-m", effective_model])
+        if effective_provider:
+            cmd.extend(["--provider", effective_provider])
+        if self.hermes_toolsets:
+            cmd.extend(["-t", self.hermes_toolsets])
+        return cmd, os.path.dirname(os.path.abspath(hermes_script))
+
+    def _format_hermes_failure(self, returncode: int, details: str) -> str:
+        text = details or "Hermes returned without details."
+        lower = text.lower()
+        if "gemini http 503" in lower or "unavailable" in lower or "high demand" in lower:
+            return (
+                "Hermes Agent dang goi Gemini ben trong va Gemini tra ve HTTP 503 "
+                "(qua tai/tam thoi khong san sang). Thu lai sau vai phut, hoac trong Settings "
+                "doi Hermes model sang gemini-2.5-flash / provider gemini, hoac dung provider khac nhu openai."
+            )
+        return f"Hermes Agent error ({returncode}): {text[-3000:]}"
+
+    def _process_hermes_message(self, user_text: str, image_data: bytes = None) -> str:
+        if image_data:
+            return "Hermes Agent trong Mon Apps chua nhan anh truc tiep. Hay doi sang Gemini neu can hoi bang anh, hoac go noi dung anh thanh chu."
+
+        prompt = (user_text or "").strip()
+        if not prompt:
+            return "Hay nhap noi dung truoc khi gui Hermes Agent."
+
+        if self.logger:
+            self.logger.log_turn("user", prompt, {"provider": "hermes"})
+
+        try:
+            cmd, cwd = self._build_hermes_command(prompt)
+            env = os.environ.copy()
+            env["PYTHONIOENCODING"] = "utf-8"
+            env["PYTHONUTF8"] = "1"
+            creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+            print(f"AIHandler: Sending to Hermes Agent via {cmd[0]}")
+            completed = subprocess.run(
+                cmd,
+                cwd=cwd,
+                env=env,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=self.hermes_timeout,
+                creationflags=creationflags,
+            )
+            stdout = (completed.stdout or "").strip()
+            stderr = (completed.stderr or "").strip()
+            if completed.returncode != 0:
+                details = stderr or stdout or "Hermes returned without details."
+                reply = self._format_hermes_failure(completed.returncode, details)
+            else:
+                reply = stdout or stderr or "Hermes Agent khong tra ve noi dung."
+
+            if self.logger:
+                self.logger.log_turn("model", reply, {"provider": "hermes", "returncode": completed.returncode})
+            return reply
+        except subprocess.TimeoutExpired:
+            return f"Hermes Agent qua thoi gian cho ({self.hermes_timeout}s)."
+        except Exception as e:
+            print(f"AIHandler: Hermes error: {e}")
+            traceback.print_exc()
+            return f"Hermes Agent error: {str(e)}"
 
     def process_message(self, user_text: str, image_data: bytes = None) -> str:
         """
-        Send message to Gemini, handle function calls automatically, and return response.
-        Supports optional image data (bytes).
+        Send message to the active AI provider and return response text.
+        Gemini supports optional image data and local function calls.
         """
+        if self.provider == "hermes":
+            return self._process_hermes_message(user_text, image_data)
+
         if not self.api_key or not self.chat_session:
             return "⚠️ Please configure your Gemini API Key in Settings first."
 
@@ -383,9 +565,13 @@ class AIHandler:
     
     def process_message_stream(self, user_text: str, image_data: bytes = None):
         """
-        Stream message to Gemini, yield chunks as they arrive.
-        Supports multi-turn function calling (Tool Chaining).
+        Stream message from the active AI provider, yielding chunks as they arrive.
+        Hermes one-shot mode returns one final chunk.
         """
+        if self.provider == "hermes":
+            yield self._process_hermes_message(user_text, image_data)
+            return
+
         if not self.api_key or not self.chat_session:
             yield "⚠️ Please configure your Gemini API Key in Settings first."
             return

@@ -15,6 +15,11 @@ import json
 import os
 
 
+def default_hermes_path():
+    return os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..", "Mon AI", "hermes")
+    )
+
 
 class AIWorker(QThread):
     """Background worker for AI processing (non-streaming)."""
@@ -61,6 +66,38 @@ class AIStreamWorker(QThread):
         """Request to stop streaming."""
         self._stop_requested = True
 
+class ClickableImageLabel(QLabel):
+    """A QLabel that shows an image and opens it in fullscreen when clicked."""
+    def __init__(self, pixmap, parent=None):
+        super().__init__(parent)
+        self.orig_pixmap = pixmap
+        self.setCursor(Qt.PointingHandCursor)
+        
+    def mousePressEvent(self, ev):
+        if ev.button() == Qt.LeftButton:
+            dlg = QDialog(self.window())
+            dlg.setWindowTitle("Image Viewer")
+            dlg.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
+            dlg.setStyleSheet("background-color: rgba(0, 0, 0, 0.9);")
+            layout = QVBoxLayout(dlg)
+            layout.setContentsMargins(0, 0, 0, 0)
+            
+            lbl = QLabel()
+            lbl.setAlignment(Qt.AlignCenter)
+            
+            # Scale to fit most of the screen
+            screen = QApplication.primaryScreen().availableGeometry()
+            scaled = self.orig_pixmap.scaled(screen.width() * 0.9, screen.height() * 0.9, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            lbl.setPixmap(scaled)
+            
+            layout.addWidget(lbl)
+            
+            # Click to close
+            lbl.mousePressEvent = lambda e: dlg.close()
+            dlg.mousePressEvent = lambda e: dlg.close()
+            dlg.exec()
+        super().mousePressEvent(ev)
+
 class MarkdownLabel(QTextBrowser):
     """Custom widget to render markdown with syntax highlighting."""
     def __init__(self, parent=None):
@@ -99,13 +136,31 @@ class ChatSettings:
     # Use absolute path relative to AIChat module to ensure persistence works
     SETTINGS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "chat_settings.json")
 
-    def __init__(self, api_keys: list = None, active_key_index: int = 0, bot_name: str = "Mon Assistant", system_rule: str = "", model_name: str = "gemini-2.5-flash", enable_streaming: bool = True):
+    def __init__(
+        self,
+        api_keys: list = None,
+        active_key_index: int = 0,
+        bot_name: str = "Mon Assistant",
+        system_rule: str = "",
+        model_name: str = "gemini-2.5-flash",
+        enable_streaming: bool = True,
+        provider: str = "gemini",
+        hermes_path: str = "",
+        hermes_model: str = "",
+        hermes_provider: str = "",
+        hermes_toolsets: str = "",
+    ):
         self.api_keys = api_keys
         self.active_key_index = active_key_index
         self.bot_name = bot_name
         self.system_rule = system_rule
         self.model_name = model_name
         self.enable_streaming = enable_streaming
+        self.provider = provider or "gemini"
+        self.hermes_path = hermes_path or default_hermes_path()
+        self.hermes_model = hermes_model or ""
+        self.hermes_provider = hermes_provider or ""
+        self.hermes_toolsets = hermes_toolsets or ""
         
         if self.api_keys is None:
             self.api_keys = [{"name": "Default", "key": ""}]
@@ -125,9 +180,15 @@ class ChatSettings:
             "bot_name": self.bot_name,
             "system_rule": self.system_rule,
             "model_name": self.model_name,
-            "enable_streaming": self.enable_streaming
+            "enable_streaming": self.enable_streaming,
+            "provider": self.provider,
+            "hermes_path": self.hermes_path,
+            "hermes_model": self.hermes_model,
+            "hermes_provider": self.hermes_provider,
+            "hermes_toolsets": self.hermes_toolsets
         }
         try:
+            os.makedirs(os.path.dirname(self.SETTINGS_FILE), exist_ok=True)
             with open(self.SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
             print("✅ ChatSettings saved.")
@@ -148,6 +209,11 @@ class ChatSettings:
                 self.system_rule = data.get("system_rule", "")
                 self.model_name = data.get("model_name", "gemini-2.5-flash")
                 self.enable_streaming = data.get("enable_streaming", True)
+                self.provider = data.get("provider", "gemini")
+                self.hermes_path = data.get("hermes_path", default_hermes_path())
+                self.hermes_model = data.get("hermes_model", "")
+                self.hermes_provider = data.get("hermes_provider", "")
+                self.hermes_toolsets = data.get("hermes_toolsets", "")
             print("✅ ChatSettings loaded.")
         except Exception as e:
             print(f"❌ Error loading ChatSettings: {e}")
@@ -344,10 +410,10 @@ class ChatSettingsDialog(QDialog):
         super().__init__(parent)
         self.settings = settings
         self.setWindowTitle("Cài đặt Chatbot")
-        self.resize(500, 600)
+        self.resize(560, 760)
         
         # Fix black background by setting a theme-aware background
-        bg_color = "#2b2b2b" if isDarkTheme() else "#f9f9f9"
+        bg_color = "#121212" if isDarkTheme() else "#f9f9f9"
         self.setStyleSheet(f"QDialog {{ background-color: {bg_color}; }}")
         
         layout = QVBoxLayout(self)
@@ -363,6 +429,18 @@ class ChatSettingsDialog(QDialog):
         self.bot_name_input.setPlaceholderText("Tên Bot")
         self.bot_name_input.setText(self.settings.bot_name)
         layout.addWidget(self.bot_name_input)
+
+        # Provider Selection
+        layout.addWidget(BodyLabel("AI Provider:", self))
+        self.provider_combo = ComboBox(self)
+        self.provider_combo.addItems(["Gemini", "Hermes Agent"])
+        self.provider_map = {
+            0: "gemini",
+            1: "hermes"
+        }
+        provider_index = 1 if self.settings.provider == "hermes" else 0
+        self.provider_combo.setCurrentIndex(provider_index)
+        layout.addWidget(self.provider_combo)
         
         # API Keys Section
         layout.addWidget(BodyLabel("Danh sách API Key:", self))
@@ -415,6 +493,31 @@ class ChatSettingsDialog(QDialog):
                 self.model_combo.setCurrentIndex(idx)
                 break
         layout.addWidget(self.model_combo)
+
+        # Hermes Agent options
+        layout.addWidget(BodyLabel("Hermes launcher:", self))
+        self.hermes_path_input = LineEdit(self)
+        self.hermes_path_input.setPlaceholderText("C:\\Users\\Mon\\Desktop\\Protect\\Mon AI\\hermes")
+        self.hermes_path_input.setText(self.settings.hermes_path or default_hermes_path())
+        layout.addWidget(self.hermes_path_input)
+
+        layout.addWidget(BodyLabel("Hermes model (optional):", self))
+        self.hermes_model_input = LineEdit(self)
+        self.hermes_model_input.setPlaceholderText("Blank = Gemini model đang chọn")
+        self.hermes_model_input.setText(self.settings.hermes_model)
+        layout.addWidget(self.hermes_model_input)
+
+        layout.addWidget(BodyLabel("Hermes provider (optional):", self))
+        self.hermes_provider_input = LineEdit(self)
+        self.hermes_provider_input.setPlaceholderText("Blank = tự suy ra từ model")
+        self.hermes_provider_input.setText(self.settings.hermes_provider)
+        layout.addWidget(self.hermes_provider_input)
+
+        layout.addWidget(BodyLabel("Hermes toolsets (optional):", self))
+        self.hermes_toolsets_input = LineEdit(self)
+        self.hermes_toolsets_input.setPlaceholderText("Example: default,web")
+        self.hermes_toolsets_input.setText(self.settings.hermes_toolsets)
+        layout.addWidget(self.hermes_toolsets_input)
         
         # Streaming Enable/Disable
         from qfluentwidgets import SwitchButton
@@ -506,7 +609,12 @@ class ChatSettingsDialog(QDialog):
             bot_name=self.bot_name_input.text().strip() or "Mon Assistant",
             system_rule=self.rule_input.toPlainText().strip(),
             model_name=self.model_map[self.model_combo.currentIndex()],
-            enable_streaming=self.streaming_switch.isChecked()
+            enable_streaming=self.streaming_switch.isChecked(),
+            provider=self.provider_map.get(self.provider_combo.currentIndex(), "gemini"),
+            hermes_path=self.hermes_path_input.text().strip() or default_hermes_path(),
+            hermes_model=self.hermes_model_input.text().strip(),
+            hermes_provider=self.hermes_provider_input.text().strip(),
+            hermes_toolsets=self.hermes_toolsets_input.text().strip()
         )
 
 class DraggableButton(QPushButton):
@@ -610,7 +718,16 @@ class ChatBubble(QWidget):
         self.setMouseTracking(True) # Enable mouse tracking for cursor update
         
         # Initialize AI Handler with model from settings and logger
-        self.ai_handler = AIHandler(self.settings.current_key, self.settings.model_name, logger=self.logger)
+        self.ai_handler = AIHandler(
+            self.settings.current_key,
+            self.settings.model_name,
+            logger=self.logger,
+            provider=self.settings.provider,
+            hermes_path=self.settings.hermes_path,
+            hermes_model=self.settings.hermes_model,
+            hermes_provider=self.settings.hermes_provider,
+            hermes_toolsets=self.settings.hermes_toolsets,
+        )
         
         # Setup UI - Initially as embedded widget (no overlay flags)
         # Will switch to overlay mode after first chat interaction
@@ -629,7 +746,7 @@ class ChatBubble(QWidget):
         # Set gray background to match Main window
         self.chat_card.setStyleSheet("""
             CardWidget {
-                background-color: #2b2b2b;
+                background-color: #121212;
                 border-radius: 10px;
             }
         """)
@@ -696,6 +813,7 @@ class ChatBubble(QWidget):
         # Calculate new maximum width for labels
         # 👉 Luôn update theo chiều rộng viewport hiện tại
         available_width = int(self.chat_list.viewport().width() * 0.9)
+        if available_width < 100: available_width = 300
         
         # Update all existing message labels
         for i in range(self.chat_list.count()):
@@ -706,8 +824,12 @@ class ChatBubble(QWidget):
                 # Find all QLabel widgets in the item
                 labels = widget.findChildren(BodyLabel)
                 for label in labels:
-                    # Update maximum width
-                    label.setMaximumWidth(available_width)
+                    text = label.text()
+                    if text:
+                        fm = label.fontMetrics()
+                        rect = fm.boundingRect(0, 0, available_width, 10000, Qt.TextWordWrap, text)
+                        calculated_width = rect.width() + 32
+                        label.setFixedWidth(min(calculated_width, available_width))
                     label.updateGeometry()
                 
                 # Update item size hint after label width change
@@ -756,7 +878,7 @@ class ChatBubble(QWidget):
         # ✅ Dark theme background for chat area with ID selector for higher specificity
         self.chat_list.setStyleSheet("""
             #chatHistoryList { 
-                background: #2b2b2b; 
+                background: #121212; 
                 border-radius: 5px; 
                 outline: none;
                 border: none;
@@ -1016,7 +1138,15 @@ class ChatBubble(QWidget):
                 self.settings.save() # ✅ Save to file
                 self.title_label.setText(self.settings.bot_name)
                 # Update API Key in AI Handler
-                self.ai_handler.update_api_key(self.settings.current_key)
+                self.ai_handler.update_settings(
+                    api_key=self.settings.current_key,
+                    model_name=self.settings.model_name,
+                    provider=self.settings.provider,
+                    hermes_path=self.settings.hermes_path,
+                    hermes_model=self.settings.hermes_model,
+                    hermes_provider=self.settings.hermes_provider,
+                    hermes_toolsets=self.settings.hermes_toolsets,
+                )
                 InfoBar.success("Thành công", "Đã lưu cài đặt Chatbot", parent=self.window())
         except Exception as e:
             print(f"❌ Error opening settings: {e}")
@@ -1135,7 +1265,7 @@ class ChatBubble(QWidget):
         
         # Add Image if present
         if image:
-            img_label = QLabel()
+            img_label = ClickableImageLabel(image)
             # Scale image for chat display
             scaled_pixmap = image.scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             img_label.setPixmap(scaled_pixmap)
@@ -1161,9 +1291,14 @@ class ChatBubble(QWidget):
             label.setWordWrap(True)
             label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
-            # 👉 Ép bubble user rộng ~90% chat_list để không bị wrap vô lý
+            # 👉 Tính toán chính xác word-wrap bounding box
             available_width = int(self.chat_list.viewport().width() * 0.9)
-            label.setFixedWidth(available_width)   # ⬅ THAY vì setMaximumWidth
+            if available_width < 100: available_width = 300
+            
+            fm = label.fontMetrics()
+            rect = fm.boundingRect(0, 0, available_width, 10000, Qt.TextWordWrap, text)
+            calculated_width = rect.width() + 32  # Padding + Buffer
+            label.setFixedWidth(min(calculated_width, available_width))
 
             content_layout.addWidget(label, 0, Qt.AlignRight)
             
@@ -1195,9 +1330,14 @@ class ChatBubble(QWidget):
         label.setWordWrap(True)
         label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         
-        # Set max width
+        # Tính toán chiều rộng chính xác cho tin nhắn bot
         available_width = int(self.chat_list.viewport().width() * 0.9)
-        label.setMaximumWidth(available_width)
+        if available_width < 100: available_width = 300
+        
+        fm = label.fontMetrics()
+        rect = fm.boundingRect(0, 0, available_width, 10000, Qt.TextWordWrap, text)
+        calculated_width = rect.width() + 32
+        label.setFixedWidth(min(calculated_width, available_width))
         
         # Add copy button
         copy_btn = TransparentToolButton(FIF.COPY, widget)
@@ -1260,7 +1400,7 @@ class ChatBubble(QWidget):
 
     def request_ai_reply(self, user_text: str, image: QPixmap = None):
         """
-        Call Gemini API via AIHandler with streaming or non-streaming based on settings.
+        Call the active AI provider via AIHandler with streaming or non-streaming based on settings.
         """
         # Convert QPixmap to bytes if present
         image_data = None
@@ -1294,6 +1434,15 @@ class ChatBubble(QWidget):
         if hasattr(self, 'streaming_label') and self.streaming_label:
             try:
                 self.streaming_label.setText(self.streaming_text)
+                
+                # Update text width dynamically
+                available_width = int(self.chat_list.viewport().width() * 0.9)
+                if available_width < 100: available_width = 300
+                fm = self.streaming_label.fontMetrics()
+                rect = fm.boundingRect(0, 0, available_width, 10000, Qt.TextWordWrap, self.streaming_text)
+                calculated_width = rect.width() + 32
+                self.streaming_label.setFixedWidth(min(calculated_width, available_width))
+                
                 self.streaming_widget.updateGeometry()
                 self._updateItemSize(self.streaming_item, self.streaming_widget)
                 # Force scroll to bottom

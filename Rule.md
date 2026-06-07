@@ -134,3 +134,9 @@
       2. **`naming_registry.json`:** Add new UI element IDs, button names, variable names
     - **Format:** Notify user when updates are complete
     - **Goal:** Keep documentation in sync with codebase to prevent orphan files and naming conflicts
+
+## XII. ECC PERFORMANCE SYSTEM (Everything Claude Code)
+20. **ECC Rules Integration:**
+    - **Location:** .agent/rules/
+    - **Action:** ALWAYS adhere to the coding standards, patterns, and security guidelines defined in the .agent/rules/ directory.
+    - **Priority:** In case of conflict, project-specific rules in this Rule.md take precedence, but ECC rules serve as the primary engineering standard.

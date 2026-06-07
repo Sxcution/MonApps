@@ -11,20 +11,26 @@ from datetime import datetime, timezone
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem,
     QHeaderView, QMessageBox, QMenu, QColorDialog, QInputDialog, QStyle, QStyledItemDelegate,
-    QSplitter, QApplication, QTextEdit
+    QSplitter, QApplication, QTextEdit, QDialog, QScrollArea, QDialogButtonBox,
+    QFormLayout
 )
 from PySide6.QtGui import (
     QFont, QColor, QFocusEvent, QAction, QTextCursor, QTextCharFormat, 
-    QDesktopServices, QPainter, QPen, QPixmap, QImage, QKeySequence, QBrush, QFontMetrics
+    QDesktopServices, QPainter, QPen, QPixmap, QImage, QKeySequence, QBrush, QFontMetrics,
+    QRegularExpressionValidator
 )
 from PySide6.QtCore import (
     Qt, QTimer, Signal, QUrl, QRect, QPoint,
-    QDateTime, QBuffer, QIODevice, QEvent, QSize, QByteArray, QThread
+    QDateTime, QBuffer, QIODevice, QEvent, QSize, QByteArray, QThread, QRegularExpression
 )
 
 import re
 import base64
 import json
+try:
+    import winsound
+except ImportError:
+    winsound = None
 
 # Import qfluentwidgets components
 from qfluentwidgets import (
@@ -391,6 +397,211 @@ class ProfileTooltip(QWidget):
         preview = ProfilePreviewWidget(data)
         self.container_layout.addWidget(preview)
 
+
+class NoteImagePreviewDialog(QDialog):
+    """Show a pasted note image at its stored full size."""
+
+    def __init__(self, pixmap, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("\u1ea2nh ghi ch\u00fa")
+        self.resize(min(pixmap.width() + 40, 1100), min(pixmap.height() + 70, 800))
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+
+        image_label = QLabel()
+        image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        image_label.setPixmap(pixmap)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(False)
+        scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        scroll.setWidget(image_label)
+        scroll.setStyleSheet("""
+            QScrollArea {
+                background-color: #1f1f1f;
+                border: 1px solid #454545;
+                border-radius: 6px;
+            }
+        """)
+        layout.addWidget(scroll)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+
+class ReminderDialog(QDialog):
+    """Dialog for setting a note reminder with plain text inputs."""
+
+    def __init__(self, parent=None, current_due_time=None):
+        super().__init__(parent)
+        self.setWindowTitle("Th\u00f4ng B\u00e1o")
+        self.setMinimumWidth(330)
+        self.clear_requested = False
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
+
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+
+        input_style = """
+            QLineEdit {
+                background-color: #2b2b2b;
+                color: #ffffff;
+                border: 1px solid #454545;
+                border-radius: 4px;
+                padding: 6px 8px;
+                selection-background-color: #0078d4;
+            }
+            QLineEdit:focus {
+                border: 1px solid #2986ff;
+            }
+        """
+
+        self.hour_input = LineEdit()
+        self.hour_input.setPlaceholderText("Hour")
+        self.hour_input.setMaximumWidth(70)
+        self.hour_input.setValidator(QRegularExpressionValidator(QRegularExpression(r"^\d{0,2}$"), self))
+        self.hour_input.setStyleSheet(input_style)
+
+        self.minute_input = LineEdit()
+        self.minute_input.setPlaceholderText("Minutes")
+        self.minute_input.setMaximumWidth(90)
+        self.minute_input.setValidator(QRegularExpressionValidator(QRegularExpression(r"^\d{0,2}$"), self))
+        self.minute_input.setStyleSheet(input_style)
+
+        time_row = QHBoxLayout()
+        time_row.setSpacing(8)
+        time_row.addWidget(self.hour_input)
+        time_row.addWidget(self.minute_input)
+        time_row.addStretch()
+
+        self.date_input = LineEdit()
+        self.date_input.setPlaceholderText("Ng\u00e0y/Th\u00e1ng/N\u0103m")
+        self.date_input.setValidator(QRegularExpressionValidator(QRegularExpression(r"^\d{0,2}/?\d{0,2}/?\d{0,4}$"), self))
+        self.date_input.setStyleSheet(input_style)
+
+        form.addRow("Hour / Minutes:", time_row)
+        form.addRow("Ng\u00e0y/Th\u00e1ng/N\u0103m:", self.date_input)
+        layout.addLayout(form)
+
+        now = datetime.now()
+        if current_due_time:
+            try:
+                due_dt = datetime.fromisoformat(current_due_time)
+                self.hour_input.setText(f"{due_dt.hour:02d}")
+                self.minute_input.setText(f"{due_dt.minute:02d}")
+                self.date_input.setText(due_dt.strftime("%d/%m/%Y"))
+            except Exception:
+                self.hour_input.setText(f"{now.hour:02d}")
+                self.minute_input.setText(f"{now.minute:02d}")
+                self.date_input.setText(now.strftime("%d/%m/%Y"))
+        else:
+            self.hour_input.setText(f"{now.hour:02d}")
+            self.minute_input.setText(f"{now.minute:02d}")
+            self.date_input.setText(now.strftime("%d/%m/%Y"))
+
+        button_row = QHBoxLayout()
+        clear_btn = PushButton("X\u00f3a th\u00f4ng b\u00e1o")
+        clear_btn.clicked.connect(self.request_clear)
+        button_row.addWidget(clear_btn)
+        button_row.addStretch()
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        button_row.addWidget(buttons)
+        layout.addLayout(button_row)
+
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #242424;
+                color: #ffffff;
+            }
+            QLabel {
+                color: #ffffff;
+            }
+        """)
+
+    def request_clear(self):
+        self.clear_requested = True
+        self.accept()
+
+    def get_due_datetime(self):
+        hour = int(self.hour_input.text().strip())
+        minute = int(self.minute_input.text().strip())
+        day, month, year = [int(part) for part in self.date_input.text().strip().split("/")]
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            raise ValueError("Gi\u1edd ho\u1eb7c ph\u00fat kh\u00f4ng h\u1ee3p l\u1ec7")
+        return datetime(year, month, day, hour, minute)
+
+
+class ReminderAlertDialog(QDialog):
+    """Popup shown when a note reminder fires."""
+
+    def __init__(self, title, content_preview, due_dt, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Th\u00f4ng B\u00e1o Ghi Ch\u00fa")
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        self.resize(430, 220)
+        self.beep_count = 0
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
+
+        title_label = QLabel(f"<b>{title}</b>")
+        title_label.setWordWrap(True)
+        layout.addWidget(title_label)
+
+        time_label = QLabel(due_dt.strftime("%H:%M - %d/%m/%Y"))
+        time_label.setStyleSheet("color: #7db7ff;")
+        layout.addWidget(time_label)
+
+        if content_preview:
+            preview_label = QLabel(content_preview)
+            preview_label.setWordWrap(True)
+            preview_label.setMaximumHeight(80)
+            layout.addWidget(preview_label)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("\u0110\u00e3 bi\u1ebft")
+        buttons.accepted.connect(self.accept)
+        layout.addWidget(buttons)
+
+        self.sound_timer = QTimer(self)
+        self.sound_timer.timeout.connect(self.play_sound)
+        self.sound_timer.start(1000)
+        self.play_sound()
+
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #242424;
+                color: #ffffff;
+            }
+            QLabel {
+                color: #ffffff;
+                font-size: 14px;
+            }
+        """)
+
+    def play_sound(self):
+        if self.beep_count >= 8:
+            self.sound_timer.stop()
+            return
+        self.beep_count += 1
+        if winsound:
+            winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
+        else:
+            QApplication.beep()
+
+    def accept(self):
+        self.sound_timer.stop()
+        super().accept()
+
 class AutoSaveTextEdit(QTextEdit):
     """TextEdit with auto-save on focus out and custom context menu."""
     focusOut = Signal()
@@ -420,6 +631,96 @@ class AutoSaveTextEdit(QTextEdit):
         # Set standard font
         font = QFont("Segoe UI", 11)
         self.setFont(font)
+
+    def insertFromMimeData(self, source):
+        """Paste clipboard images into the note as compressed clickable previews."""
+        if source.hasImage():
+            self.insert_note_image(source.imageData())
+            return
+
+        if source.hasUrls():
+            inserted = False
+            for url in source.urls():
+                local_path = url.toLocalFile()
+                if local_path and os.path.isfile(local_path):
+                    image = QImage(local_path)
+                    if not image.isNull():
+                        self.insert_note_image(image)
+                        inserted = True
+            if inserted:
+                return
+
+        super().insertFromMimeData(source)
+
+    def insert_note_image(self, image):
+        """Compress, resize, and insert a clickable image into the editor."""
+        if isinstance(image, QPixmap):
+            image = image.toImage()
+        if not isinstance(image, QImage) or image.isNull():
+            return
+
+        full_image = self._prepare_image(image, 1920)
+        preview_image = self._prepare_image(image, 720)
+
+        full_b64 = self._image_to_data_url(full_image, quality=82)
+        preview_b64 = self._image_to_data_url(preview_image, quality=76)
+        if not full_b64 or not preview_b64:
+            return
+
+        width = min(preview_image.width(), 520)
+        href = f"noteimage://{full_b64.split(',', 1)[1]}"
+        html = (
+            f'<a href="{href}">'
+            f'<img src="{preview_b64}" width="{width}" '
+            f'style="border:1px solid #555; border-radius:6px; margin:6px 0;" />'
+            f'</a><br />'
+        )
+        self.textCursor().insertHtml(html)
+        self.focusOut.emit()
+
+    def _prepare_image(self, image, max_side):
+        """Resize very large images while keeping aspect ratio."""
+        prepared = image
+        if prepared.width() > max_side or prepared.height() > max_side:
+            prepared = prepared.scaled(
+                max_side,
+                max_side,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+
+        if prepared.hasAlphaChannel():
+            flattened = QImage(prepared.size(), QImage.Format.Format_RGB888)
+            flattened.fill(QColor("#ffffff"))
+            painter = QPainter(flattened)
+            painter.drawImage(0, 0, prepared)
+            painter.end()
+            prepared = flattened
+        else:
+            prepared = prepared.convertToFormat(QImage.Format.Format_RGB888)
+
+        return prepared
+
+    def _image_to_data_url(self, image, quality=78):
+        ba = QByteArray()
+        buffer = QBuffer(ba)
+        if not buffer.open(QIODevice.OpenModeFlag.WriteOnly):
+            return ""
+        image.save(buffer, "JPG", quality)
+        return "data:image/jpeg;base64," + ba.toBase64().data().decode()
+
+    def show_note_image(self, href):
+        """Open the stored large image from a note image anchor."""
+        try:
+            img_data = base64.b64decode(href.replace("noteimage://", ""))
+            pixmap = QPixmap()
+            pixmap.loadFromData(img_data)
+            if pixmap.isNull():
+                return
+            dialog = NoteImagePreviewDialog(pixmap, self.window())
+            dialog.exec()
+        except Exception:
+            pass
         
     def on_text_changed(self):
         """Restart save timer on text change."""
@@ -434,6 +735,13 @@ class AutoSaveTextEdit(QTextEdit):
         """Change cursor and show preview when hovering over profile links."""
         # Call super first to handle standard behavior
         super().mouseMoveEvent(event)
+
+        if self.anchorAt(event.pos()).startswith("noteimage://"):
+            self.viewport().setCursor(Qt.CursorShape.PointingHandCursor)
+            if self.current_hover_href:
+                self.current_hover_href = None
+                self.profile_tooltip.hide()
+            return
         
         cursor = self.cursorForPosition(event.pos())
         cursor_rect = self.cursorRect(cursor)
@@ -545,6 +853,11 @@ class AutoSaveTextEdit(QTextEdit):
     def mousePressEvent(self, event):
         """Handle clicks on profile links."""
         if event.button() == Qt.MouseButton.LeftButton:
+            anchor_href = self.anchorAt(event.pos())
+            if anchor_href.startswith("noteimage://"):
+                self.show_note_image(anchor_href)
+                return
+
             cursor = self.cursorForPosition(event.pos())
             cursor_rect = self.cursorRect(cursor)
             
@@ -952,6 +1265,52 @@ class NotesDatabase:
         cursor.execute("UPDATE notes SET is_marked = NOT is_marked WHERE id = ?", (note_id,))
         conn.commit()
         conn.close()
+
+    def set_reminder(self, note_id, due_time):
+        """Set a reminder for a note."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE notes SET due_time = ?, status = 'alarm_pending' WHERE id = ?",
+            (due_time, note_id)
+        )
+        conn.commit()
+        conn.close()
+
+    def clear_reminder(self, note_id):
+        """Clear a note reminder."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE notes SET due_time = NULL, status = 'none' WHERE id = ?",
+            (note_id,)
+        )
+        conn.commit()
+        conn.close()
+
+    def mark_reminder_done(self, note_id):
+        """Mark reminder as fired."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE notes SET status = 'alarm_done' WHERE id = ?", (note_id,))
+        conn.commit()
+        conn.close()
+
+    def get_due_reminders(self):
+        """Return reminders due at or before now."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        now = datetime.now().isoformat(timespec="minutes")
+        cursor.execute("""
+            SELECT * FROM notes
+            WHERE due_time IS NOT NULL
+              AND status = 'alarm_pending'
+              AND due_time <= ?
+            ORDER BY due_time ASC
+        """, (now,))
+        notes = cursor.fetchall()
+        conn.close()
+        return [dict(note) for note in notes]
     
     def get_all_notes(self, search_query="", filter_marked=False):
         """Get all notes with optional search and filter."""
@@ -992,8 +1351,12 @@ class NotesWidget(QWidget):
         self.shared_log = shared_log
         self.original_title = ""
         self.original_content = ""
+        self.active_reminder_dialogs = []
         self.init_ui()
         self.load_notes()
+        self.reminder_timer = QTimer(self)
+        self.reminder_timer.timeout.connect(self.check_reminders)
+        self.reminder_timer.start(5000)
     
     def log(self, message):
         """Log message to shared log output."""
@@ -1234,7 +1597,14 @@ class NotesWidget(QWidget):
             
             # Column 0: Title|||Time format (will be rendered by custom delegate)
             relative_time = self.get_relative_time(note['modified_at'])
-            display_text = f"{note['title']}|||{relative_time}" if relative_time else f"{note['title']}|||"
+            title_text = note['title']
+            if note.get('due_time') and note.get('status') == 'alarm_pending':
+                try:
+                    due_dt = datetime.fromisoformat(note['due_time'])
+                    title_text = f"[TB {due_dt.strftime('%H:%M %d/%m')}] {title_text}"
+                except Exception:
+                    title_text = f"[TB] {title_text}"
+            display_text = f"{title_text}|||{relative_time}" if relative_time else f"{title_text}|||"
             
             title_item = QTableWidgetItem(display_text)
             
@@ -1408,6 +1778,10 @@ class NotesWidget(QWidget):
         mark_action = QAction(mark_icon.icon(), mark_text, self)
         mark_action.triggered.connect(lambda: self.toggle_mark(note_id))
         menu.addAction(mark_action)
+
+        reminder_action = QAction("Th\u00f4ng B\u00e1o", self)
+        reminder_action.triggered.connect(lambda: self.show_reminder_dialog(note_id))
+        menu.addAction(reminder_action)
         
         menu.addSeparator()
         
@@ -1417,6 +1791,72 @@ class NotesWidget(QWidget):
         menu.addAction(delete_action)
         
         menu.exec(self.notes_table.viewport().mapToGlobal(position))
+
+    def show_reminder_dialog(self, note_id):
+        """Show reminder editor for a note."""
+        notes = self.db.get_all_notes()
+        selected_note = next((n for n in notes if n['id'] == note_id), None)
+        if not selected_note:
+            return
+
+        dialog = ReminderDialog(self.window(), selected_note.get('due_time'))
+        if not dialog.exec():
+            return
+
+        if dialog.clear_requested:
+            self.db.clear_reminder(note_id)
+            self.log("\u0110\u00e3 x\u00f3a th\u00f4ng b\u00e1o ghi ch\u00fa")
+            self.load_notes()
+            return
+
+        try:
+            due_dt = dialog.get_due_datetime()
+        except Exception:
+            QMessageBox.warning(self, "L\u1ed7i", "Ng\u00e0y gi\u1edd kh\u00f4ng h\u1ee3p l\u1ec7. H\u00e3y nh\u1eadp theo d\u1ea1ng dd/mm/yyyy v\u00e0 gi\u1edd 0-23, ph\u00fat 0-59.")
+            return
+
+        self.db.set_reminder(note_id, due_dt.isoformat(timespec="minutes"))
+        self.log(f"\u0110\u00e3 h\u1eb9n th\u00f4ng b\u00e1o: {selected_note['title']} - {due_dt.strftime('%H:%M %d/%m/%Y')}")
+        self.load_notes()
+
+    def check_reminders(self):
+        """Check and fire due note reminders."""
+        due_notes = self.db.get_due_reminders()
+        if not due_notes:
+            return
+
+        for note in due_notes:
+            self.db.mark_reminder_done(note['id'])
+            try:
+                due_dt = datetime.fromisoformat(note['due_time'])
+            except Exception:
+                due_dt = datetime.now()
+
+            self.raise_()
+            window = self.window()
+            if window:
+                window.showNormal()
+                window.raise_()
+                window.activateWindow()
+
+            preview = self._plain_preview(note.get('content') or "")
+            dialog = ReminderAlertDialog(note.get('title') or "Ghi ch\u00fa", preview, due_dt, window or self)
+            self.active_reminder_dialogs.append(dialog)
+            dialog.finished.connect(lambda _result, d=dialog: self.active_reminder_dialogs.remove(d) if d in self.active_reminder_dialogs else None)
+            dialog.show()
+            dialog.raise_()
+            dialog.activateWindow()
+
+        self.load_notes()
+
+    def _plain_preview(self, html):
+        """Create a short plain-text preview from note HTML."""
+        temp = QTextEdit()
+        temp.setHtml(html)
+        text = re.sub(r"\s+", " ", temp.toPlainText()).strip()
+        if len(text) > 180:
+            text = text[:177] + "..."
+        return text
     
     def delete_note_from_menu(self, note_id):
         """Delete note from context menu with confirmation."""

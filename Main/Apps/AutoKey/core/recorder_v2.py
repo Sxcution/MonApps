@@ -10,6 +10,9 @@ import time
 from pynput import mouse, keyboard
 from PySide6.QtCore import QObject, Signal
 
+from core.error_logger import log_exceptions
+from pynput import keyboard # Ensure imported for KeyCode check
+
 class RecorderV2(QObject):
     event_recorded = Signal(dict)
     
@@ -90,6 +93,32 @@ class RecorderV2(QObject):
             # For now, default to delta for better 3D support
             return True
     
+    def _normalize_key(self, key, k: str) -> str:
+        """
+        Normalize key:
+        - Convert control code to char
+        """
+        try:
+            # If it is a non-printable character => likely Ctrl+<key>
+            if isinstance(key, keyboard.KeyCode) and k and len(k) == 1 and ord(k) < 32:
+                if hasattr(key, "vk") and key.vk is not None:
+                    vk = key.vk
+                    # A-Z
+                    if 65 <= vk <= 90:
+                        k = chr(vk).lower() 
+                    # 0-9
+                    elif 48 <= vk <= 57:
+                        k = chr(vk)
+            return k
+        except Exception:
+            from core.error_logger import log_exception
+            log_exception("RecorderV2._normalize_key", extra={"key": str(key), "k": k})
+            try:
+                return key.char or str(key)
+            except:
+                return str(key)
+
+    @log_exceptions("RecorderV2.on_move")
     def on_move(self, x, y):
         """Mouse move event"""
         if not self.recording:
@@ -133,6 +162,7 @@ class RecorderV2(QObject):
         
         self.events.append(event)
     
+    @log_exceptions("RecorderV2.on_click")
     def on_click(self, x, y, button, pressed):
         """Mouse click event"""
         if not self.recording:
@@ -150,6 +180,7 @@ class RecorderV2(QObject):
         self.events.append(event)
         self.event_recorded.emit(event)
     
+    @log_exceptions("RecorderV2.on_scroll")
     def on_scroll(self, x, y, dx, dy):
         """Mouse scroll event"""
         if not self.recording:
@@ -167,6 +198,7 @@ class RecorderV2(QObject):
         self.events.append(event)
         self.event_recorded.emit(event)
     
+    @log_exceptions("RecorderV2.on_press")
     def on_press(self, key):
         """Keyboard press event"""
         if not self.recording:
@@ -177,6 +209,11 @@ class RecorderV2(QObject):
         except AttributeError:
             k = str(key)
         
+        if k is None:
+            k = str(key)
+            
+        k = self._normalize_key(key, k)
+        
         event = {
             'type': 'key_press',
             'key': k,
@@ -186,6 +223,7 @@ class RecorderV2(QObject):
         self.events.append(event)
         self.event_recorded.emit(event)
     
+    @log_exceptions("RecorderV2.on_release")
     def on_release(self, key):
         """Keyboard release event"""
         if not self.recording:
@@ -195,6 +233,11 @@ class RecorderV2(QObject):
             k = key.char
         except AttributeError:
             k = str(key)
+        
+        if k is None:
+            k = str(key)
+            
+        k = self._normalize_key(key, k)
         
         event = {
             'type': 'key_release',

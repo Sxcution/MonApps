@@ -482,6 +482,49 @@ class GpsPatcherThread(QThread):
             return True
         return False
 
+    def _clone_zipinfo(self, item, filename=None, compress_type=None):
+        info = zipfile.ZipInfo(filename or item.filename, item.date_time)
+        info.comment = item.comment
+        info.extra = item.extra
+        info.internal_attr = item.internal_attr
+        info.external_attr = item.external_attr
+        info.create_system = item.create_system
+        info.compress_type = item.compress_type if compress_type is None else compress_type
+        return info
+
+    def _copy_zip_entry(self, zin, zout, item):
+        info = self._clone_zipinfo(item)
+        with zin.open(item) as source:
+            with zout.open(info, 'w') as target:
+                chunk_size = 8 * 1024 * 1024
+                while True:
+                    chunk = source.read(chunk_size)
+                    if not chunk:
+                        break
+                    target.write(chunk)
+
+    def _write_dex_entry(self, zout, dex_name, dex_path, original_dex_infos):
+        original = original_dex_infos.get(dex_name)
+        if original:
+            info = self._clone_zipinfo(original, filename=dex_name)
+        else:
+            info = zipfile.ZipInfo(dex_name)
+            info.external_attr = 0o644 << 16
+            info.compress_type = zipfile.ZIP_STORED
+
+        # Framework dex entries must be uncompressed so ART can mmap them
+        # consistently across first boot and later reboots.
+        info.compress_type = zipfile.ZIP_STORED
+
+        with open(dex_path, 'rb') as source:
+            with zout.open(info, 'w') as target:
+                chunk_size = 8 * 1024 * 1024
+                while True:
+                    chunk = source.read(chunk_size)
+                    if not chunk:
+                        break
+                    target.write(chunk)
+
     def run(self):
         # --- DEPENDENCY CHECK ---
         required_jars = ['baksmali.jar', 'smali.jar']
@@ -588,23 +631,21 @@ class GpsPatcherThread(QThread):
                 temp_zip_path = output_path + ".tmp"
                 try:
                     with zipfile.ZipFile(self.input_file, 'r') as zin:
-                        with zipfile.ZipFile(temp_zip_path, 'w', compression=zipfile.ZIP_DEFLATED) as zout:
-                            original_dex_files = {f for f in zin.namelist() if f.startswith('classes') and f.endswith('.dex')}
+                        with zipfile.ZipFile(temp_zip_path, 'w') as zout:
+                            original_dex_infos = {item.filename: item for item in zin.infolist() if item.filename.startswith('classes') and item.filename.endswith('.dex')}
+                            original_dex_files = set(original_dex_infos.keys())
                             copied_count = 0
                             total_items = len([x for x in zin.infolist() if x.filename not in original_dex_files])
                             
                             # Copy existing files (EXCEPT old dex) với chunk
                             for item in zin.infolist():
+                                if item.filename in original_dex_files:
+                                    dex_path = recompiled_dex_files.get(item.filename)
+                                    if dex_path:
+                                        self._write_dex_entry(zout, item.filename, dex_path, original_dex_infos)
+                                    continue
                                 if item.filename not in original_dex_files:
-                                    # Đọc/ghi theo chunk 8MB để tránh OOM với file lớn
-                                    with zin.open(item) as source:
-                                        with zout.open(item.filename, 'w') as target:
-                                            chunk_size = 8 * 1024 * 1024  # 8MB chunks
-                                            while True:
-                                                chunk = source.read(chunk_size)
-                                                if not chunk:
-                                                    break
-                                                target.write(chunk)
+                                    self._copy_zip_entry(zin, zout, item)
                                     
                                     copied_count += 1
                                     # Update progress mỗi 10 file
@@ -615,7 +656,8 @@ class GpsPatcherThread(QThread):
                             # Write new dex files
                             self.log_message.emit("🔍 [GPSPatcherWorker] Ghi các file dex mới...")
                             for dex_name, dex_path in recompiled_dex_files.items():
-                                zout.write(dex_path, dex_name)
+                                if dex_name not in original_dex_files:
+                                    self._write_dex_entry(zout, dex_name, dex_path, original_dex_infos)
                     
                     shutil.move(temp_zip_path, output_path)
                     success_message = "✅ THÀNH CÔNG! Đã vá và ghi đè lên file services.jar gốc."
@@ -632,23 +674,21 @@ class GpsPatcherThread(QThread):
                 self.log_message.emit(f"Tạo file đã vá tại: {output_path}")
                 try:
                     with zipfile.ZipFile(self.input_file, 'r') as zin:
-                        with zipfile.ZipFile(output_path, 'w', compression=zipfile.ZIP_DEFLATED) as zout:
-                            original_dex_files = {f for f in zin.namelist() if f.startswith('classes') and f.endswith('.dex')}
+                        with zipfile.ZipFile(output_path, 'w') as zout:
+                            original_dex_infos = {item.filename: item for item in zin.infolist() if item.filename.startswith('classes') and item.filename.endswith('.dex')}
+                            original_dex_files = set(original_dex_infos.keys())
                             copied_count = 0
                             total_items = len([x for x in zin.infolist() if x.filename not in original_dex_files])
                             
                             # Copy existing files (EXCEPT old dex) với chunk
                             for item in zin.infolist():
+                                if item.filename in original_dex_files:
+                                    dex_path = recompiled_dex_files.get(item.filename)
+                                    if dex_path:
+                                        self._write_dex_entry(zout, item.filename, dex_path, original_dex_infos)
+                                    continue
                                 if item.filename not in original_dex_files:
-                                    # Đọc/ghi theo chunk 8MB để tránh OOM với file lớn
-                                    with zin.open(item) as source:
-                                        with zout.open(item.filename, 'w') as target:
-                                            chunk_size = 8 * 1024 * 1024  # 8MB chunks
-                                            while True:
-                                                chunk = source.read(chunk_size)
-                                                if not chunk:
-                                                    break
-                                                target.write(chunk)
+                                    self._copy_zip_entry(zin, zout, item)
                                     
                                     copied_count += 1
                                     # Update progress mỗi 10 file
@@ -659,7 +699,8 @@ class GpsPatcherThread(QThread):
                             # Write new dex files
                             self.log_message.emit("🔍 [GPSPatcherWorker] Ghi các file dex mới...")
                             for dex_name, dex_path in recompiled_dex_files.items():
-                                zout.write(dex_path, dex_name)
+                                if dex_name not in original_dex_files:
+                                    self._write_dex_entry(zout, dex_name, dex_path, original_dex_infos)
                     
                     success_message = f"✅ THÀNH CÔNG! File đã vá được lưu trong thư mục '{output_dir}'."
                 except Exception as e:

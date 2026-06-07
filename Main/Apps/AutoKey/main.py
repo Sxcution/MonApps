@@ -22,16 +22,21 @@ def is_admin():
     except:
         return False
 
+from core.error_logger import log_exception
+import threading
+
 def exception_hook(exctype, value, traceback):
-    import traceback as tb
-    error_msg = "".join(tb.format_exception(exctype, value, traceback))
-    print(error_msg)
-    with open("error.log", "a") as f:
-        f.write(error_msg + "\n")
+    log_exception("sys.excepthook", exctype, value, traceback)
     sys.excepthook = sys.__excepthook__
     sys.excepthook(exctype, value, traceback)
 
 sys.excepthook = exception_hook
+
+# Catch exceptions in threads (like pynput)
+def threading_exception_hook(args):
+    log_exception("threading.excepthook", args.exc_type, args.exc_value, args.exc_traceback)
+
+threading.excepthook = threading_exception_hook
 
 def qt_message_handler(mode, context, message):
     if "QFont::setPointSize" in message:

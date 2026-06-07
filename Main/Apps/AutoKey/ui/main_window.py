@@ -314,11 +314,38 @@ class MainWindow(QMainWindow):
                         new_events.pop()
                     else:
                         break
+
+            # Safety pass: remove record-control hotkeys even if a flushed mouse
+            # move landed after them in the batch.
+            control_hotkeys = []
+            for hotkey in [start_rec_key, stop_rec_key]:
+                if hotkey:
+                    normalized = hotkey.lower().strip()
+                    base = normalized.split('+')[-1] if '+' in normalized else normalized
+                    control_hotkeys.append((normalized, base))
+
+            if control_hotkeys:
+                filtered_events = []
+                for event in new_events:
+                    if event.get('type') in ['key_press', 'key_release']:
+                        event_key = event.get('key', '').lower().strip()
+                        event_key_normalized = event_key.replace(' ', '+')
+                        if any(
+                            self._check_hotkey_match(event_key, event_key_normalized, normalized, base)
+                            for normalized, base in control_hotkeys
+                        ):
+                            print(f"  ✂️ Removing record-control hotkey event: {event['type']} '{event.get('key', '')}'")
+                            continue
+
+                    filtered_events.append(event)
+
+                new_events = filtered_events
+
+            new_events = self._remove_trailing_control_mouse_events(new_events)
             
             # Add cleaned events to recorded_events
             self.recorded_events.extend(new_events)
-            
-            # No need to scan and remove from table - we filter at add time now
+            self._reload_events_table()
             
             if new_events:
                 self.has_unsaved_changes = True
@@ -454,53 +481,62 @@ class MainWindow(QMainWindow):
     # They handle table operations, event editing, dialogs, file I/O, and hotkeys
     # ===========================================================================
 
+    def _remove_trailing_control_mouse_events(self, events):
+        """Drop final mouse events used only to click AutoKey's own Stop button."""
+        if not events:
+            return events
+
+        control_rects = []
+        for widget in [self, getattr(self, "recording_overlay", None)]:
+            if not widget or not widget.isVisible():
+                continue
+            top_left = widget.mapToGlobal(QPoint(0, 0))
+            size = widget.size()
+            control_rects.append((
+                top_left.x(),
+                top_left.y(),
+                top_left.x() + size.width(),
+                top_left.y() + size.height(),
+            ))
+
+        if not control_rects:
+            return events
+
+        def is_control_mouse_event(event):
+            if event.get("type") not in ["mouse_move", "mouse_click", "mouse_scroll"]:
+                return False
+            if "x" not in event or "y" not in event:
+                return False
+            x, y = event["x"], event["y"]
+            return any(left <= x <= right and top <= y <= bottom for left, top, right, bottom in control_rects)
+
+        trimmed = list(events)
+        removed = 0
+        while trimmed and is_control_mouse_event(trimmed[-1]):
+            trimmed.pop()
+            removed += 1
+
+        if removed:
+            print(f"✂️ Removed {removed} trailing AutoKey control mouse events")
+
+        return trimmed
+
+    def _reload_events_table(self):
+        """Rebuild the table from recorded_events without mutating the event list."""
+        previous_block_state = self.model.blockSignals(True)
+        try:
+            self.model.removeRows(0, self.model.rowCount())
+            for event in self.recorded_events:
+                self.add_event_to_table(event)
+        finally:
+            self.model.blockSignals(previous_block_state)
+
     def add_event_to_table(self, event, insert_at_row=None):
         """Add event to table at specified row, or at the end if insert_at_row is None
         
-        Visual Filter: 
-        - mouse_move and mouse_scroll events are NOT displayed in the table
-        - mouse_click with pressed=False (release) is NOT displayed in the table
-        - start/stop recording hotkey events are NOT displayed in the table
-        All hidden events are still recorded in recorded_events for accurate playback.
+        Every saved event is shown in the table. Keeping the table 1:1 with
+        recorded_events avoids row mismatches when editing, deleting, or saving.
         """
-        # VISUAL FILTER: Skip displaying filtered events in table
-        # They are still in recorded_events, just hidden from view
-        if event['type'] in ['mouse_move', 'mouse_scroll']:
-            # Still assign ID for consistency
-            if 'id' not in event:
-                event['id'] = str(uuid.uuid4())
-            return  # Don't add to table, exit early
-        
-        # VISUAL FILTER: Hide mouse release events (pressed=False)
-        # Only show mouse press events to avoid duplicate entries in table
-        if event['type'] == 'mouse_click' and not event.get('pressed', True):
-            # Still assign ID for consistency
-            if 'id' not in event:
-                event['id'] = str(uuid.uuid4())
-            return  # Don't add to table, exit early
-        
-        # VISUAL FILTER: Hide start/stop recording hotkey events
-        # Check if this is a keyboard event that matches start or stop hotkey
-        if event['type'] in ['key_press', 'key_release']:
-            event_key = event.get('key', '').lower().strip()
-            event_key_normalized = event_key.replace(' ', '+')
-            
-            # Get current hotkeys
-            start_hotkey = self.settings.value("hotkey_record", "F9")
-            stop_hotkey = self.settings.value("hotkey_stop_record", "F10")
-            
-            for hotkey in [start_hotkey, stop_hotkey]:
-                if not hotkey:
-                    continue
-                hotkey_normalized = hotkey.lower().strip()
-                hotkey_base = hotkey_normalized.split('+')[-1] if '+' in hotkey_normalized else hotkey_normalized
-                
-                # Check if this event matches the hotkey
-                if self._check_hotkey_match(event_key, event_key_normalized, hotkey_normalized, hotkey_base):
-                    # This is a start/stop hotkey - don't display it
-                    if 'id' not in event:
-                        event['id'] = str(uuid.uuid4())
-                    return  # Don't add to table, exit early
         # Add row to table
         if insert_at_row is not None:
             row = insert_at_row
@@ -523,6 +559,9 @@ class MainWindow(QMainWindow):
         action_text = ""
         if event['type'] == 'undefined':
             action_text = event['text']
+        elif event['type'] == 'key_preset':
+            preset_name = event.get('preset', 'Unknown')
+            action_text = f"Shortcut: {preset_name}"
         elif event['type'] == 'key_press':
              action_text = f"Key Press {event['key']}"
         elif event['type'] == 'key_release':
@@ -530,7 +569,11 @@ class MainWindow(QMainWindow):
         elif event['type'] == 'key_click':
              action_text = f"Key Click {event['key']}"
         elif event['type'] == 'mouse_click':
-             action_text = "Mouse Click"
+             action_text = self._mouse_action_text(event)
+        elif event['type'] == 'mouse_move':
+             action_text = "Mouse Move"
+        elif event['type'] == 'mouse_scroll':
+             action_text = "Mouse Wheel"
         elif event['type'] == 'mouse_hold':
              action_text = "Mouse Hold"
         elif event['type'] == 'detect_image':
@@ -622,6 +665,7 @@ class MainWindow(QMainWindow):
                 event['type'] = 'mouse_click'
                 event['button'] = 'Button.left'
                 event['pressed'] = True
+                event['click_count'] = 1
                 event['x'] = 0 
                 event['y'] = 0
                 self.model.blockSignals(True)
@@ -713,11 +757,6 @@ class MainWindow(QMainWindow):
             self.edit_event(index.row())
         elif action == delete_action:
             self.delete_event(index.row())
-            
-
-            self.edit_event(index.row())
-        elif action == delete_action:
-            self.delete_event(index.row())
 
     def edit_event(self, row):
         if row >= len(self.recorded_events):
@@ -731,7 +770,7 @@ class MainWindow(QMainWindow):
         # Determine which dialog to open based on event type
         if event['type'] in ['mouse_move', 'mouse_click', 'mouse_scroll', 'mouse_hold']:
             self.open_mouse_dialog(row)
-        elif event['type'] in ['key_press', 'key_release', 'key_click']:
+        elif event['type'] in ['key_press', 'key_release', 'key_click', 'key_preset']:
             self.open_keyboard_dialog(row)
         elif event['type'] == 'detect_image':
             self.open_image_search_dialog(row)
@@ -878,7 +917,10 @@ class MainWindow(QMainWindow):
         
         # Action
         action_text = ""
-        if event['type'] == 'key_press':
+        if event['type'] == 'key_preset':
+            preset_name = event.get('preset', 'Unknown')
+            action_text = f"Shortcut: {preset_name}"
+        elif event['type'] == 'key_press':
             key = event['key']
             hold_duration = event.get('hold_duration', 0)
             if hold_duration > 0:
@@ -890,7 +932,7 @@ class MainWindow(QMainWindow):
         elif event['type'] == 'key_click':
              action_text = f"Key Click {event['key']}"
         elif event['type'] == 'mouse_click':
-             action_text = "Mouse Click"
+             action_text = self._mouse_action_text(event)
         elif event['type'] == 'mouse_move':
              action_text = "Mouse Move"
         elif event['type'] == 'mouse_scroll':
@@ -932,7 +974,12 @@ class MainWindow(QMainWindow):
             button = event.get('button', 'Button.left')
             x = event.get('x', 0)
             y = event.get('y', 0)
-            if button == 'Button.left':
+            click_count = self._mouse_click_count(event)
+            if not event.get('pressed', True):
+                details = f"Release: {button} at {x},{y}"
+            elif button == 'Button.left' and click_count >= 2:
+                details = f"Double Click: {x},{y}"
+            elif button == 'Button.left':
                 details = f"Click: {x},{y}"
             elif button == 'Button.right':
                 details = f"Right Click: {x},{y}"
@@ -956,6 +1003,9 @@ class MainWindow(QMainWindow):
             details = f"Release: {event.get('key','')}"
         elif event['type'] == 'key_click':
             details = f"Click: {event.get('key','')}"
+        elif event['type'] == 'key_preset':
+            preset_name = event.get('preset', 'Unknown')
+            details = f"Preset: {preset_name}"
         elif event['type'] == 'mouse_scroll':
             details = f"Delta: {event.get('dy', 0)}"
         elif event['type'] == 'detect_image':
@@ -982,6 +1032,19 @@ class MainWindow(QMainWindow):
             details = f"Query: {query}"
 
         item.setText(details)
+
+    def _mouse_click_count(self, event):
+        try:
+            return max(1, int(event.get('click_count', 1) or 1))
+        except (TypeError, ValueError):
+            return 1
+
+    def _mouse_action_text(self, event):
+        if not event.get('pressed', True):
+            return "Mouse Release"
+        if self._mouse_click_count(event) >= 2:
+            return "Mouse Double Click"
+        return "Mouse Click"
 
 
     def save_recording(self):
@@ -1142,6 +1205,11 @@ class MainWindow(QMainWindow):
         self.hotkey_configs = []
         self.pressed_keys = set()
         
+        # Hotkey cooldown system to prevent double-trigger
+        # Stores last trigger time for each hotkey
+        self.hotkey_last_trigger = {}
+        self.hotkey_cooldown_ms = 500  # 500ms cooldown between triggers
+
         def parse_hotkey(key_str, callback):
             if not key_str or not key_str.strip():
                 return
@@ -1243,6 +1311,18 @@ class MainWindow(QMainWindow):
                         break
                 
                 if match:
+                    # Check cooldown to prevent double-trigger
+                    hotkey_id = config['original']
+                    current_time = time.time() * 1000  # Convert to milliseconds
+                    last_trigger = self.hotkey_last_trigger.get(hotkey_id, 0)
+                    time_since_last = current_time - last_trigger
+
+                    if time_since_last < self.hotkey_cooldown_ms:
+                        continue  # Skip this trigger (cooldown active)
+
+                    # Update last trigger time
+                    self.hotkey_last_trigger[hotkey_id] = current_time
+
                     # Execute callback
                     config['callback']()
                     
@@ -1428,4 +1508,3 @@ class MainWindow(QMainWindow):
             print(f"⚠️ Error loading autosave: {e}")
             import traceback
             traceback.print_exc()
-

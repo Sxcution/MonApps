@@ -64,6 +64,23 @@ class PlayerV2(QThread):
         self.roi_manager = None
     
     def run(self):
+        try:
+            self._run_impl()
+        except Exception:
+            from core.error_logger import log_exception
+            log_exception(
+                context="PlayerV2.run",
+                extra={
+                    "play_count": self.play_count,
+                    "mouse_mode": self.mouse_mode,
+                    "tick_hz": self.tick_hz
+                }
+            )
+            print("❌ PlayerV2 crash detected! Check error.log")
+            self.status_updated.emit("❌ Macro V2 bị crash, xem error.log")
+            self.playback_finished.emit()
+
+    def _run_impl(self):
         """Main playback loop"""
         print(f"🎮 Player V2 started (Mouse mode: {self.mouse_mode}, Tick: {self.tick_hz}Hz)")
         self.status_updated.emit("Đang khởi động...")
@@ -218,8 +235,16 @@ class PlayerV2(QThread):
             elif 'Button.middle' in event.get('button', ''):
                 btn = Button.middle
             
-            if event.get('pressed', True):
-                self.mouse_controller.press(btn)
+            click_count = self._get_click_count(event)
+            if click_count:
+                self._click_mouse(btn, click_count)
+            elif 'pressed' not in event:
+                self._click_mouse(btn, 1)
+            elif event.get('pressed', True):
+                if self._has_matching_mouse_release(current_idx, event):
+                    self.mouse_controller.press(btn)
+                else:
+                    self._click_mouse(btn, 1)
             else:
                 self.mouse_controller.release(btn)
         
@@ -241,6 +266,38 @@ class PlayerV2(QThread):
             return self.execute_text_search(event, current_idx)
         
         return None
+
+    def _get_click_count(self, event):
+        """Return click count for configured click actions, or 0 for raw recorder events."""
+        try:
+            click_count = int(event.get('click_count', 0) or 0)
+        except (TypeError, ValueError):
+            return 0
+        return max(0, click_count)
+
+    def _has_matching_mouse_release(self, current_idx, event):
+        if current_idx is None:
+            return False
+
+        button = event.get('button', 'Button.left')
+        for next_event in self.events[current_idx + 1:]:
+            if next_event.get('type') != 'mouse_click':
+                continue
+            if next_event.get('button', 'Button.left') != button:
+                continue
+            if self._get_click_count(next_event):
+                return False
+            return not next_event.get('pressed', True)
+        return False
+
+    def _click_mouse(self, button, count=1):
+        count = max(1, int(count))
+        for click_index in range(count):
+            self.mouse_controller.press(button)
+            time.sleep(0.04)
+            self.mouse_controller.release(button)
+            if click_index < count - 1:
+                time.sleep(0.06)
     
     def execute_text_search(self, event, current_idx):
         """Execute text search event"""

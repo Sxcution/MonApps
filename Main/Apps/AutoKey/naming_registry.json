@@ -42,7 +42,8 @@
         "spin_mouse_hold_duration": "Mouse Hold Duration Input (ms)"
     },
     "UI_KEYBOARD_DIALOG": {
-        "input_key": "Key Sequence Input",
+        "combo_preset_shortcut": "Preset Shortcut ComboBox (Alt+Tab, Ctrl+Shift+Esc, etc.)",
+        "input_key": "Key Sequence Input (for Custom shortcuts)",
         "combo_key_type": "Key Event Type ComboBox (KeyPress/KeyDown/KeyUp)",
         "spin_key_hold_duration": "Key Hold Duration Input (ms, for KeyDown)"
     },

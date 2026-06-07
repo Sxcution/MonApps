@@ -4,6 +4,7 @@ import random
 import ctypes
 import os
 import threading
+from ctypes import wintypes
 from PySide6.QtCore import QSettings, QThread, Signal
 from pynput.keyboard import Controller as KeyboardController
 from pynput.mouse import Controller as MouseController, Button
@@ -43,6 +44,22 @@ class Player(QThread):
         self.max_duration = (self.play_hours * 3600) + (self.play_minutes * 60)
 
     def run(self):
+        try:
+            self._run_impl()
+        except Exception:
+            from core.error_logger import log_exception
+            log_exception(
+                context="Player.run",
+                extra={
+                    "play_count": self.play_count,
+                    "max_duration": self.max_duration
+                }
+            )
+            print("❌ Player crash detected! Check error.log")
+            self.status_updated.emit("❌ Macro bị crash, xem error.log")
+            self.playback_finished.emit()
+
+    def _run_impl(self):
         print("Player started")
         self.status_updated.emit("Đang khởi động...")
         
@@ -121,9 +138,9 @@ class Player(QThread):
             
             # Check duration limit
             if self.max_duration > 0:
-                elapsed = (time.time() - self.start_time) / 60 # minutes
+                elapsed = time.time() - self.start_time  # seconds
                 if elapsed >= self.max_duration:
-                    print("⏱️ Max duration reached. Stopping.")
+                    print(f"⏱️ Max duration reached ({elapsed:.0f}s >= {self.max_duration}s). Stopping.")
                     return
 
             # Get action description for log
@@ -168,12 +185,41 @@ class Player(QThread):
             return self.handle_text_search(event, current_idx)
             
         elif etype in ['mouse_move', 'mouse_click', 'mouse_hold']:
-            self._handle_mouse(event)
+            self._handle_mouse(event, current_idx)
             
         elif etype == 'mouse_scroll':
             self.mouse.scroll(event.get('dx', 0), event.get('dy', 0))
-            
+
+        elif etype == 'key_preset':
+            # Handle preset shortcuts (Alt+Tab, Ctrl+Shift+Esc, etc.)
+            from utils.preset_shortcuts import get_preset_data
+            preset_name = event.get('preset', '')
+            preset_data = get_preset_data(preset_name)
+
+            if preset_data:
+                # Press modifiers first
+                if preset_data.get('alt'): press_key('Alt')
+                if preset_data.get('ctrl'): press_key('Ctrl')
+                if preset_data.get('shift'): press_key('Shift')
+                if preset_data.get('win'): press_key('LWin')
+
+                time.sleep(0.05)  # Small delay between modifiers and key
+
+                # Press and release main key
+                press_key(preset_data['key'])
+                time.sleep(0.1)
+                release_key(preset_data['key'])
+
+                time.sleep(0.05)  # Small delay before releasing modifiers
+
+                # Release modifiers in reverse order
+                if preset_data.get('win'): release_key('LWin')
+                if preset_data.get('shift'): release_key('Shift')
+                if preset_data.get('ctrl'): release_key('Ctrl')
+                if preset_data.get('alt'): release_key('Alt')
+
         elif etype == 'key_click':
+
             # Use DirectInput for games: Press -> Wait -> Release
             press_key(event['key'])
             time.sleep(0.1) # Short hold to ensure game registers it
@@ -565,7 +611,7 @@ class Player(QThread):
                 pass
         return None
 
-    def _handle_mouse(self, event):
+    def _handle_mouse(self, event, current_idx=None):
         etype = event['type']
         # Calculate Target Coordinates
         target_x = event.get('x', 0)
@@ -582,7 +628,7 @@ class Player(QThread):
                 # Relative to active window
                 hwnd = ctypes.windll.user32.GetForegroundWindow()
                 if hwnd:
-                    rect = ctypes.wintypes.RECT()
+                    rect = wintypes.RECT()
                     ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect))
                     target_x += rect.left
                     target_y += rect.top
@@ -613,8 +659,16 @@ class Player(QThread):
             elif 'Button.middle' in event.get('button', ''):
                 btn = Button.middle
             
-            if event.get('pressed', True):
-                self.mouse.press(btn)
+            click_count = self._get_click_count(event)
+            if click_count:
+                self._click_mouse(btn, click_count)
+            elif 'pressed' not in event:
+                self._click_mouse(btn, 1)
+            elif event.get('pressed', True):
+                if self._has_matching_mouse_release(current_idx, event):
+                    self.mouse.press(btn)
+                else:
+                    self._click_mouse(btn, 1)
             else:
                 self.mouse.release(btn)
         
@@ -631,6 +685,43 @@ class Player(QThread):
             
             # Release
             self.mouse.release(Button.left)
+
+    def _get_click_count(self, event):
+        """Return click count for configured click actions, or 0 for raw recorder events."""
+        try:
+            click_count = int(event.get('click_count', 0) or 0)
+        except (TypeError, ValueError):
+            return 0
+        return max(0, click_count)
+
+    def _has_matching_mouse_release(self, current_idx, event):
+        """
+        Recorder-generated mouse clicks are stored as press + release events.
+        Hand-created clicks from the dialog are a single event, so they need a
+        full press/release during playback.
+        """
+        if current_idx is None:
+            return False
+
+        button = event.get('button', 'Button.left')
+        for next_event in self.events[current_idx + 1:]:
+            if next_event.get('type') != 'mouse_click':
+                continue
+            if next_event.get('button', 'Button.left') != button:
+                continue
+            if self._get_click_count(next_event):
+                return False
+            return not next_event.get('pressed', True)
+        return False
+
+    def _click_mouse(self, button, count=1):
+        count = max(1, int(count))
+        for click_index in range(count):
+            self.mouse.press(button)
+            time.sleep(0.04)
+            self.mouse.release(button)
+            if click_index < count - 1:
+                time.sleep(0.06)
 
     def _parse_key(self, key_str):
         from pynput.keyboard import Key
@@ -694,7 +785,9 @@ class Player(QThread):
         
         if event_type == 'mouse_click':
             button = event.get('button', 'left')
-            return f"Mouse Click ({button})"
+            click_count = self._get_click_count(event) or 1
+            action = "Mouse Double Click" if click_count >= 2 else "Mouse Click"
+            return f"{action} ({button})"
         elif event_type == 'mouse_move':
             x = event.get('x', 0)
             y = event.get('y', 0)
@@ -715,7 +808,11 @@ class Player(QThread):
         elif event_type == 'key_click':
             key = event.get('key', 'unknown')
             return f"Key Click: {key}"
+        elif event_type == 'key_preset':
+            preset = event.get('preset', 'unknown')
+            return f"Shortcut: {preset}"
         elif event_type == 'detect_image':
+
             image = event.get('image_path', '')
             image_name = image.split('/')[-1] if image else 'unknown'
             return f"Detect Image: {image_name}"
