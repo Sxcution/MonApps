@@ -1,0 +1,129 @@
+Mục tiêu: Ảnh khác
+
+Đây là rule tạo ảnh:
+Dùng ảnh gốc làm "identity reference", "outfit reference" và "environment reference".
+Tạo ảnh mới "photorealistic" của cùng một cô gái.
+Ảnh phải giống như một tấm ảnh mới được chụp lại hoàn toàn, không phải ảnh chỉnh sửa từ ảnh gốc.
+
+Quy tắc ưu tiên:
+Nếu “Mục tiêu ảnh” có yêu cầu khác hoặc mâu thuẫn với rule nền, thì luôn ưu tiên làm theo “Mục tiêu ảnh”.
+Rule nền chỉ là mặc định khi “Mục tiêu ảnh” không nói rõ.
+Không được để rule nền cản mục tiêu chính của ảnh.
+
+Thứ tự ưu tiên:
+1. Mục tiêu ảnh
+2. Tuỳ chọn người dùng đã bật
+3. Rule nền
+4. Negative rule
+
+Khuôn mặt:
+Giữ đúng "facial identity" để người nhìn vẫn nhận ra là cùng một cô gái trong ảnh gốc.
+Giữ các đặc điểm nhận diện chính như mắt, chân mày, mũi, môi, dáng mặt, màu da, thần thái và phong cách makeup.
+Giữ nguyên phong cách makeup của ảnh gốc.
+Tuyệt đối không tự ý thêm má hồng, không đổi màu da, không làm da trắng hơn hoặc hồng hơn.
+Nhưng không được sao chép nguyên xi phần đầu từ ảnh gốc.
+Không giữ nguyên "head pose", "face angle", biểu cảm gốc hoặc bố cục khuôn mặt gốc.
+Phải tái dựng lại gương mặt ở góc chụp mới, phù hợp với pose mới, ánh sáng mới và camera angle mới.
+Đặc biệt khi đổi hướng đầu/hướng mặt, bắt buộc phải chỉ rõ hướng mới theo bên trái/bên phải của khung hình và cấm tuyệt đối hướng cũ (ví dụ: "Head must tilt to the viewer's right / her left is forbidden / do not tilt toward the same side as reference") để phá vỡ "reference lock".
+
+Tóc:
+Giữ cùng màu tóc, độ dài tóc và chất tóc tổng thể nếu “Mục tiêu ảnh” không yêu cầu đổi.
+Bắt buộc tạo "hairstyle variation" rõ ràng so với ảnh gốc.
+Không giữ nguyên "hair flow", "hair parting", ngôi tóc, hướng tóc rơi hoặc cách tóc ôm mặt giống ảnh gốc.
+Tóc phải thay đổi tự nhiên theo "head pose", "camera angle" và pose mới.
+Có thể dùng một trong các kiểu tóc tự nhiên như: tóc vén nhẹ sau tai, tóc hất ra sau vai, tóc rẽ ngôi lệch, tóc đổ qua một vai, half-up hairstyle, wind-swept hair nhẹ, hoặc kẹp tóc nhẹ.
+
+Trang phục:
+Giữ nguyên outfit theo ảnh gốc nếu “Mục tiêu ảnh” không yêu cầu đổi.
+Nếu “Mục tiêu ảnh” yêu cầu đổi màu, đổi kiểu, đổi chất liệu hoặc đổi phong cách trang phục, thì ưu tiên làm theo “Mục tiêu ảnh”.
+Không tự ý đổi outfit khi không có yêu cầu.
+
+Bối cảnh:
+Mặc định giữ cùng loại bối cảnh, ánh sáng và không khí của ảnh gốc.
+Nếu “Mục tiêu ảnh” yêu cầu đổi sang bối cảnh mới như ban công, quán cafe, ngoài đường, rừng cây, vườn hoa, bãi biển, phòng khách sạn hoặc nơi khác, thì ưu tiên làm theo bối cảnh mới đó.
+Dù đổi bối cảnh, ảnh vẫn phải tự nhiên và giống ảnh chụp thật bằng điện thoại.
+Chỉ thay đổi những phần được yêu cầu như: pose, head pose, camera angle, gaze direction, hand gesture, hairstyle variation, outfit hoặc background nếu “Mục tiêu ảnh” yêu cầu.
+
+Phong cách ảnh:
+Natural smartphone photo, photorealistic, realistic anatomy, realistic hands, natural hair, natural skin texture, real lighting, realistic camera perspective, không chỉnh sửa quá đà.
+
+Negative rule:
+Không làm cô gái thành người khác.
+Không sao chép nguyên phần đầu từ ảnh gốc.
+Không giữ nguyên head pose.
+Không giữ nguyên face angle hoặc hướng nghiêng đầu cũ của ảnh reference.
+Không giữ nguyên hair flow.
+Không giữ nguyên hair parting.
+Không giữ nguyên kiểu tóc gốc nếu mục tiêu yêu cầu tóc khác hoặc nếu đang tạo ảnh mới khác.
+Không đổi outfit nếu mục tiêu không yêu cầu.
+Không đổi loại bối cảnh nếu mục tiêu không yêu cầu.
+Không làm tay lỗi, dư ngón, thiếu ngón, méo bàn tay hoặc bàn tay không tự nhiên.
+Không làm cơ thể sai tỷ lệ.
+Không tự ý thêm trang điểm.
+Không tự ý thêm má hồng.
+Không làm thay đổi màu da gốc.
+Không tạo ảnh giả AI, CGI, anime, tranh vẽ hoặc da quá mịn.
+Không tạo biểu cảm quá lố.
+Không tạo dáng tay phức tạp nếu làm bàn tay dễ bị lỗi.
+
+Quy tắc đặc biệt cho lệnh ngắn:
+Khi người dùng chỉ nhập: “Mục tiêu: Ảnh khác” thì tự động áp dụng toàn bộ Rule nền và Negative rule đã thống nhất.
+Đồng thời tự động tạo một “Mục tiêu ảnh” hoàn chỉnh bằng cách random có kiểm soát các yếu tố sau.
+Chỉ chọn một tổ hợp hợp lý, không dùng tất cả lựa chọn cùng lúc.
+
+Random pose:
+Chọn một trong hai:
+* Dáng đứng thư giãn, tự nhiên, đời thường
+* Dáng ngồi thư giãn, tự nhiên, đời thường
+
+Random hand gesture:
+Chỉ chọn một gesture chính để tránh lỗi tay:
+* Hai tay nắm hờ đặt nhẹ trước ngực
+* Một tay vịn nhẹ vào vai áo hoặc cổ áo
+* Tay thả lỏng tự nhiên dọc theo cơ thể nếu góc chụp rộng
+* Nếu dáng đứng, hai tay chắp nhẹ giấu sau lưng
+* Một ngón trỏ chạm nhẹ vào má hoặc môi dưới
+* Một tay chống cằm nhẹ
+* Hai tay chống cằm nhẹ nếu bố cục phù hợp
+* Một bàn tay che hờ nửa miệng, tạo cảm giác đang cười chúm chím ngượng ngùng
+* Thả tim bằng hai ngón tay, đặt gần má hoặc trước ngực
+* Giơ peace sign nhỏ nhắn, đặt gần mắt hoặc gần má
+* Một tay vén lọn tóc ra sau tai
+* Một tay vuốt nhẹ mái tóc hoặc giữ tóc như có gió thổi nhẹ
+* Một tay xoắn nhẹ đuôi tóc
+
+Random expression:
+Chọn biểu cảm mỉm cười nhẹ, dễ thương, tự nhiên, không quá lố. Có thể là:
+* Cười nhẹ nhìn vào camera
+* Cười chúm chím hơi ngượng
+* Ánh mắt dịu, thần thái nữ tính
+* Biểu cảm dễ thương, tự nhiên như ảnh đời thường
+
+Random head pose và camera angle:
+Chọn một tổ hợp tự nhiên giữa:
+* Đầu nghiêng nhẹ qua trái (phần đầu phải nghiêng rõ ràng sang bên trái của khung hình và cấm nghiêng sang phải nếu ảnh trước nghiêng phải)
+* Đầu nghiêng nhẹ qua phải (phần đầu phải nghiêng rõ ràng sang bên phải của khung hình và cấm nghiêng sang phải nếu ảnh trước nghiêng trái)
+* Nhìn thẳng vào camera
+* Mặt hơi nghiêng 3/4
+* Góc chụp ngang tầm mắt
+* Góc chụp hơi cao nhẹ như ảnh selfie
+* Góc chụp hơi nghiêng nhẹ để khác ảnh gốc
+
+Random hairstyle variation:
+Tạo kiểu tóc khác nhẹ nhưng vẫn tự nhiên so với ảnh gốc. Có thể chọn một kiểu:
+* Tóc vén nhẹ sau một bên tai
+* Tóc rẽ ngôi lệch khác ảnh gốc
+* Tóc đổ nhẹ qua một vai
+* Tóc hất nhẹ ra sau vai
+* Tóc có vài lọn bay nhẹ tự nhiên
+* Tóc half-up nhẹ nhàng
+* Tóc được chỉnh gọn hơn quanh mặt
+
+Điều kiện bắt buộc khi dùng “Mục tiêu: Ảnh khác”:
+Giữ đúng facial identity của ảnh gốc.
+Giữ nguyên outfit nếu người dùng không yêu cầu đổi.
+Giữ nguyên loại bối cảnh nếu người dùng không yêu cầu đổi.
+Giữ nguyên phong cách makeup của ảnh gốc.
+Tuyệt đối không tự bôi thêm má hồng.
+Tạo ảnh mới có pose mới, góc mặt mới, kiểu tóc biến thể mới và cảm giác như được chụp lại thật sự.
+Ảnh cuối phải tự nhiên, rõ nét, chân thật, không giống ảnh AI.

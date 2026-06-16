@@ -131,6 +131,7 @@ RunAsUser(Target, Args := "", WorkingDir := "") {
 }
 
 ; CÁC PHÍM TẮT & HOTSTRING SẼ BỊ VÔ HIỆU HÓA KHI DÙNG LDPLAYER
+
 ::ff::
     SendQuickText("Hi a, A ở đâu vậy a?")
 return
@@ -140,7 +141,7 @@ return
 return
 
 ::ww::
-    SendInput Hi, Where are you from?
+    SendInput Hi, where are you from?
 return
 
 ::www::
@@ -236,7 +237,7 @@ return
 return
 
 ::ee::
-    SendQuickText("Hi A. A ở đâu vậy?")
+    SendQuickText("Hi a, a ở đâu vậy?")
 return
 
 ::oo::
@@ -301,9 +302,20 @@ sleep 100
 return
 
 ^3::
-Sendinput https://github.com/Sxcution/MonAndroid
+Sendinput https://github.com/Sxcution/MonDashboard
 sleep 100
 return
+
+!2::
+    rulesFile := A_ScriptDir . "\MonAHK_rules.txt"
+    if (FileExist(rulesFile)) {
+        FileRead, rulesText, *P65001 %rulesFile%
+        SendQuickText(rulesText)
+    } else {
+        MsgBox, 16, Error, Rules file not found: %rulesFile%
+    }
+return
+
 
 ; English chat seed generator: Ctrl+4 sends one complete, natural message.
 ^4::
