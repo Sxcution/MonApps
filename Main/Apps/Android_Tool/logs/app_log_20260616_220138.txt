@@ -14,3 +14,7 @@
 22:01:38 | INFO | ============================================================
 22:02:37 | INFO | 🔒 UI Locked - Worker running
 22:04:11 | INFO | 🔓 UI Unlocked - Worker finished
+00:00:29 | INFO | 💾 Đã lưu serial: 262bba890d037ece
+00:00:32 | INFO | 💾 Đã lưu serial: 262bba890d037ece
+00:15:16 | INFO | 🔒 UI Locked - Worker running
+00:15:16 | INFO | 🔓 UI Unlocked - Worker finished

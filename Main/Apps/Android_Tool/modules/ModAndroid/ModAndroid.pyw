@@ -385,20 +385,20 @@ class GpsPatcherThread(QThread):
 
         # --- 1) SystemAppOpsHelper: chỉ patch noteOp/ noteOpNoThrow trả boolean ---
         pattern_bool = re.compile(
-            r"(\.method public noteOp(?:NoThrow)?\(.*?\)Z\s*\.registers \d+)(.*?)(\.end method)",
+            r"(\.method public noteOp(?:NoThrow)?\(.*?\)Z\s*)\.(?:registers|locals)\s+\d+(.*?)(\.end method)",
             re.DOTALL
         )
-        replacement_bool = r"\1\n\n    const/4 v0, 0x1\n    return v0\n\n\3"
+        replacement_bool = r"\1.locals 1\n\n    const/4 v0, 0x1\n    return v0\n\n\3"
         patched_content, count_bool = pattern_bool.subn(replacement_bool, patched_content)
 
         # Giữ nguyên checkOpNoThrow(...)Z  -> KHÔNG regex đụng tới
 
         # (tuỳ ROM, nếu có các biến thể trả int I như noteOp(...)I / checkOp(...)I thì ép MODE_ALLOWED=0)
         pattern_int = re.compile(
-            r"(\.method public (?:note|check)(?:Proxy)?Op(?:NoThrow)?\(.*?\)I\s*\.registers \d+)(.*?)(\.end method)",
+            r"(\.method public (?:note|check)(?:Proxy)?Op(?:NoThrow)?\(.*?\)I\s*)\.(?:registers|locals)\s+\d+(.*?)(\.end method)",
             re.DOTALL
         )
-        replacement_int = r"\1\n\n    .locals 1\n    const/4 v0, 0x0\n    return v0\n\n\3"
+        replacement_int = r"\1.locals 1\n\n    const/4 v0, 0x0\n    return v0\n\n\3"
         patched_content, count_int = pattern_int.subn(replacement_int, patched_content)
 
         if count_bool == 0 and count_int == 0:
