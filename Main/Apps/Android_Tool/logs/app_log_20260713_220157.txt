@@ -1,0 +1,26 @@
+22:01:57 | INFO | ============================================================
+22:01:57 | INFO | 🚀 TOOL HUB STARTED
+22:01:57 | INFO | ============================================================
+22:01:58 | INFO | 💾 Config loaded from: c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\config\config.json
+22:01:58 | INFO | 📋 All function logs connected to shared output panel
+22:01:58 | INFO | 📱 Shared log output connected to ModAndroid
+22:01:58 | INFO | ✅ ModAndroid module loaded successfully
+22:01:58 | INFO | ============================================================
+22:01:58 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+22:01:58 | INFO | ============================================================
+22:01:58 | INFO | ✅ Loaded modules (2):
+22:01:58 | INFO |    - 📱 Mod Android
+22:01:58 | INFO |    - 💬 Telegram
+22:01:58 | INFO | ============================================================
+22:02:23 | INFO | 🔒 UI Locked - Worker running
+22:02:23 | INFO | 🔓 UI Unlocked - Worker finished
+22:02:31 | INFO | 🔒 UI Locked - Worker running
+22:03:40 | INFO | 🔓 UI Unlocked - Worker finished
+22:03:51 | INFO | 🔒 UI Locked - Worker running
+22:03:51 | INFO | 🔓 UI Unlocked - Worker finished
+22:03:54 | INFO | 💾 Đã lưu serial: 27f30c41a3217ece
+22:11:58 | INFO | 💾 Đã lưu serial: 27f30c41a3217ece
+01:06:13 | INFO | 💾 Đã lưu serial: 27f30c41a3217ece
+08:52:07 | INFO | 💾 Đã lưu serial: R58N42JX8VH
+08:52:17 | INFO | 💾 Đã lưu serial: R58N22VK5RL
+08:52:22 | INFO | 💾 Đã lưu serial: R58N42JX8VH

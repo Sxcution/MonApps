@@ -2136,7 +2136,8 @@ class MainWindow(QWidget):
             self.adb_comment_log.append(f"{'='*30}\n")
             
             if self.multi_device_worker and self.multi_device_worker.isRunning():
-                self.multi_device_worker.wait()
+                self.adb_comment_log.append("⚠️ Worker trước đang chạy, vui lòng đợi hoàn thành!")
+                return
             
             self.multi_device_worker = MultiDeviceWorker("unlock_twrp", self.multi_device_serials)
             self.multi_device_worker.log_signal.connect(self.adb_comment_log.append)
@@ -2239,7 +2240,8 @@ class MainWindow(QWidget):
             self.adb_comment_log.append(f"{'='*30}\n")
             
             if self.multi_device_worker and self.multi_device_worker.isRunning():
-                self.multi_device_worker.wait()
+                self.adb_comment_log.append("⚠️ Worker trước đang chạy, vui lòng đợi hoàn thành!")
+                return
             
             self.multi_device_worker = MultiDeviceWorker("push_files", self.multi_device_serials, files=[file_to_push])
             self.multi_device_worker.log_signal.connect(self.adb_comment_log.append)
@@ -2378,7 +2380,8 @@ class MainWindow(QWidget):
                 self.adb_comment_log.append(f"{'='*30}\n")
                 
                 if self.multi_device_worker and self.multi_device_worker.isRunning():
-                    self.multi_device_worker.wait()
+                    self.adb_comment_log.append("⚠️ Worker trước đang chạy, vui lòng đợi hoàn thành!")
+                    return
                 
                 self.multi_device_worker = MultiDeviceWorker(
                     "flash_file", 
@@ -2936,7 +2939,8 @@ class MainWindow(QWidget):
             
             # Stop previous worker if running
             if self.multi_device_worker and self.multi_device_worker.isRunning():
-                self.multi_device_worker.wait()
+                self.adb_comment_log.append("⚠️ Worker trước đang chạy, vui lòng đợi hoàn thành!")
+                return
             
             # Create and start worker
             self.multi_device_worker = MultiDeviceWorker("reboot_twrp", self.multi_device_serials)
@@ -2958,7 +2962,8 @@ class MainWindow(QWidget):
             self.adb_comment_log.append(f"{'='*30}\n")
             
             if self.multi_device_worker and self.multi_device_worker.isRunning():
-                self.multi_device_worker.wait()
+                self.adb_comment_log.append("⚠️ Worker trước đang chạy, vui lòng đợi hoàn thành!")
+                return
             
             self.multi_device_worker = MultiDeviceWorker("reboot_bootloader", self.multi_device_serials)
             self.multi_device_worker.log_signal.connect(self.adb_comment_log.append)
@@ -2978,7 +2983,8 @@ class MainWindow(QWidget):
             self.adb_comment_log.append(f"{'='*30}\n")
             
             if self.multi_device_worker and self.multi_device_worker.isRunning():
-                self.multi_device_worker.wait()
+                self.adb_comment_log.append("⚠️ Worker trước đang chạy, vui lòng đợi hoàn thành!")
+                return
             
             self.multi_device_worker = MultiDeviceWorker("reboot_system", self.multi_device_serials)
             self.multi_device_worker.log_signal.connect(self.adb_comment_log.append)
@@ -3433,21 +3439,21 @@ class MainWindow(QWidget):
     def _on_file_import_finished(self, dst_path: str):
         """Callback khi import file hoàn thành"""
         self._file_import_thread.quit()
-        self._file_import_thread.wait()
+        self._file_import_thread.wait(3000)
         self._endBusy()
         self.append(f"✔ Hoàn thành: {dst_path}")
     
     def _on_file_import_error(self, error_msg: str):
         """Callback khi import file lỗi"""
         self._file_import_thread.quit()
-        self._file_import_thread.wait()
+        self._file_import_thread.wait(3000)
         self._endBusy()
         self.append(f"✖ Lỗi: {error_msg}")
     
     def _on_file_import_cancelled(self):
         """Callback khi import file bị hủy"""
         self._file_import_thread.quit()
-        self._file_import_thread.wait()
+        self._file_import_thread.wait(3000)
         self._endBusy()
         self.append("⛔ Đã hủy import file")
 

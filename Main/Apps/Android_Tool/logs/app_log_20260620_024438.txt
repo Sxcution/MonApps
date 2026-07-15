@@ -1,0 +1,15 @@
+02:44:38 | INFO | ============================================================
+02:44:38 | INFO | 🚀 TOOL HUB STARTED
+02:44:38 | INFO | ============================================================
+02:44:39 | INFO | 💾 Config loaded from: c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\config\config.json
+02:44:39 | INFO | 📋 All function logs connected to shared output panel
+02:44:39 | INFO | 📱 Shared log output connected to ModAndroid
+02:44:39 | INFO | ✅ ModAndroid module loaded successfully
+02:44:39 | INFO | ============================================================
+02:44:39 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+02:44:39 | INFO | ============================================================
+02:44:39 | INFO | ✅ Loaded modules (2):
+02:44:39 | INFO |    - 📱 Mod Android
+02:44:39 | INFO |    - 💬 Telegram
+02:44:39 | INFO | ============================================================
+02:44:50 | INFO | 💾 Đã lưu serial: 262bba890d037ece

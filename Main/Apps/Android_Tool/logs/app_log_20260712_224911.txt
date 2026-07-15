@@ -1,0 +1,29 @@
+22:49:11 | INFO | ============================================================
+22:49:11 | INFO | 🚀 TOOL HUB STARTED
+22:49:11 | INFO | ============================================================
+22:49:12 | INFO | 💾 Config loaded from: c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\config\config.json
+22:49:12 | INFO | 📋 All function logs connected to shared output panel
+22:49:12 | INFO | 📱 Shared log output connected to ModAndroid
+22:49:12 | INFO | ✅ ModAndroid module loaded successfully
+22:49:12 | INFO | ============================================================
+22:49:12 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+22:49:12 | INFO | ============================================================
+22:49:12 | INFO | ✅ Loaded modules (2):
+22:49:12 | INFO |    - 📱 Mod Android
+22:49:12 | INFO |    - 💬 Telegram
+22:49:12 | INFO | ============================================================
+22:49:19 | INFO | 💾 Đã lưu serial: 27f30c41a3217ece
+07:45:00 | INFO | 💾 Đã lưu serial: R58N42JX8VH
+11:17:11 | INFO | 💾 Đã lưu serial: R58N42JX8VH
+11:19:10 | INFO | 🔒 UI Locked - Worker running
+11:19:10 | INFO | 🔓 UI Unlocked - Worker finished
+11:19:20 | INFO | 🔒 UI Locked - Worker running
+11:19:20 | INFO | 🔓 UI Unlocked - Worker finished
+11:19:34 | INFO | 🔒 UI Locked - Worker running
+11:21:16 | INFO | 🔓 UI Unlocked - Worker finished
+11:29:33 | INFO | 🔒 UI Locked - Worker running
+11:31:13 | INFO | 🔓 UI Unlocked - Worker finished
+11:31:33 | INFO | 🔒 UI Locked - Worker running
+11:31:33 | INFO | 🔓 UI Unlocked - Worker finished
+11:31:40 | INFO | 🔒 UI Locked - Worker running
+11:31:40 | INFO | 🔓 UI Unlocked - Worker finished

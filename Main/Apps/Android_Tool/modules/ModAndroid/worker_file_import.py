@@ -377,6 +377,9 @@ class AdbCommandWorker(QObject):
                 
                 if success:
                     success_count += 1
+                else:
+                    self.log.emit("❌ Gặp lỗi! Hủy các lệnh tiếp theo.")
+                    break
                 
                 # Update overall progress
                 overall_progress = int(idx * 100 / total_commands)
@@ -395,7 +398,7 @@ class AdbCommandWorker(QObject):
             self.error.emit(f"Lỗi: {repr(e)}")
     
     def _run_shell_command(self, cmd: str) -> bool:
-        """Run adb shell command with timeout"""
+        """Run adb shell command with timeout, cancel support, and clean process tree termination"""
         if not cmd:
             return False
         
@@ -404,20 +407,54 @@ class AdbCommandWorker(QObject):
         
         self.log.emit(f"   $ {full_cmd}")
         
+        import time
+        start_time = time.time()
+        timeout = 180  # 3 minutes timeout
+        
         try:
-            # Use run() with timeout instead of Popen + readline
-            # This avoids blocking on buffered output
-            result = self.subprocess.run(
+            process = self.subprocess.Popen(
                 full_cmd,
                 shell=True,
-                capture_output=True,
-                text=True,
-                timeout=180  # 3 minutes timeout for heavy commands like format
+                stdout=self.subprocess.PIPE,
+                stderr=self.subprocess.STDOUT,
+                text=True
             )
             
+            output_lines = []
+            
+            # Non-blocking poll loop to allow cancellation and timeout checks
+            try:
+                while True:
+                    if self._cancel:
+                        self.log.emit("   ⚠️ Đang hủy lệnh shell...")
+                        self.subprocess.run(f"taskkill /F /T /PID {process.pid}", shell=True, capture_output=True)
+                        return False
+                    
+                    if time.time() - start_time > timeout:
+                        self.log.emit(f"   ❌ Timeout ({timeout} giây)")
+                        self.subprocess.run(f"taskkill /F /T /PID {process.pid}", shell=True, capture_output=True)
+                        return False
+                    
+                    # Check if process is still running
+                    retcode = process.poll()
+                    if retcode is not None:
+                        break
+                    
+                    time.sleep(0.5)
+                
+                # Get all output safely
+                stdout, _ = process.communicate()
+                if stdout:
+                    output_lines.extend(stdout.strip().splitlines())
+                    
+            except Exception as e:
+                # Force kill process tree if an exception occurs
+                self.subprocess.run(f"taskkill /F /T /PID {process.pid}", shell=True, capture_output=True)
+                raise e
+            
             # Output stdout lines
-            output = (result.stdout or "") + (result.stderr or "")
-            for line in output.strip().split('\n'):
+            output = "\n".join(output_lines)
+            for line in output_lines:
                 line = line.strip()
                 if line:
                     self.log.emit(f"   {line}")
@@ -428,16 +465,13 @@ class AdbCommandWorker(QObject):
                 "error", "failed", "unable to", "cannot"
             ])
             
-            if result.returncode == 0 and not has_error:
+            if process.returncode == 0 and not has_error:
                 self.log.emit(f"   ✅ Thành công")
                 return True
             else:
-                self.log.emit(f"   ⚠️ Exit code: {result.returncode}")
-                return result.returncode == 0
+                self.log.emit(f"   ⚠️ Exit code: {process.returncode}")
+                return process.returncode == 0
                 
-        except self.subprocess.TimeoutExpired:
-            self.log.emit(f"   ❌ Timeout (3 phút)")
-            return False
         except Exception as e:
             self.log.emit(f"   ❌ Exception: {e}")
             return False
@@ -476,22 +510,35 @@ class AdbCommandWorker(QObject):
             )
             
             # Read output (adb push shows progress)
+            # Throttle: chỉ emit log khi phần trăm thay đổi, tránh spam UI
+            import re
+            _last_pct = -1
+            
             for line in iter(process.stdout.readline, ''):
                 if self._cancel:
-                    process.terminate()
+                    self.log.emit("   ⚠️ Đang hủy lệnh push...")
+                    self.subprocess.run(f"taskkill /F /T /PID {process.pid}", shell=True, capture_output=True)
                     return False
                 
                 line = line.rstrip()
-                if line:
-                    self.log.emit(f"   {line}")
-                    
-                    # Try to parse progress from adb push output
-                    # Format: "file.zip: 50% (123456/246912)"
-                    import re
-                    match = re.search(r'(\d+)%', line)
-                    if match:
-                        pct = int(match.group(1))
+                if not line:
+                    continue
+                
+                # Parse progress từ adb push output
+                # Format: "file.zip: 50% (123456/246912)"
+                match = re.search(r'(\d+)%', line)
+                if match:
+                    pct = int(match.group(1))
+                    # Chỉ emit khi phần trăm thực sự thay đổi
+                    if pct != _last_pct:
+                        _last_pct = pct
                         self.progress.emit(pct)
+                        # Chỉ log mỗi 10% hoặc khi hoàn thành để tránh flood UI
+                        if pct % 10 == 0 or pct >= 99:
+                            self.log.emit(f"   📤 {pct}%")
+                else:
+                    # Dòng không phải progress → emit bình thường
+                    self.log.emit(f"   {line}")
             
             process.wait()
             

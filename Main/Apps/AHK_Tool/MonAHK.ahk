@@ -29,6 +29,9 @@ GroupAdd, ExcludedGames, ahk_exe df_garena_launcher
 GroupAdd, ExcludedGames, Delta Force
 GroupAdd, ExcludedGames, Garena Delta Force
 GroupAdd, ExcludedGames, ahk_exe dnplayer.exe
+GroupAdd, ExcludedGames, ahk_exe HD-Player.exe
+GroupAdd, ExcludedGames, ahk_exe BlueStacks.exe
+GroupAdd, ExcludedGames, ahk_exe BlueStacksX.exe
 
 ; Chỉ kích hoạt các hotkey/hotstring bên dưới nếu KHÔNG phải là các game trong nhóm ExcludedGames
 #IfWinNotActive, ahk_group ExcludedGames

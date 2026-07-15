@@ -140,3 +140,12 @@
     - **Location:** .agent/rules/
     - **Action:** ALWAYS adhere to the coding standards, patterns, and security guidelines defined in the .agent/rules/ directory.
     - **Priority:** In case of conflict, project-specific rules in this Rule.md take precedence, but ECC rules serve as the primary engineering standard.
+
+## XIII. WORK LOGGING PROTOCOL / QUY TẮC GHI NHẬT KÝ LÀM VIỆC
+
+21. **Mandatory Work Log File (`work_log.md`):**
+    - **Requirement:** Whenever the AI performs coding, development, or research tasks in this project, it MUST maintain a `work_log.md` file at the root of the project.
+    - **Date Grouping:** Group all entries by date (`## YYYY-MM-DD` based on local system time). If today's block exists, append under it directly. Do not duplicate the date heading.
+    - **Timestamped Entries:** Every entry must start with a `HH:MM` timestamp (local time) in the format: `- **HH:MM**: [Description in Vietnamese/bilingual]`.
+    - **Content Requirements:** Record bug discoveries (symptom + root cause), failed attempts (what was tried, why it failed), successful solutions (what worked, why it resolved), and crucial learnings/gotchas to avoid.
+

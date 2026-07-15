@@ -1,0 +1,14 @@
+05:20:49 | INFO | ============================================================
+05:20:49 | INFO | 🚀 TOOL HUB STARTED
+05:20:49 | INFO | ============================================================
+05:20:50 | INFO | 💾 Config loaded from: c:\Users\Mon\Desktop\Protect\Mon Apps\Main\Apps\Android_Tool\modules\ModAndroid\config\config.json
+05:20:50 | INFO | 📋 All function logs connected to shared output panel
+05:20:50 | INFO | 📱 Shared log output connected to ModAndroid
+05:20:50 | INFO | ✅ ModAndroid module loaded successfully
+05:20:50 | INFO | ============================================================
+05:20:50 | INFO | 🚀 TOOL HUB - MODULE MANAGER v1.0
+05:20:50 | INFO | ============================================================
+05:20:50 | INFO | ✅ Loaded modules (2):
+05:20:50 | INFO |    - 📱 Mod Android
+05:20:50 | INFO |    - 💬 Telegram
+05:20:50 | INFO | ============================================================
